@@ -119,7 +119,7 @@ trait CaseStudy {
 
   def prependUnderscore: Term => Term = namesF fmap ("_" + _)
 
-  // val namesF = functor( T => Term { var = Var(T) ; Abs(x = T) } )
+  // val namesF = functor( T => Term { var = Var(T) ; abs = Abs(x = T) } )
 
   // System generates:
 
