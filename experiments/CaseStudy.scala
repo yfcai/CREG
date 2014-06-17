@@ -3,10 +3,9 @@
   * Datatype generic programming with maps and folds,
   * made feasible by nominal functor declarations
   *
-  * Examples in code:
+  * Functors in code that should be generated:
+  *   def termF
   *   val namesF
-  *   val varsF
-  *   val varsTF
   */
 
 
@@ -60,7 +59,7 @@ trait CaseStudy {
   type Term = Fix[TermF[String, String]#λ]
 
   implicit def termF[V, X] = new Functor {
-    type Map[T] = TermF[V, X]#λ[T]
+    type Map[T] = TermT[V, X, T, T, T]
 
     def fmap[A, B]: (A => B) => Map[A] => Map[B] = f => {
       case Void() => Void()
