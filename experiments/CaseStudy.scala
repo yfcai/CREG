@@ -59,7 +59,7 @@ trait CaseStudy {
 
   type Term = Fix[TermF[String, String]#λ]
 
-  implicit def FunctorTermF[V, X] = new Functor {
+  implicit def termF[V, X] = new Functor {
     type Map[T] = TermF[V, X]#λ[T]
 
     def fmap[A, B]: (A => B) => Map[A] => Map[B] = f => {
@@ -99,9 +99,11 @@ trait CaseStudy {
       val myPrecedence = 9
       val leftTolerance = 9 // left associative
       val rightTolerance = 10
-      def paren(s: (String, Int), tolerance: Int): String =
+      def parenthesize(s: (String, Int), tolerance: Int): String =
         if (s._2 >= tolerance) s._1 else s"(${s._1})"
-      (s"${paren(f, leftTolerance)} ${paren(y, rightTolerance)}", myPrecedence)
+      val lhs = parenthesize(f, leftTolerance)
+      val rhs = parenthesize(y, rightTolerance)
+      (s"$lhs $rhs", myPrecedence)
   }
 
   def pretty(t: Term): String = prettyVisitor(t)._1
@@ -113,7 +115,7 @@ trait CaseStudy {
 
   def prependUnderscore: Term => Term = namesF fmap ("_" + _)
 
-  // val namesF = functor( T => Term { Var(T) ; Abs(T, _) } )
+  // val namesF = functor( T => Term { var = Var(T) ; Abs(x = T) } )
 
   // System generates:
 
@@ -141,58 +143,25 @@ trait CaseStudy {
   // User writes:
 
   def freevars(t: Term): Set[String] =
-    // System should infer argument type of the first argument of fmap
-    varsF.fmap( (x: String) => Set(x) )(t).
-      fold[Set[String]] {
-        case Abs(x, body) =>
-          body - x
+    t.fold[Set[String]] {
+      case Var(v) =>
+        Set(v)
 
-        case other =>
-          // System should infer type arguments of gfoldl
-          varsTF.gfoldl[Set[String]](Set.empty, _ ++ _)(other)
-      }
+      case Abs(x, body) =>
+        body - x
 
-  // val varsF  = functor( T => Term { Var(T) } )
-
-  // val varsTF = functor( T => TermF[T] { Var(T) } )
-
-  // System generates:
-
-  val varsF = new Functor {
-    type Map[T] = Fix[TermF[T, String]#λ]
-
-    def fmap[A, B] = f => _.fold[Fix[TermF[B, String]#λ]] {
-      case Void() => Roll[TermF[B, String]#λ](Void())
-      case Var(v) => Roll[TermF[B, String]#λ](Var(f(v))) // f is called
-      case Abs(x, b) => Roll[TermF[B, String]#λ](Abs(x, b))
-      case App(g, y) => Roll[TermF[B, String]#λ](App(g, y))
+      case other =>
+        // System should infer type arguments of gfoldl
+        // and keep [String, String] as the default type arguments of termF
+        termF[String, String].gfoldl[Set[String]](Set.empty, _ ++ _)(other)
     }
 
-    def gfoldl[A](nil: A, combine: (A, A) => A) = _.fold[A] {
-      case Void() => nil
-      case Var(v) => v
-      case Abs(x, b) => b
-      case App(g, y) => combine(g, y)
-    }
-  }
 
-  val varsTF = new Functor {
-    type Map[T] = TermF[T, String]#λ[T]
+  // [PENDING] USAGE: CAPTURE-AVOIDING SUBSTITUTION
 
-    def fmap[A, B] = f => {
-      case Void() => Void()
-      case Var(v) => Var(f(v))
-      case Abs(x, b) => Abs(x, f(b))
-      case App(g, y) => App(f(g), f(y))
-    }
-
-    def gfoldl[A](nil: A, combine: (A, A) => A) = {
-      case Void() => nil
-      case Var(v) => v
-      case Abs(x, b) => b
-      case App(g, y) => combine(g, y)
-    }
-  }
+  // Need a more granular template functor TermT.
+  // Right now, types are adjustable at sum-of-product level.
+  // For capture-avoiding substitution, need mobility at sum level.
 }
 
 object CaseStudyApp extends CaseStudy with App {
@@ -217,8 +186,8 @@ object CaseStudyApp extends CaseStudy with App {
   val f_xy: Term = Roll[TF](Abs("x",
     Roll[TF](App(Roll[TF](Var("f")), Roll[TF](App(Roll[TF](Var("x")), Roll[TF](Var("y"))))))))
 
-  // \x -> (f x) y
-  val fx_y: Term = Roll[TF](Abs("x",
+  // \y -> (f x) y
+  val fx_y: Term = Roll[TF](Abs("y",
     Roll[TF](App(Roll[TF](App(Roll[TF](Var("f")), Roll[TF](Var("x")))), Roll[TF](Var("y"))))))
 
   def put (name: String, obj : Any ) = println(s"$name = $obj")
