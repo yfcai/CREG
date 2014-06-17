@@ -3,7 +3,10 @@
   * Datatype generic programming with maps and folds,
   * made feasible by nominal functor declarations
   *
-  * Examples: search for "val namesF"
+  * Examples in code:
+  *   val namesF
+  *   val varsF
+  *   val varsTF
   */
 
 
@@ -149,9 +152,9 @@ trait CaseStudy {
           varsTF.gfoldl[Set[String]](Set.empty, _ ++ _)(other)
       }
 
-  // val varsF = functor( T => Term { Var(T) } )
+  // val varsF  = functor( T => Term { Var(T) } )
 
-  // val varsTF = functor( T => TermF[T] { Var(T) }
+  // val varsTF = functor( T => TermF[T] { Var(T) } )
 
   // System generates:
 
