@@ -3,6 +3,11 @@
   * Datatype generic programming with maps and folds,
   * made feasible by nominal functor declarations
   *
+  * Usage examples:
+  *   - prepend "_" to all variable names
+  *   - compute free variables
+  *   - [pending] capture-avoiding substitution
+  *
   * Functors in code that should be generated:
   *   def termF
   *   val namesF
