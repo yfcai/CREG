@@ -26,6 +26,9 @@
   *
   *   - implicit macro tests equivalence of equirecursive
   *     types to know where to insert safe casts/conversions
+  *
+  *   - inline `fold` with a def macro to avoid covariance
+  *     problem
   */
 
 
