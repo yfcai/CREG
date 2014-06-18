@@ -42,7 +42,8 @@ trait CaseStudy {
 
    datatype Term {
      Void()
-     Abs(x: String, body: Term)
+     Var(String)
+     Abs(param: String, body: Term)
      App(Term, Term)
    }
 
@@ -58,9 +59,9 @@ trait CaseStudy {
   sealed trait Void extends TermT[Void, ⊥, ⊥, ⊥] // ill-founded inheritance
   // case classes/objects should be final. For now they ain't, due to SI-4440.
   case object Void extends Void
-  case class Var[+T](name: T) extends TermT[⊥, Var[T], ⊥, ⊥]
+  case class Var[+T1](_1: T1) extends TermT[⊥, Var[T1], ⊥, ⊥]
   case class Abs[+Param, +Body](param: Param, body: Body) extends TermT[⊥, ⊥, Abs[Param, Body], ⊥]
-  case class App[+Fun, +Arg](fun: Fun, arg: Arg) extends TermT[⊥, ⊥, ⊥, App[Fun, Arg]]
+  case class App[+T1, +T2](_1: T1, _2: T2) extends TermT[⊥, ⊥, ⊥, App[T1, T2]]
 
   def dontcare = sys error "don't care"
 
