@@ -265,39 +265,6 @@ trait CaseStudy {
         Roll[TermF](other) // System should roll automatically
     }
 
-  // alternative: substitution by mapping over Var
-  def subst2(x: String, xsub: Term, t: Term): Term = {
-
-    // step 1: replace String inside Var by needed Term
-    val replaced = varF.map[String, Term](
-      y => if (x == y) xsub else y
-    )(
-      // System should infer this cast
-      avoidCapture(freevars(xsub) + x, Map.empty, t).asInstanceOf[varF.Map[String]]
-    )
-
-    // step 2: remove extraneous Var constructors
-    import language.reflectiveCalls // for varF.patternFunctor
-
-    type F[V] = { type λ[+T] = TermT[Void, Var[V], Abs[String, T], App[T, T]] }
-
-    new Foldable[F[Term]#λ](replaced).fold[Term]({
-      case Var(t) =>
-        t
-
-      case other =>
-        Roll[TermF](other.asInstanceOf[TermF[Term]])
-    })(varF.patternFunctor)
-
-    // It is tempting to use
-    //
-    //   functor( V => Term { Var = V } )
-    //
-    // to do the two steps at the same time. However, the intended
-    // input morphism has type (Var => Term), and TermT[_, Term, _, _]
-    // is not an object in our category.
-  }
-
   // val avoidF = bifunctor( (V, A) => Term { Var = Var(V), Abs = A } )
 
   // val varF = functor( N => Term { Var(N) } )
@@ -415,8 +382,6 @@ object CaseStudyApp extends CaseStudy with App {
       ).foreach {
         case (y, ysub) =>
           val s1 = subst(y, ysub, term)
-          val s2 = subst2(y, ysub, term)
-          assert(s1 == s2)
           show(s"subst($y, ${pretty{ysub}}, $name)", s1)
       }
       println()
