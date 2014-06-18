@@ -6,7 +6,7 @@
   * Usage examples:
   *   - prepend "_" to all variable names
   *   - compute free variables
-  *   - [pending] capture-avoiding substitution
+  *   - capture-avoiding substitution
   *
   * Functors in code that should be generated:
   *   def termF
@@ -14,7 +14,7 @@
   */
 
 
-import language.higherKinds
+import language.{higherKinds, implicitConversions}
 
 trait CaseStudy {
 
@@ -41,7 +41,7 @@ trait CaseStudy {
   trait Functor {
     type Map[T]
 
-    def fmap[A, B]: (A => B) => Map[A] => Map[B]
+    def map[A, B]: (A => B) => Map[A] => Map[B]
 
     def gfoldl[A](default: A, combine: (A, A) => A): Map[A] => A
   }
@@ -52,21 +52,28 @@ trait CaseStudy {
     def unroll: F[Fix[F]]
 
     def fold[T](f: F[T] => T)(implicit functor: FunctorOf[F]): T =
-      f(functor.fmap[Fix[F], T](_.fold(f))(unroll))
+      f(functor.map[Fix[F], T](_.fold(f))(unroll))
   }
 
   case class Roll[F[_]](unroll: F[Fix[F]]) extends Fix[F]
-
+/*
   type TermF[V, X] = {
     type λ[T] = TermT[V, X, T, T, T]
   }
 
   type Term = Fix[TermF[String, String]#λ]
 
+  // Eventually there will be constructor/destructor objects Void, Var, Abs, App.
+  // For now, we use smart constructors.
+  def void(): Term = Roll[TermF[String, String]#λ](Void())
+  implicit def _var(x: String): Term = Roll[TermF[String, String]#λ](Var(x))
+  def abs(x: String, body: Term): Term = Roll[TermF[String, String]#λ](Abs(x, body))
+  def app(f: Term, y: Term): Term = Roll[TermF[String, String]#λ](App(f, y))
+
   implicit def termF[V, X] = new Functor {
     type Map[T] = TermT[V, X, T, T, T]
 
-    def fmap[A, B]: (A => B) => Map[A] => Map[B] = f => {
+    def map[A, B]: (A => B) => Map[A] => Map[B] = f => {
       case Void() => Void()
       case Var(v) => Var(v)
       case Abs(x, t) => Abs(x, f(t))
@@ -80,8 +87,6 @@ trait CaseStudy {
       case App(t1, t2) => combine(t1, t2)
     }
   }
-
-  type TermQ[R] = TermT[R, R, R, R, R]
 
 
   // USAGE: PRETTY PRINTING VISITOR
@@ -117,16 +122,16 @@ trait CaseStudy {
 
   // User writes:
 
-  def prependUnderscore: Term => Term = namesF fmap ("_" + _)
+  def prependUnderscore: Term => Term = namesF map ("_" + _)
 
-  // val namesF = functor( T => Term { var = Var(T) ; abs = Abs(x = T) } )
+  // val namesF = functor( T => Term { Var(T) ; Abs(x = T) } )
 
   // System generates:
 
   val namesF = new Functor {
     type Map[T] = Fix[TermF[T, T]#λ]
 
-    def fmap[A, B] = f => _.fold[Fix[TermF[B, B]#λ]] {
+    def map[A, B] = f => _.fold[Fix[TermF[B, B]#λ]] {
       case Void() => Roll[TermF[B, B]#λ](Void())
       case Var(v) => Roll[TermF[B, B]#λ](Var(f(v))) // f is called
       case Abs(x, b) => Roll[TermF[B, B]#λ](Abs(f(x), b)) // f is called
@@ -161,38 +166,37 @@ trait CaseStudy {
     }
 
 
-  // [PENDING] USAGE: CAPTURE-AVOIDING SUBSTITUTION
+  // USAGE: CAPTURE-AVOIDING SUBSTITUTION
 
-  // Need a more granular template functor TermT.
-  // Right now, types are adjustable at sum-of-product level.
-  // For capture-avoiding substitution, need mobility at sum level.
+  // User writes:
+
+  // val substF = bifunctor( (V, A) => Term { Var = Var(V), Abs = A } )
+
+  // System generates:
+
+  trait Bifunctor {
+    type Bimap[A, B]
+
+    def bimap[A, B, C, D](f: A => C, g: B => D): Bimap[A, B] => Bimap[C, D]
+  }
+
+  val substF = new Bifunctor {
+    type Bimap[A, B] = ???
+  }
 }
 
 object CaseStudyApp extends CaseStudy with App {
-  // it's pretty annoying to write terms right now.
-  // Björn's macro contains something to make it less annoying.
-  // Under that technique, one would write
-  //
-  // val id = Abs("x", Var("x"))
-  // val idy = App(id, Var("y"))
-  // val f_xy = Abs("x", App(Var("f"), App(Var("x"), Var("y"))))
-  // val fx_y = Abs("x", App(App(Var("f"), Var("x")), Var("y")))
-
-  type TF[X] = TermF[String, String]#λ[X]
-
   // \x -> x
-  val id: Term = Roll[TF](Abs("x", Roll[TF](Var("x"))))
+  val id = abs("x", "x")
 
   // (\x -> x) y
-  val idy: Term = Roll[TF](App(id, Roll[TF](Var("y"))))
+  val idy = app(id, "y")
 
   // \x -> f (x y)
-  val f_xy: Term = Roll[TF](Abs("x",
-    Roll[TF](App(Roll[TF](Var("f")), Roll[TF](App(Roll[TF](Var("x")), Roll[TF](Var("y"))))))))
+  val f_xy = abs("x", app("f", app("x", "y")))
 
   // \y -> (f x) y
-  val fx_y: Term = Roll[TF](Abs("y",
-    Roll[TF](App(Roll[TF](App(Roll[TF](Var("f")), Roll[TF](Var("x")))), Roll[TF](Var("y"))))))
+  val fx_y = abs("y", app(app("f", "x"), "y"))
 
   def put (name: String, obj : Any ) = println(s"$name = $obj")
   def show(name: String, term: Term) = put(name, pretty(term))
@@ -204,4 +208,5 @@ object CaseStudyApp extends CaseStudy with App {
       show(s"prependUnderscore($name)", prependUnderscore(term))
       println()
   }
+ */
 }
