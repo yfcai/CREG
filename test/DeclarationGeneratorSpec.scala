@@ -12,16 +12,16 @@ class DeclarationGeneratorSpec extends FlatSpec {
 
   it should "generate a case object for variant without arguments" in {
     @caseObject trait Variant { Singleton }
-    val x: VariantT[Singleton] = Singleton
-    x match {
+    val singleton: VariantT[Singleton] = Singleton
+    singleton match {
       case Singleton => info("success")
     }
   }
 
   it should "generate multiple variants without arguments" in {
     @fourCaseObjects trait Horsemen { Conquest ; War ; Famine ; Death }
-    val x: HorsemenT[Conquest, War, Famine, Death] = War
-    x match {
+    val war: HorsemenT[Conquest, War, Famine, Death] = War
+    war match {
       case Conquest => fail("War is not Conquest")
       case War      => info("War. War never changes.")
       case Famine   => fail("War is not Famine.")
