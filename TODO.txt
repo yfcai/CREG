@@ -1,0 +1,8 @@
+T1. representation of datatypes (named sum, named product, fixed point)
+T2. representation of n-hole contexts of datatypes
+T3. from scala types to representation of datatypes (macro)
+T4. from representation of datatypes to scala types (macro)
+T5. from n-hole contexts of datatypes to n-nary functors (macro)
+T6. from scala expressions to datatypes (macro / parser-metaphor)
+T7. from scala closures to n-hole contexts (macro / parser-metaphor)
+T8. subtyping equirecursion of datatypes (implicit macro)
