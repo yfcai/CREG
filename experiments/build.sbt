@@ -1,5 +1,7 @@
-scalaVersion := "2.11.0"
+val sversion = "2.11.0"
+
+scalaVersion := sversion
 
 scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint")
 
-libraryDependencies += "cglib" % "cglib" % "3.1"
+libraryDependencies += "org.scala-lang" % "scala-reflect" % sversion
