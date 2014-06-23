@@ -10,6 +10,7 @@ lazy val macro = project in file("macro") settings (
   scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
   libraryDependencies ++= List(
     "org.scala-lang" % "scala-reflect" % sversion,
+    //"org.scala-lang" % "scala-compiler" % sversion, // uncomment this for scala.tools.reflect.ToolBox
     compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
   )
 )
