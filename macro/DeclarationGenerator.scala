@@ -3,6 +3,11 @@ import scala.reflect.macros.blackbox.Context
 trait DeclarationGenerator extends DatatypeRepresentation {
   /** @param datatype Representation of data type
     * @return AST of generated traits and case classes
+    *
+    * Caution: Classes involved in datatypes must *all* be uninheritable.
+    * If this is the case, then we can make the fixed point type covariant
+    * without sacrificing the functor instance inside Fix[+F[+_]], which
+    * is necessary to obtain covariance in something like List[+A].
     */
   def generateDeclaration(c: Context)(datatype: Variant): c.Tree = {
     import c.universe._
