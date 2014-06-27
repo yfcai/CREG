@@ -80,7 +80,7 @@ object DeclarationGenerator {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
 
-    def err(msg: String): Nothing = { System.err println msg ; sys error "got error" }
+    private[this] def err(msg: String): Nothing = { System.err println msg ; sys error "got error" }
 
     def assertEqual(c: Context)(expected: c.Tree, actual: c.Tree): c.Expr[Any] = {
       import c.universe._
