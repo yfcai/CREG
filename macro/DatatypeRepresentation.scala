@@ -13,12 +13,18 @@ object DatatypeRepresentation {
     def holes: Set[Name]
   }
 
-  case class Scala(get: reflect.runtime.universe.Type) extends Datatype {
+  // scala type, or, free type variable
+  case class Scala(get: Name) extends ScalaOrHole {
     def sane: Boolean = true
     def holes = Set.empty
   }
 
-  case class Record(name: Name, fields: Many[Field]) extends RecordOrHole {
+  // hole, or, bound type variable
+  case class Hole(name: Name) extends RecordOrHole {
+    def holes: Set[Name] = Set(name)
+  }
+
+  case class Record(name: Name, fields: Many[Field]) extends RecordOrHole with ScalaOrHole {
     def holes: Set[Name] = fields.foldLeft(Set.empty[Name])(_ ++ _.holes)
   }
 
@@ -30,8 +36,8 @@ object DatatypeRepresentation {
     def holes: Set[Name] = cons.body.holes -- cons.params
   }
 
-  case class Hole(name: Name) extends RecordOrHole {
-    def holes: Set[Name] = Set(name)
+  case class TypeApplication(operator: ScalaOrHole, operands: Many[Datatype]) extends Datatype {
+    def holes: Set[Name] = operands.foldLeft(Set.empty[Name])(_ ++ _.holes)
   }
 
 
@@ -41,6 +47,8 @@ object DatatypeRepresentation {
   trait RecordOrHole extends Datatype {
     def name: Name
   }
+
+  trait ScalaOrHole extends Datatype
 
   case class Field(name: Name, get: Datatype) {
     def holes: Set[Name] = get.holes

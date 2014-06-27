@@ -16,7 +16,7 @@ trait DeclarationGenerator {
 
     val DataConstructor(params, datatype: Variant) = dataConstructor
 
-    val template = mkTemplate(c)(datatype.name)
+    val template = TypeName(datatype.name)
 
     if (datatype.cases.isEmpty)
       q"sealed trait $template"
@@ -29,9 +29,6 @@ trait DeclarationGenerator {
       """
     }
   }
-
-  /** create the name of the template trait by appending T */
-  def mkTemplate(c: Context)(name: Name): c.TypeName = c.universe.TypeName(name + "T")
 
   /** @param cases a bunch of named variants
     * @return their names as TypeName
@@ -68,6 +65,9 @@ trait DeclarationGenerator {
         Many(
           q"sealed trait $typeName extends $template[..$allParams]",
           q"case object $termName extends $typeName")
+
+      case _ =>
+        Many.empty // stub: if cases have arguments, then don't generate anything for now
     }
   }
 
@@ -111,7 +111,7 @@ object DeclarationGenerator {
         val actual = generateDeclaration(c)(
           DataConstructor(Many.empty, Variant(name.toString, Many.empty))
         )
-        val expected = q"sealed trait ${TypeName(name.toString + "T")}"
+        val expected = q"sealed trait $name"
         assertEqual(c)(expected, actual)
       }
     }
@@ -129,7 +129,7 @@ object DeclarationGenerator {
             ))
           )
         )
-        val template = TypeName(variant.toString + "T")
+        val template = TypeName(variant.toString)
         val singleton = TermName(singletonBody.toString)
         val singletonType = TypeName(singleton.toString)
         val expected = q"""
@@ -157,7 +157,7 @@ object DeclarationGenerator {
             ))
           )
         )
-        val template = TypeName(variant.toString + "T")
+        val template = TypeName(variant.toString)
         val c1 = TypeName(case1.toString)
         val c2 = TypeName(case2.toString)
         val c3 = TypeName(case3.toString)
@@ -197,7 +197,7 @@ object DeclarationGenerator {
           )
         )
 
-        val template = TypeName(variant.toString + "T")
+        val template = TypeName(variant.toString)
         val p1 = TypeName(param1.toString)
         val p2 = TypeName(param2.toString)
         val p3 = TypeName(param3.toString)
@@ -217,6 +217,60 @@ object DeclarationGenerator {
           case object ${TermName(c4.toString)} extends $c4
         """
         assertEqual(c)(expected, actual)
+      }
+    }
+
+    class caseClasses extends StaticAnnotation {
+      def macroTransform(annottees: Any*): Any = macro caseClasses.impl
+    }
+    object caseClasses {
+      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+        import c.universe._
+
+        val q"""
+          trait HorsemenT[+Of, +The, +Apocalypse] {
+            Conquest(Of, Int)
+            War(The, Boolean)
+            Famine(List[Apocalypse])
+            Death
+          }""" = annottees.head.tree
+
+        val actual = generateDeclaration(c)(
+          DataConstructor(
+            Many("Of", "The", "Apocalypse"),
+            Variant("HorsemenT", Many(
+              Record("Conquest", Many(Field("_1", Hole("Of" )), Field("_2", Scala("Int")))),
+              Record("War"     , Many(Field("_1", Hole("The")), Field("_2", Scala("Boolean")))),
+              Record("Famine"  , Many(Field("_1", TypeApplication(Scala("List"), Many(Hole("Apocalypse")))))),
+              Record("Death"   , Many.empty)
+            ))
+          )
+        )
+
+        /*
+        val template = TypeName(variant.toString)
+        val p1 = TypeName(param1.toString)
+        val p2 = TypeName(param2.toString)
+        val p3 = TypeName(param3.toString)
+        val c1 = TypeName(case1.toString)
+        val c2 = TypeName(case2.toString)
+        val c3 = TypeName(case3.toString)
+        val c4 = TypeName(case4.toString)
+        val expected = q"""
+          sealed trait $template[+$p1, +$p2, +$p3, +$c1, +$c2, +$c3, +$c4]
+          sealed trait $c1 extends $template[Nothing, Nothing, Nothing, $c1, Nothing, Nothing, Nothing]
+          case object ${TermName(c1.toString)} extends $c1
+          sealed trait $c2 extends $template[Nothing, Nothing, Nothing, Nothing, $c2, Nothing, Nothing]
+          case object ${TermName(c2.toString)} extends $c2
+          sealed trait $c3 extends $template[Nothing, Nothing, Nothing, Nothing, Nothing, $c3, Nothing]
+          case object ${TermName(c3.toString)} extends $c3
+          sealed trait $c4 extends $template[Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, $c4]
+          case object ${TermName(c4.toString)} extends $c4
+        """
+        assertEqual(c)(expected, actual)
+
+         */
+        c.Expr(q"") // stub
       }
     }
   }
