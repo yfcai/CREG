@@ -36,10 +36,6 @@ object DatatypeRepresentation {
     def holes: Set[Name] = cons.body.holes -- cons.params
   }
 
-  case class TypeApplication(operator: ScalaOrHole, operands: Many[Datatype]) extends Datatype {
-    def holes: Set[Name] = operands.foldLeft(Set.empty[Name])(_ ++ _.holes)
-  }
-
 
   // datatype representation helpers
   case class DataConstructor(params: Many[Name], body: Datatype)

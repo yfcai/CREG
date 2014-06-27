@@ -43,8 +43,8 @@ class DeclarationGeneratorSpec extends FlatSpec {
   it should "generate case class for variant with arguments" in {
     @caseClasses trait HorsemenT[+Of, +The, +Apocalypse] {
       Conquest(Of, Int)
-      War(The, Boolean)
-      Famine(List[Apocalypse])
+      War(The, Apocalypse)
+      Famine(Boolean)
       Death
     }
   }

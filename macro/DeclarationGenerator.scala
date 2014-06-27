@@ -230,8 +230,8 @@ object DeclarationGenerator {
         val q"""
           trait HorsemenT[+Of, +The, +Apocalypse] {
             Conquest(Of, Int)
-            War(The, Boolean)
-            Famine(List[Apocalypse])
+            War(The, Apocalypse)
+            Famine(Boolean)
             Death
           }""" = annottees.head.tree
 
@@ -240,8 +240,8 @@ object DeclarationGenerator {
             Many("Of", "The", "Apocalypse"),
             Variant("HorsemenT", Many(
               Record("Conquest", Many(Field("_1", Hole("Of" )), Field("_2", Scala("Int")))),
-              Record("War"     , Many(Field("_1", Hole("The")), Field("_2", Scala("Boolean")))),
-              Record("Famine"  , Many(Field("_1", TypeApplication(Scala("List"), Many(Hole("Apocalypse")))))),
+              Record("War"     , Many(Field("_1", Hole("The")), Field("_2", Hole("Apocalypse")))),
+              Record("Famine"  , Many(Field("_1", Scala("Boolean")))),
               Record("Death"   , Many.empty)
             ))
           )
