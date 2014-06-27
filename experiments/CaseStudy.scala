@@ -285,7 +285,16 @@ trait CaseStudy {
         else
           Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
       }
-        // System should infer these casts, they are safe up to erasure.
+        // System should infer these casts, they are safe up to erasure:
+        //
+        //   Term               = μ T. TermT[Void, Var[String], Abs[String, T], App[T, T]]
+        //
+        //   avoidF.Bimap[V, A] = μ T. TermT[Void, Var[V],      A,              App[T, T]]
+        //
+        // Thus,
+        //
+        //   Term == avoidF.Bimap[String, Abs[String, Term]].
+        //
     )(t.asInstanceOf[avoidF.Bimap[String, Abs[String, Term]]]).asInstanceOf[Term]
 
   // capture-avoiding substitution
