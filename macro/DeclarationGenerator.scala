@@ -1,6 +1,8 @@
 import scala.reflect.macros.blackbox.Context
 
-trait DeclarationGenerator extends DatatypeRepresentation {
+import DatatypeRepresentation._
+
+trait DeclarationGenerator {
   /** @param datatype Representation of data type
     * @return AST of generated traits and case classes
     *

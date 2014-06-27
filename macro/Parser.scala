@@ -1,6 +1,8 @@
 import scala.reflect.macros.blackbox.Context
 
-trait Parser extends DatatypeRepresentation {
+import DatatypeRepresentation._
+
+trait Parser {
     /** @param datatypeDecl
       */
   def parse(c: Context)(datatypeDecl: c.Tree): Variant = {

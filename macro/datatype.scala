@@ -2,6 +2,8 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.annotation.StaticAnnotation
 
+import DatatypeRepresentation._
+
 object datatype extends Parser with DeclarationGenerator {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._

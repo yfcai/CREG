@@ -1,4 +1,4 @@
-trait DatatypeRepresentation {
+object DatatypeRepresentation {
   // name of records, variants, fields
   type Name = String
 
