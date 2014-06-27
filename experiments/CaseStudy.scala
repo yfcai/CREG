@@ -2,7 +2,7 @@
   *
   * Datatype generic programming with maps and folds,
   * made feasible by nominal functor declarations
-  * and equirecursive datatypes
+  * and pseudo-equirecursive datatypes
   *
   * Usage examples:
   *
@@ -293,7 +293,7 @@ trait CaseStudy {
         //
         // Thus,
         //
-        //   Term == avoidF.Bimap[String, Abs[String, Term]].
+        //   Term === avoidF.Bimap[String, Abs[String, Term]].
         //
     )(t.asInstanceOf[avoidF.Bimap[String, Abs[String, Term]]]).asInstanceOf[Term]
 
