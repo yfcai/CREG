@@ -9,7 +9,7 @@ object datatype extends Parser with DeclarationGenerator {
     import c.universe._
 
     val datatypeDecl: Tree = annottees.head.tree
-    val datatype: Variant = parse(c)(datatypeDecl)
+    val datatype: DataConstructor = parse(c)(datatypeDecl)
     val declaration: Tree = generateDeclaration(c)(datatype)
 
     c.Expr[Any](declaration) // TODO: generate functor instances too

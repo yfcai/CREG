@@ -28,4 +28,15 @@ class DeclarationGeneratorSpec extends FlatSpec {
       case Death    => fail("War is not Death")
     }
   }
+
+  it should "permit extra covariant type parameters" in {
+    @genericCaseObjects trait Horsemen[+Of, +The, +Apocalypse] { Conquest ; War ; Famine ; Death }
+    val war: HorsemenT[Int, Boolean, String, Conquest, War, Famine, Death] = War
+    war match {
+      case Conquest => fail("War is not Conquest")
+      case War      => info("War. War never changes.")
+      case Famine   => fail("War is not Famine.")
+      case Death    => fail("War is not Death")
+    }
+  }
 }

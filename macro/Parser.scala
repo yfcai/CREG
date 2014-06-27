@@ -5,7 +5,7 @@ import DatatypeRepresentation._
 trait Parser {
     /** @param datatypeDecl
       */
-  def parse(c: Context)(datatypeDecl: c.Tree): Variant = {
+  def parse(c: Context)(datatypeDecl: c.Tree): DataConstructor = {
     import c.universe._
     datatypeDecl match {
       case q"trait $name [..$typeParams] { ..$body }" =>
@@ -14,7 +14,7 @@ trait Parser {
         // TODO: parse the expression
 
         // dummy output to test generation
-        Variant("Empty", Many.empty)
+        DataConstructor(Many.empty, Variant("Empty", Many.empty))
 
       case _ =>
         sys error "incorrect usage"
