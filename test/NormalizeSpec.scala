@@ -27,9 +27,18 @@ class NormalizeSpec extends FlatSpec {
     info(actual)
   }
 
-  it should "normalize abstract synonyms to a form usable in new definitions" is (pending) /* {
+  /** Try to normalize types with free type variables
+    *
+    * Ignored because we may never encounter free type variables.
+    * For generic functors, users should write e. g.
+    *
+    *   def listF[A] = functor { L => List { Cons(A, L) } }
+    *
+    * where the type name A is bound in RHS.
+    */
+  ignore should "normalize abstract synonyms to a form usable in new definitions" in {
     @normalize type normalized[X] = Trial[X]
     // does not compile yet...
-    val x: normalized.InnerType[String] = Map.empty[Int, String]
-  } */
+    // val x: normalized.InnerType[String] = Map.empty[Int, String]
+  }
 }
