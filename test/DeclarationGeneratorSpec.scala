@@ -19,8 +19,8 @@ class DeclarationGeneratorSpec extends FlatSpec {
   }
 
   it should "generate multiple variants without arguments" in {
-    @fourCaseObjects trait HorsemenT { Conquest ; War ; Famine ; Death }
-    val war: HorsemenT[Conquest, War, Famine, Death] = War
+    @fourCaseObjects trait HorsemanT { Conquest ; War ; Famine ; Death }
+    val war: HorsemanT[Conquest, War, Famine, Death] = War
     war match {
       case Conquest => fail("War is not Conquest")
       case War      => info("War. War never changes.")
@@ -29,11 +29,33 @@ class DeclarationGeneratorSpec extends FlatSpec {
     }
   }
 
-  it should "generate case class for variant with arguments" in (pending) /* {
-    @caseClasses trait HorsemenT[+Of, +The, +Apocalypse] {
-      Conquest(Of, Int)
-      War(The, Apocalypse)
-      Famine(Boolean)
+  it should "generate case classes for variants with flat arguments" in {
+    @flatCaseClasses trait HorsemanT {
+      Conquest(A, A, A)
+      War(A, A, B)
+      Famine(B)
+      Death
+    }
+
+    type Horseman = HorsemanT[Conquest[Int, Int, Int], War[Int, Int, Boolean], Famine[Boolean], Death]
+    val war: Horseman = War(3, 5, true)
+
+    val eight: Int = war match {
+      case Conquest(a, b, c) => a + b + c
+      case War(a, b, c) => if (c) a + b else a - b
+      case Famine(c) => if (c) 1 else 2
+      case Death => 0
+    }
+
+    assert(eight == 8)
+    info(s"3 + 5 = $eight")
+  }
+
+  it should "generate case classes for variants with nested arguments" in (pending) /* {
+    @nestedCaseClasses trait HorsemanT {
+      Conquest( Cities { Rome ; Carthage } )
+      War ( WorldWars { I(A) ; II(A, B) } )
+      Famine( B )
       Death
     }
   } */

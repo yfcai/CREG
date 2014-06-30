@@ -49,8 +49,30 @@ trait DeclarationGenerator extends UniverseConstruction {
         Many(
           q"sealed trait $typeName extends $template[..$params]",
           q"case object $termName extends $typeName")
+
+      case (Record(name, fields), i) =>
+        // records are wholely free
+        val typeName = TypeName(name)
+        val fieldNames = fields.map(_.name)
+        val caseParams = covariantTypeParams(c)(fieldNames)
+        val q"??? : $myType" = q"??? : $typeName[..${fieldNames.map(name => TypeName(name))}]"
+        val templateParams = appliedParamsWithNothing(c)(myType, i, cases.size)
+        val decls = generateFreeDecls(c)(fieldNames)
+        Many(q"sealed case class $typeName[..$caseParams](..$decls) extends $template[..$templateParams]")
+        // TODO: RECURSE
     }
   }
+
+  /** @param fieldNames names of fields _i to put in the form of _i: _i
+    */
+  def generateFreeDecls(c: Context)(fieldNames: Many[Name]): Many[c.Tree] =
+    fieldNames.map {
+      case name =>
+        import c.universe._
+        val q"case class __case_class__($decl)" =
+          q"case class __case_class__(${TermName(name)}: ${TypeName(name)})"
+        decl
+    }
 
   /** @param param type name at position `index`
     * @param index index of `tpe`
@@ -59,6 +81,16 @@ trait DeclarationGenerator extends UniverseConstruction {
   def namedParamsWithNothing(c: Context)(param: c.TypeName, index: Int, size: Int): Many[c.TypeName] = {
     import c.universe._
     val nothing = TypeName("Nothing")
+    Many.tabulate(size)(i => if (i == index) param else nothing)
+  }
+
+  /** @param param applied type at position `index`
+    * @param index index of `tpe`
+    * @param size  size of whole param list
+    */
+  def appliedParamsWithNothing(c: Context)(param: c.Tree, index: Int, size: Int): Many[c.Tree] = {
+    import c.universe._
+    val nothing = Ident(TypeName("Nothing"))
     Many.tabulate(size)(i => if (i == index) param else nothing)
   }
 }
@@ -136,5 +168,50 @@ object DeclarationGenerator {
         assertEqual(c)(expected, actual)
       }
     }
-  }
-}
+
+    class flatCaseClasses extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro flatCaseClasses.impl }
+    object flatCaseClasses {
+      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+        import c.universe._
+
+        val q"""
+          trait HorsemanT {
+             Conquest(A, A, A)
+             War(A, A, B)
+             Famine(B)
+             Death
+          }""" = annottees.head.tree
+
+        val actual = generateDeclaration(c)(
+          Variant("HorsemanT", Many(
+            Record("Conquest", Many(
+              Field("_1", Scala("A")),
+              Field("_2", Scala("A")),
+              Field("_3", Scala("A")))),
+            Record("War", Many(
+              Field("_1", Scala("A")),
+              Field("_2", Scala("A")),
+              Field("_3", Scala("B")))),
+            Record("Famine", Many(
+              Field("_1", Scala("B")))),
+            Record("Death", Many.empty)
+          ))
+        )
+
+        val expected = q"""
+          sealed trait HorsemanT[+Conquest, +War, +Famine, +Death]
+          sealed case class Conquest[+_1, +_2, +_3](_1: _1, _2: _2, _3: _3) extends
+            HorsemanT[Conquest[_1, _2, _3], Nothing, Nothing, Nothing]
+          sealed case class War[+_1, +_2, +_3](_1: _1, _2: _2, _3: _3) extends
+            HorsemanT[Nothing, War[_1, _2, _3], Nothing, Nothing]
+          sealed case class Famine[+_1](_1: _1) extends
+            HorsemanT[Nothing, Nothing, Famine[_1], Nothing]
+          sealed trait Death extends HorsemanT[Nothing, Nothing, Nothing, Death]
+          case object Death extends Death
+        """
+        assertEqual(c)(expected, actual)
+      }
+    }
+
+  } // end of DeclarationGenerator.Tests
+} // end of DeclarationGenerator
