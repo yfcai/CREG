@@ -2,7 +2,7 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait DeclarationGenerator {
+trait DeclarationGenerator extends UniverseConstruction {
   /** @param datatype Representation of data type
     * @return AST of generated traits and case classes
     *
@@ -35,18 +35,6 @@ trait DeclarationGenerator {
     */
   def generateCaseNames(c: Context)(cases: Many[RecordOrHole]): Many[c.Tree] =
     covariantTypeParams(c)(cases.map(_.name))
-
-  def covariantTypeParams(c: Context)(names: Many[Name]): Many[c.Tree] =
-    names.map(name => covariantTypeParam(c)(name))
-
-  /** @param name name of type parameter
-    * @return covariant type parameter of that name
-    */
-  def covariantTypeParam(c: Context)(name: Name): c.Tree = {
-    import c.universe._
-    val q"type Dummy[$result]" = q"type Dummy[+${TypeName(name)}]"
-    result
-  }
 
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
@@ -84,24 +72,9 @@ trait DeclarationGenerator {
 
 object DeclarationGenerator {
   /** test macros */
-  object Tests extends DeclarationGenerator {
+  object Tests extends DeclarationGenerator with AssertEqual {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
-
-    private[this] def err(msg: String): Nothing = { System.err println msg ; sys error "got error" }
-
-    def assertEqual(c: Context)(expected: c.Tree, actual: c.Tree): c.Expr[Any] = {
-      import c.universe._
-      // assert(actual.duplicate != actual) // this is actually true!
-      // resorting to string comparison.
-      // doesn't seem to have anything better.
-      val eRaw = showRaw(expected)
-      val aRaw = showRaw(actual)
-      if (eRaw != aRaw)
-        err(s"\nExpected:\n$eRaw\n\nActual:\n$aRaw\n")
-      else
-        c.Expr(actual)
-    }
 
     class empty extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro empty.impl }
     object empty {
