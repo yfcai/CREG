@@ -2,7 +2,7 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait DeclarationGenerator {
+trait DeclarationGenerator extends UniverseConstruction {
   /** @param datatype Representation of data type
     * @return AST of generated traits and case classes
     *
@@ -32,19 +32,8 @@ trait DeclarationGenerator {
   /** @param cases a bunch of named variants
     * @return their names as TypeName
     */
-  def generateCaseNames(c: Context)(cases: Many[RecordOrHole]): Many[c.Tree] = {
-    import c.universe._
-    cases.map(record => covariantTypeParam(c)(record.name))
-  }
-
-  /** @param name name of type parameter
-    * @return covariant type parameter of that name
-    */
-  def covariantTypeParam(c: Context)(name: String): c.Tree = {
-    import c.universe._
-    val q"type Dummy[$result]" = q"type Dummy[+${TypeName(name)}]"
-    result
-  }
+  def generateCaseNames(c: Context)(cases: Many[RecordOrHole]): Many[c.Tree] =
+    covariantTypeParams(c)(cases.map(_.name))
 
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
