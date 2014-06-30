@@ -2,7 +2,7 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait DeclarationGenerator extends UniverseConstruction {
+trait DeclarationGenerator {
   /** @param datatype Representation of data type
     * @return AST of generated traits and case classes
     *
@@ -11,51 +11,55 @@ trait DeclarationGenerator extends UniverseConstruction {
     * without sacrificing the functor instance inside Fix[+F[+_]], which
     * is necessary to obtain covariance in something like List[+A].
     */
-  def generateDeclaration(c: Context)(dataConstructor: DataConstructor): c.Tree = {
+  def generateDeclaration(c: Context)(datatype: Variant): c.Tree = {
     import c.universe._
 
-    val DataConstructor(params, datatype: Variant) = dataConstructor
-
-    val template = TypeName(datatype.name)
+    val template = mkTemplate(c)(datatype.name)
 
     if (datatype.cases.isEmpty)
       q"sealed trait $template"
     else {
-      val templateParams = covariantTypeParams(c)(params) ++ generateCaseNames(c)(datatype.cases)
-
       q"""
-        sealed trait $template [..$templateParams]
-        ..${generateCases(c)(template, params, datatype.cases)}
+        sealed trait $template [..${generateCaseNames(c)(datatype.cases)}]
+        ..${generateCases(c)(template, datatype.cases)}
       """
     }
   }
 
+  /** create the name of the template trait by appending T */
+  def mkTemplate(c: Context)(name: String): c.TypeName = c.universe.TypeName(name)
+
   /** @param cases a bunch of named variants
     * @return their names as TypeName
     */
-  def generateCaseNames(c: Context)(cases: Many[RecordOrHole]): Many[c.Tree] =
-    covariantTypeParams(c)(cases.map(_.name))
+  def generateCaseNames(c: Context)(cases: Many[RecordOrHole]): Many[c.Tree] = {
+    import c.universe._
+    cases.map(record => covariantTypeParam(c)(record.name))
+  }
+
+  /** @param name name of type parameter
+    * @return covariant type parameter of that name
+    */
+  def covariantTypeParam(c: Context)(name: String): c.Tree = {
+    import c.universe._
+    val q"type Dummy[$result]" = q"type Dummy[+${TypeName(name)}]"
+    result
+  }
 
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
     * @return generated code for cases of the variant
     */
-  def generateCases(c: Context)
-    (template: c.TypeName, genericParamNames: Many[Name], cases: Many[RecordOrHole]): Many[c.Tree] =
-  {
+  def generateCases(c: Context)(template: c.TypeName, cases: Many[RecordOrHole]): Many[c.Tree] = {
     import c.universe._
     cases.zipWithIndex flatMap {
       case (Record(name, Many()), i) =>
         val typeName = TypeName(name)
         val termName = TermName(name)
-        val extras = genericParamNames.size
-        val allParams = namedParamsWithNothing(c)(typeName, i + extras, cases.size + extras)
+        val params = namedParamsWithNothing(c)(typeName, i, cases.size)
         Many(
-          q"sealed trait $typeName extends $template[..$allParams]",
+          q"sealed trait $typeName extends $template[..$params]",
           q"case object $termName extends $typeName")
-
-      case _ =>
-        Many.empty // stub: if cases have arguments, then don't generate anything for now
     }
   }
 
@@ -82,9 +86,9 @@ object DeclarationGenerator {
         import c.universe._
         val q"trait $name" = annottees.head.tree
         val actual = generateDeclaration(c)(
-          DataConstructor(Many.empty, Variant(name.toString, Many.empty))
+          Variant(name.toString, Many.empty)
         )
-        val expected = q"sealed trait $name"
+        val expected = q"sealed trait ${TypeName(name.toString)}"
         assertEqual(c)(expected, actual)
       }
     }
@@ -95,12 +99,9 @@ object DeclarationGenerator {
         import c.universe._
         val q"trait $variant { $singletonBody }" = annottees.head.tree
         val actual = generateDeclaration(c)(
-          DataConstructor(
-            Many.empty,
-            Variant(variant.toString, Many(
-              Record(singletonBody.toString, Many.empty)
-            ))
-          )
+          Variant(variant.toString, Many(
+            Record(singletonBody.toString, Many.empty)
+          ))
         )
         val template = TypeName(variant.toString)
         val singleton = TermName(singletonBody.toString)
@@ -120,15 +121,12 @@ object DeclarationGenerator {
         import c.universe._
         val q"trait $variant { $case1 ; $case2 ; $case3 ; $case4 }" = annottees.head.tree
         val actual = generateDeclaration(c)(
-          DataConstructor(
-            Many.empty,
-            Variant(variant.toString, Many(
-              Record(case1.toString, Many.empty),
-              Record(case2.toString, Many.empty),
-              Record(case3.toString, Many.empty),
-              Record(case4.toString, Many.empty)
-            ))
-          )
+          Variant(variant.toString, Many(
+            Record(case1.toString, Many.empty),
+            Record(case2.toString, Many.empty),
+            Record(case3.toString, Many.empty),
+            Record(case4.toString, Many.empty)
+          ))
         )
         val template = TypeName(variant.toString)
         val c1 = TypeName(case1.toString)
@@ -147,103 +145,6 @@ object DeclarationGenerator {
           case object ${TermName(c4.toString)} extends $c4
         """
         assertEqual(c)(expected, actual)
-      }
-    }
-
-    class genericCaseObjects extends StaticAnnotation {
-      def macroTransform(annottees: Any*): Any = macro genericCaseObjects.impl
-    }
-    object genericCaseObjects {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
-        val q"trait $variant [+$param1, +$param2, +$param3] { $case1 ; $case2 ; $case3 ; $case4 }" = annottees.head.tree
-
-        val actual = generateDeclaration(c)(
-          DataConstructor(
-            Many(param1.toString, param2.toString, param3.toString),
-            Variant(variant.toString, Many(
-              Record(case1.toString, Many.empty),
-              Record(case2.toString, Many.empty),
-              Record(case3.toString, Many.empty),
-              Record(case4.toString, Many.empty)
-            ))
-          )
-        )
-
-        val template = TypeName(variant.toString)
-        val p1 = TypeName(param1.toString)
-        val p2 = TypeName(param2.toString)
-        val p3 = TypeName(param3.toString)
-        val c1 = TypeName(case1.toString)
-        val c2 = TypeName(case2.toString)
-        val c3 = TypeName(case3.toString)
-        val c4 = TypeName(case4.toString)
-        val expected = q"""
-          sealed trait $template[+$p1, +$p2, +$p3, +$c1, +$c2, +$c3, +$c4]
-          sealed trait $c1 extends $template[Nothing, Nothing, Nothing, $c1, Nothing, Nothing, Nothing]
-          case object ${TermName(c1.toString)} extends $c1
-          sealed trait $c2 extends $template[Nothing, Nothing, Nothing, Nothing, $c2, Nothing, Nothing]
-          case object ${TermName(c2.toString)} extends $c2
-          sealed trait $c3 extends $template[Nothing, Nothing, Nothing, Nothing, Nothing, $c3, Nothing]
-          case object ${TermName(c3.toString)} extends $c3
-          sealed trait $c4 extends $template[Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, $c4]
-          case object ${TermName(c4.toString)} extends $c4
-        """
-        assertEqual(c)(expected, actual)
-      }
-    }
-
-    class caseClasses extends StaticAnnotation {
-      def macroTransform(annottees: Any*): Any = macro caseClasses.impl
-    }
-    object caseClasses {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
-
-        val q"""
-          trait HorsemenT[+Of, +The, +Apocalypse] {
-            Conquest(Of, Int)
-            War(The, Apocalypse)
-            Famine(Boolean)
-            Death
-          }""" = annottees.head.tree
-
-        val actual = generateDeclaration(c)(
-          DataConstructor(
-            Many("Of", "The", "Apocalypse"),
-            Variant("HorsemenT", Many(
-              Record("Conquest", Many(Field("_1", Hole("Of" )), Field("_2", Scala("Int")))),
-              Record("War"     , Many(Field("_1", Hole("The")), Field("_2", Hole("Apocalypse")))),
-              Record("Famine"  , Many(Field("_1", Scala("Boolean")))),
-              Record("Death"   , Many.empty)
-            ))
-          )
-        )
-
-        /*
-        val template = TypeName(variant.toString)
-        val p1 = TypeName(param1.toString)
-        val p2 = TypeName(param2.toString)
-        val p3 = TypeName(param3.toString)
-        val c1 = TypeName(case1.toString)
-        val c2 = TypeName(case2.toString)
-        val c3 = TypeName(case3.toString)
-        val c4 = TypeName(case4.toString)
-        val expected = q"""
-          sealed trait $template[+$p1, +$p2, +$p3, +$c1, +$c2, +$c3, +$c4]
-          sealed trait $c1 extends $template[Nothing, Nothing, Nothing, $c1, Nothing, Nothing, Nothing]
-          case object ${TermName(c1.toString)} extends $c1
-          sealed trait $c2 extends $template[Nothing, Nothing, Nothing, Nothing, $c2, Nothing, Nothing]
-          case object ${TermName(c2.toString)} extends $c2
-          sealed trait $c3 extends $template[Nothing, Nothing, Nothing, Nothing, Nothing, $c3, Nothing]
-          case object ${TermName(c3.toString)} extends $c3
-          sealed trait $c4 extends $template[Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, $c4]
-          case object ${TermName(c4.toString)} extends $c4
-        """
-        assertEqual(c)(expected, actual)
-
-         */
-        c.Expr(q"") // stub
       }
     }
   }

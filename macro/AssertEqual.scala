@@ -9,7 +9,7 @@ trait AssertEqual {
     val eRaw = showRaw(expected)
     val aRaw = showRaw(actual)
     if (eRaw != aRaw) {
-      System.err println s"\nExpected:\n$eRaw\n\nActual:\n$aRaw\n"
+      System.err println s"\nExpected:\n$expected\nActual:\n$actual\n\nExpected:\n$eRaw\n\nActual:\n$aRaw\n"
       sys error "got error"
     }
     else
