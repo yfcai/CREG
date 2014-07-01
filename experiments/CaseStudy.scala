@@ -82,19 +82,19 @@ trait CaseStudy {
     type Map[+T]
 
     // mapping between morphisms, compos with identity applicative functor
-    def map[A, B]: (A => B) => Map[A] => Map[B] = gcompos[ID, A, B]
+    def map[A, B]: (A => B) => Map[A] => Map[B] = gcompos[ID].apply
 
     // de-facto flattening projection to the free monoid of A (i. e., List[A])
     // to supports SYBP-style gmapQ
     //
     // compos with constant applicative functor mapping everything to A
     //
-    def gfoldl[A](default: A, combine: (A, A) => A): Map[A] => A = t => {
+    def gfoldl[A](default: A, combine: (A, A) => A): Map[A] => A = {
       type CA[X] = A
-      gcompos[CA, A, A](identity)(t)(new Applicative[CA] {
+      gcompos[CA](new Applicative[CA] {
         def pure[X](x: X): A = default
         def call[X, Y](f: A, x: A): A = combine(f, x)
-      })
+      })(identity)
     }
 
     // Nominal-functor-enabled generalization of `compos` in:
@@ -102,7 +102,21 @@ trait CaseStudy {
     // Bringert and Ranta.
     // A pattern for almost compositional functions.
     //
-    def gcompos[F[_]: Applicative, A, B](f: A => F[B])(t: Map[A]): F[Map[B]]
+    //
+    // gcompos[F] = gcompose ∘ functor[F].map, where
+    //
+    //   functor[F].map : (A => B) => F[A] => F[B]
+    //
+    //   gcompose : ∀X. F[G[X]] => G[F[X]]
+    //
+    // gcompose is a natural transformation from F ∘ G  to  G ∘ F.
+    // is it canonical in some way?
+    //
+    def gcompos[F[_]: Applicative]: GCompos[F]
+
+    abstract class GCompos[F[_]: Applicative] {
+      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]]
+    }
   }
 
   // sugar
@@ -137,29 +151,31 @@ trait CaseStudy {
   implicit val termF = new Functor {
     type Map[+T] = TermF[T]
 
-    def gcompos[F[_]: Applicative, A, B](f: A => F[B])(t: Map[A]): F[Map[B]] = {
-      val applicative = implicitly[Applicative[F]]
-      import applicative._
-      t match {
-        case Void =>
-          pure(Void)
+    def gcompos[F[_]: Applicative] = new GCompos[F] {
+      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = {
+        val applicative = implicitly[Applicative[F]]
+        import applicative._
+        {
+          case Void =>
+            pure(Void)
 
-        case Var(v) =>
-          pure(Var(v))
+          case Var(v) =>
+            pure(Var(v))
 
-        case Abs(x, t) =>
-          call(
+          case Abs(x, t) =>
             call(
-              pure[String => B => Map[B]](x => t => Abs(x, t)),
-              pure(x)),
-            f(t))
+              call(
+                pure[String => B => Map[B]](x => t => Abs(x, t)),
+                pure(x)),
+              f(t))
 
-        case App(t1, t2) =>
-          call(
+          case App(t1, t2) =>
             call(
-              pure[B => B => Map[B]](t1 => t2 => App(t1, t2)),
-              f(t1)),
-            f(t2))
+              call(
+                pure[B => B => Map[B]](t1 => t2 => App(t1, t2)),
+                f(t1)),
+              f(t2))
+        }
       }
     }
   }
@@ -211,31 +227,33 @@ trait CaseStudy {
 
     type Map[+N] = Fix[TF[N]#λ]
 
-    def gcompos[F[_]: Applicative, A, B](f: A => F[B])(t: Map[A]): F[Map[B]] = {
-      val applicative = implicitly[Applicative[F]]
-      import applicative._
-      t.unroll match {
-        case Void =>
-          pure(Roll[TF[B]#λ](Void))
+    def gcompos[F[_]: Applicative] = new GCompos[F] {
+      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = {
+        val applicative = implicitly[Applicative[F]]
+        import applicative._
+        _.unroll match {
+          case Void =>
+            pure(Roll[TF[B]#λ](Void))
 
-        case Var(x) =>
-          call(
-            pure[B => Map[B]](x => Roll[TF[B]#λ](Var(x))),
-            f(x))
-
-        case Abs(x, b) =>
-          call(
+          case Var(x) =>
             call(
-              pure[B => Map[B] => Map[B]](x => b => Roll[TF[B]#λ](Abs(x, b))),
-              f(x)),
-            gcompos(f)(b))
+              pure[B => Map[B]](x => Roll[TF[B]#λ](Var(x))),
+              f(x))
 
-        case App(g, y) =>
-          call(
+          case Abs(x, b) =>
             call(
-              pure[Map[B] => Map[B] => Map[B]](g => y => Roll[TF[B]#λ](App(g, y))),
-              gcompos(f)(g)),
-            gcompos(f)(y))
+              call(
+                pure[B => Map[B] => Map[B]](x => b => Roll[TF[B]#λ](Abs(x, b))),
+                f(x)),
+              apply(f)(b))
+
+          case App(g, y) =>
+            call(
+              call(
+                pure[Map[B] => Map[B] => Map[B]](g => y => Roll[TF[B]#λ](App(g, y))),
+                apply(f)(g)),
+              apply(f)(y))
+        }
       }
     }
   }
@@ -324,14 +342,17 @@ trait CaseStudy {
     type Bimap[+T1 <: Bound1, +T2 <: Bound2]
 
     def bimap[A <: Bound1, B <: Bound2, C <: Bound1, D <: Bound2](f: A => C, g: B => D):
-        Bimap[A, B] => Bimap[C, D] = bicompos[ID, A, B, C, D](f, g)
+        Bimap[A, B] => Bimap[C, D] = bicompos[ID].apply(f, g)
 
     // bicompos: binary extrapolation of gcompos
-    //
-    // def gcompos[F[_]: Applicative, A, B](f: A => F[B])(t: Map[A]): F[Map[B]]
-    //
-    def bicompos[F[_]: Applicative, A <: Bound1, B <: Bound2, C <: Bound1, D <: Bound2]
-      (f: A => F[C], g: B => F[D])(t: Bimap[A, B]): F[Bimap[C, D]]
+    def bicompos[F[_]: Applicative]: Bicompos[F]
+
+    abstract class Bicompos[F[_]: Applicative] {
+      def apply
+        [A <: Bound1, B <: Bound2, C <: Bound1, D <: Bound2]
+        (f: A => F[C], g: B => F[D]):
+          Bimap[A, B] => F[Bimap[C, D]]
+    }
   }
 
   val avoidF = new Bifunctor {
@@ -344,33 +365,36 @@ trait CaseStudy {
 
     type Bimap[+V, +A <: Abs[_, _]] = Fix[H[V, A]#λ]
 
-    def bicompos
-      [F[_]: Applicative, A <: Bound1, B <: Bound2, C <: Bound1, D <: Bound2]
-      (f: A => F[C], g: B => F[D])(t: Bimap[A, B]):
-        F[Bimap[C, D]] =
-    {
-      val applicative = implicitly[Applicative[F]]
-      import applicative._
-      t.unroll match {
-        case Void =>
-          pure(Roll[H[C, D]#λ](Void))
 
-        case Var(x) =>
-          call(
-            pure[C => Bimap[C, D]](x => Roll[H[C, D]#λ](Var(x))),
-            f(x))
+    def bicompos[F[_]: Applicative]: Bicompos[F] = new Bicompos[F] {
+      def apply
+        [A, B <: Abs[_, _], C, D <: Abs[_, _]]
+        (f: A => F[C], g: B => F[D]):
+          Bimap[A, B] => F[Bimap[C, D]] =
+      {
+        val applicative = implicitly[Applicative[F]]
+        import applicative._
+        _.unroll match {
+          case Void =>
+            pure(Roll[H[C, D]#λ](Void))
 
-        case abs @ Abs(_, _) =>
-          call(
-            pure[D => Bimap[C, D]](abs => Roll[H[C, D]#λ](abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
-            g(abs))
-
-        case App(t1, t2) =>
-          call(
+          case Var(x) =>
             call(
-              pure[Bimap[C, D] => Bimap[C, D] => Bimap[C, D]](t1 => t2 => Roll[H[C, D]#λ](App(t1, t2))),
-              bicompos(f, g)(t1)),
-            bicompos(f, g)(t2))
+              pure[C => Bimap[C, D]](x => Roll[H[C, D]#λ](Var(x))),
+              f(x))
+
+          case abs @ Abs(_, _) =>
+            call(
+              pure[D => Bimap[C, D]](abs => Roll[H[C, D]#λ](abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
+              g(abs))
+
+          case App(t1, t2) =>
+            call(
+              call(
+                pure[Bimap[C, D] => Bimap[C, D] => Bimap[C, D]](t1 => t2 => Roll[H[C, D]#λ](App(t1, t2))),
+                apply(f, g)(t1)),
+              apply(f, g)(t2))
+        }
       }
     }
   }
@@ -382,31 +406,33 @@ trait CaseStudy {
 
     type Map[+V] = Fix[H[V]#λ]
 
-    def gcompos[F[_]: Applicative, A, B](f: A => F[B])(t: Map[A]): F[Map[B]] = {
-      val applicative = implicitly[Applicative[F]]
-      import applicative._
-      t.unroll match {
-        case Void =>
-          pure(Roll[H[B]#λ](Void))
+    def gcompos[F[_]: Applicative] = new GCompos[F] {
+      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = {
+        val applicative = implicitly[Applicative[F]]
+        import applicative._
+        _.unroll match {
+          case Void =>
+            pure(Roll[H[B]#λ](Void))
 
-        case Var(x) =>
-          call(
-            pure[B => Map[B]](x => Roll[H[B]#λ](Var(x))),
-            f(x))
-
-        case Abs(x, b) =>
-          call(
+          case Var(x) =>
             call(
-              pure[String => Map[B] => Map[B]](x => b => Roll[H[B]#λ](Abs(x, b))),
-              pure(x)),
-            gcompos(f)(b))
+              pure[B => Map[B]](x => Roll[H[B]#λ](Var(x))),
+              f(x))
 
-        case App(t1, t2) =>
-          call(
+          case Abs(x, b) =>
             call(
-              pure[Map[B] => Map[B] => Map[B]](t1 => t2 => Roll[H[B]#λ](App(t1, t2))),
-              gcompos(f)(t1)),
-            gcompos(f)(t2))
+              call(
+                pure[String => Map[B] => Map[B]](x => b => Roll[H[B]#λ](Abs(x, b))),
+                pure(x)),
+              apply(f)(b))
+
+          case App(t1, t2) =>
+            call(
+              call(
+                pure[Map[B] => Map[B] => Map[B]](t1 => t2 => Roll[H[B]#λ](App(t1, t2))),
+                apply(f)(t1)),
+              apply(f)(t2))
+        }
       }
     }
   }
