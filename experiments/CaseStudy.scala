@@ -103,13 +103,15 @@ trait CaseStudy {
     // A pattern for almost compositional functions.
     //
     //
-    // gcompos[F] = gcompose ∘ functor[F].map, where
+    // Let F be an applicative functor.
     //
-    //   functor[F].map : (A => B) => F[A] => F[B]
+    // gcompos[F] = gcompose[F] ∘ functor[Map].map, where
     //
-    //   gcompose : ∀X. F[G[X]] => G[F[X]]
+    //   functor[Map].map : (A => B) => Map[A] => Map[B]
     //
-    // gcompose is a natural transformation from F ∘ G  to  G ∘ F.
+    //   gcompose : ∀X. Map[F[X]] => F[Map[X]]
+    //
+    // gcompose is a natural transformation from Map ∘ F  to  F ∘ Map.
     // is it canonical in some way?
     //
     def gcompos[F[_]: Applicative]: GCompos[F]
