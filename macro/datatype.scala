@@ -8,11 +8,12 @@ object datatype extends Parser with DeclarationGenerator {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
-    val datatypeDecl: Tree = annottees.head.tree
-    val datatype: Variant = parse(c)(datatypeDecl)
-    val declaration = generateDeclaration(c)(datatype)
+    // parser parses DSL
+    // preprocessor appends T & add Fix
+    // declaration generator generates template classes
+    // synonym generator generates synonyms
 
-    c.Expr[Any](q"..$declaration") // TODO: generate synonyms & functor instances too
+    c.Expr(q"") // TODO: generate synonyms & functor instances too
   }
 }
 
