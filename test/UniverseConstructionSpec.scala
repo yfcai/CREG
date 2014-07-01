@@ -62,7 +62,7 @@ class UniverseConstructionSpec extends FlatSpec {
     info(s"xs = $xs")
   }
 
-  "UniverseConstruction" should "be able to reify generated datatypes" in {
+  "UniverseConstruction" should "be able to reify generated datatypes" in (pending) ; {
     // reify[List[Int]]
     //       ==
     // FixedPoint(DataConstructor(Many("L"),
