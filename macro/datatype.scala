@@ -10,9 +10,9 @@ object datatype extends Parser with DeclarationGenerator {
 
     val datatypeDecl: Tree = annottees.head.tree
     val datatype: Variant = parse(c)(datatypeDecl)
-    val declaration: Tree = generateDeclaration(c)(datatype)
+    val declaration = generateDeclaration(c)(datatype)
 
-    c.Expr[Any](declaration) // TODO: generate functor instances too
+    c.Expr[Any](q"..$declaration") // TODO: generate synonyms & functor instances too
   }
 }
 

@@ -11,19 +11,16 @@ trait DeclarationGenerator extends UniverseConstruction {
     * without sacrificing the functor instance inside Fix[+F[+_]], which
     * is necessary to obtain covariance in something like List[+A].
     */
-  def generateDeclaration(c: Context)(datatype: Variant): c.Tree = {
+  def generateDeclaration(c: Context)(datatype: Variant): Many[c.Tree] = {
     import c.universe._
 
     val template = mkTemplate(c)(datatype.name)
 
     if (datatype.cases.isEmpty)
-      q"sealed trait $template"
-    else {
-      q"""
-        sealed trait $template [..${generateCaseNames(c)(datatype.cases)}]
-        ..${generateCases(c)(template, datatype.cases)}
-      """
-    }
+      Many(q"sealed trait $template")
+    else
+      q"sealed trait $template [..${generateCaseNames(c)(datatype.cases)}]" +:
+        generateCases(c)(template, datatype.cases)
   }
 
   /** create the name of the template trait by appending T */
@@ -110,7 +107,7 @@ object DeclarationGenerator {
           Variant(name.toString, Many.empty)
         )
         val expected = q"sealed trait ${TypeName(name.toString)}"
-        assertEqual(c)(expected, actual)
+        assertEqualBlock(c)(expected, actual)
       }
     }
 
@@ -132,7 +129,7 @@ object DeclarationGenerator {
           sealed trait $singletonType extends $template[$singletonType]
           case object $singleton extends $singletonType
         """
-        assertEqual(c)(expected, actual)
+        assertEqualBlock(c)(expected, actual)
       }
     }
 
@@ -165,7 +162,7 @@ object DeclarationGenerator {
           sealed trait $c4 extends $template[Nothing, Nothing, Nothing, $c4]
           case object ${TermName(c4.toString)} extends $c4
         """
-        assertEqual(c)(expected, actual)
+        assertEqualBlock(c)(expected, actual)
       }
     }
 
@@ -209,7 +206,7 @@ object DeclarationGenerator {
           sealed trait Death extends HorsemanT[Nothing, Nothing, Nothing, Death]
           case object Death extends Death
         """
-        assertEqual(c)(expected, actual)
+        assertEqualBlock(c)(expected, actual)
       }
     }
 

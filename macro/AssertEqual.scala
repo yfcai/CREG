@@ -1,6 +1,16 @@
 import scala.reflect.macros.blackbox.Context
 
+import DatatypeRepresentation.Many
+
 trait AssertEqual {
+  def assertEqualBlock(c: Context)(expected: c.Tree, actual: Many[c.Tree]): c.Expr[Any] = {
+    import c.universe._
+    if (actual.size == 1)
+      assertEqual(c)(expected, actual.head)
+    else
+      assertEqual(c)(expected, q"..$actual")
+  }
+
   def assertEqual(c: Context)(expected: c.Tree, actual: c.Tree): c.Expr[Any] = {
     import c.universe._
     // assert(actual.duplicate != actual) // this is actually true!
