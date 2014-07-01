@@ -50,13 +50,4 @@ class DeclarationGeneratorSpec extends FlatSpec {
     assert(eight == 8)
     info(s"3 + 5 = $eight")
   }
-
-  it should "generate case classes for variants with nested arguments" in (pending) /* {
-    @nestedCaseClasses trait HorsemanT {
-      Conquest( Cities { Rome ; Carthage } )
-      War ( WorldWars { I(A) ; II(A, B) } )
-      Famine( B )
-      Death
-    }
-  } */
 }
