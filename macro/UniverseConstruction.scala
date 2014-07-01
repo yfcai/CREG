@@ -27,18 +27,15 @@ trait UniverseConstruction {
 
       case FixedPoint(DataConstructor(params, body)) =>
         // to take the fixed point, the data constructor must be unary
-        val Many(param) = params
+        val Many(paramName) = params
         val fix = getFix(c)
 
-        // strangely, macros can adapt TypeName arguments of a trait to TypeDefs,
-        // but cannot adapt those of a type synonym.
-        // hence the quote+unquote here.
-        val q"trait __Trait__ [$paramTypeDef]" = q"trait __Trait__ [${covariantTypeParam(c)(param)}]"
+        val typeDef = covariantTypeDef(c)(paramName)
 
         val q"??? : $result" =
           q"""
             ??? : $fix[({
-              type __innerType__[$paramTypeDef] = ${meaning(c)(body)}
+              type __innerType__[$typeDef] = ${meaning(c)(body)}
             })#__innerType__]
           """
         result
@@ -69,6 +66,23 @@ trait UniverseConstruction {
 
   def covariantTypeParams(c: Context)(names: Many[Name]): Many[c.Tree] =
     names.map(name => covariantTypeParam(c)(name))
+
+  // covariantTypeDef* are just like covariantTypeParam*, except outputting typedefs
+
+  def covariantTypeDef(c: Context)(name: Name): c.universe.TypeDef = {
+    import c.universe._
+    val param = covariantTypeParam(c)(name)
+
+    // strangely, macros can adapt TypeName arguments of a trait to TypeDefs,
+    // but cannot adapt those of a type synonym.
+    // hence the quote+unquote here.
+
+    val q"trait __Trait__ [$typeDef]" = q"trait __Trait__ [$param]"
+    typeDef
+  }
+
+  def covariantTypeDefs(c: Context)(names: Many[Name]): Many[c.universe.TypeDef] =
+    names.map(name => covariantTypeDef(c)(name))
 
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
