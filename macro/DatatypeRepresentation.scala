@@ -20,6 +20,12 @@ object DatatypeRepresentation {
   case class Variant(name: Name, cases: Many[RecordOrHole]) extends Datatype
   case class FixedPoint(cons: DataConstructor) extends Datatype
 
+  // covariant function
+  case class CovariantFunction(domain: Scala, range: Datatype) extends Datatype
+
+  // with-composition
+  case class Intersect(lhs: Record, rhs: Record) extends Datatype
+
 
   // datatype representation helpers
   case class DataConstructor(params: Many[Name], body: Datatype)

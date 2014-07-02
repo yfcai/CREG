@@ -41,6 +41,18 @@ trait UniverseConstruction {
             })#__innerType__]
           """
         result
+
+      case CovariantFunction(domain, range) =>
+        val domainType = meaning(c)(domain)
+        val rangeType = meaning(c)(range)
+        val q"??? : $result" = q"??? : ($domainType => $rangeType)"
+        result
+
+      case Intersect(lhs, rhs) =>
+        val lhsType = meaning(c)(lhs)
+        val rhsType = meaning(c)(rhs)
+        val q"??? : $result" = q"??? : ($lhsType with $rhsType)"
+        result
     }
   }
 
