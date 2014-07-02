@@ -9,32 +9,16 @@ object DatatypeRepresentation {
 
 
   // datatype representation
-  sealed trait Datatype {
-    def typeNames: Set[Name]
-  }
+  sealed trait Datatype
 
   // scala type, or, free type variable
-  case class Scala(get: Name) extends ScalaOrHole {
-    def sane: Boolean = true
-    lazy val typeNames: Set[Name] = Set(get) // all typeNames used
-  }
-
+  case class Scala(get: Name) extends ScalaOrHole
   // hole, or, bound type variable
-  case class Hole(name: Name) extends RecordOrHole {
-    lazy val typeNames: Set[Name] = Set(name)
-  }
+  case class Hole(name: Name) extends RecordOrHole
 
-  case class Record(name: Name, fields: Many[Field]) extends RecordOrHole with ScalaOrHole {
-    lazy val typeNames: Set[Name] = fields.foldLeft(Set.empty[Name])(_ ++ _.typeNames) + name
-  }
-
-  case class Variant(name: Name, cases: Many[RecordOrHole]) extends Datatype {
-    lazy val typeNames: Set[Name] = cases.foldLeft(Set.empty[Name])(_ ++ _.typeNames) + name
-  }
-
-  case class FixedPoint(cons: DataConstructor) extends Datatype {
-    def typeNames: Set[Name] = cons.body.typeNames ++ cons.params
-  }
+  case class Record(name: Name, fields: Many[Field]) extends RecordOrHole with ScalaOrHole
+  case class Variant(name: Name, cases: Many[RecordOrHole]) extends Datatype
+  case class FixedPoint(cons: DataConstructor) extends Datatype
 
 
   // datatype representation helpers
@@ -46,7 +30,5 @@ object DatatypeRepresentation {
 
   sealed trait ScalaOrHole extends Datatype
 
-  case class Field(name: Name, get: Datatype) {
-    lazy val typeNames: Set[Name] = get.typeNames
-  }
+  case class Field(name: Name, get: Datatype)
 }
