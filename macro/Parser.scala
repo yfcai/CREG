@@ -1,6 +1,7 @@
 import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
+import monad.contextReaderParser._
 
 trait Parser {
 
@@ -43,8 +44,8 @@ trait Parser {
   // WITH (term-level name of keyword `with`)
   //
 
-  private[this] type Parser[A] = monad.ContextReaderParser[A]
-  private[this] type Singleton[A] = monad.SingletonContextReaderParser[A]
+  // shadow trait Parser by Parser[A]
+  private[this] type Parser[A] = monad.contextReaderParser.Parser[A]
 
   // parsers must be lazy val because they're mutually recursive
   lazy val DatatypeP: Parser[Datatype] = ???
