@@ -27,7 +27,7 @@ trait Parser {
   //      Field := Datatype
   //             | Name : Datatype
   //
-  //   Function := TypeVar => Datatype
+  //     Reader := TypeVar => Datatype
   //
   //  Intersect := Datatype with Datatype
   //
@@ -49,7 +49,7 @@ trait Parser {
 
   lazy val FieldP: Parser[Field] = ???
 
-  lazy val FunctionP: Parser[CovariantFunction] = ???
+  lazy val ReaderP: Parser[Reader] = ???
 
   /*
   lazy val IntersectP: Parser[Intersect] = new Singleton[Intersect]("(X with Y)") {

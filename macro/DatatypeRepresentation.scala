@@ -26,7 +26,7 @@ object DatatypeRepresentation {
   }
 
   // covariant function
-  case class CovariantFunction(domain: TypeVar, range: Datatype) extends Datatype {
+  case class Reader(domain: TypeVar, range: Datatype) extends Datatype {
     def name: Name = s"(${domain.name} => ${range.name}"
   }
 

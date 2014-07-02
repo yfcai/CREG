@@ -38,7 +38,7 @@ trait UniverseConstruction {
           """
         result
 
-      case CovariantFunction(domain, range) =>
+      case Reader(domain, range) =>
         val domainType = meaning(c)(domain)
         val rangeType = meaning(c)(range)
         val q"??? : $result" = q"??? : ($domainType => $rangeType)"
