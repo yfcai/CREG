@@ -12,8 +12,16 @@ trait SynonymGenerator extends UniverseConstruction {
     q"type $typeName [ ..$typeDefs ] = $rhs"
   }
 
-  def generateRHS(c: Context)(datatype: Datatype): c.Tree =
-    meaning(c)(datatype)
+  def generateRHS(c: Context)(datatype: Datatype): c.Tree = meaning(c)(datatype)
+
+  def generatePatternFunctor(c: Context)(patternFunctorName: Name, genericFixedPoint: DataConstructor): c.Tree = {
+    import c.universe._
+    val DataConstructor(genericParams, FixedPoint(DataConstructor(Many(recursiveParam), datatypeBody))) = genericFixedPoint
+    val patternFunctorTypeName = TypeName(patternFunctorName)
+    val typeParams = covariantTypeDefs(c)(genericParams :+ recursiveParam) // defer to scalac to report name clashes
+    val rhs = generateRHS(c)(datatypeBody)
+    q"type $patternFunctorTypeName [ ..$typeParams ] = $rhs"
+  }
 }
 
 object SynonymGenerator {
@@ -66,21 +74,26 @@ object SynonymGenerator {
               Field("_1", Scala("Int")),
               Field("_2", Hole(intList /* no T */))))))
 
-        val genericDatatype =
-          DataConstructor(Many.empty,
-            FixedPoint(DataConstructor(Many(intList), datatypeBody)))
+        val fixedPoint = FixedPoint(DataConstructor(Many(intList), datatypeBody))
+
+        val genericDatatype = DataConstructor(Many.empty, fixedPoint)
 
         val declaration = generateDeclaration(c)(datatypeBody)
+
         val synonym = generateSynonym(c)(intList, genericDatatype)
-        val expected = q"""
+        val expectedSynonym = q"""
           type IntList = _root_.fixedpoint.Fix[({
             type __innerType__[+IntList] = IntListT[Nil, Cons[Int, IntList]]
           })#__innerType__]"""
-        assertEqual(c)(expected, synonym)
+        assertEqual(c)(expectedSynonym, synonym)
 
-        // TODO: generate synonym IntListF
+        val patternF = generatePatternFunctor(c)(intListF, genericDatatype)
+        val expectedPatternF = q"""
+          type IntListF[+IntList] = IntListT[Nil, Cons[Int, IntList]]
+        """
+        assertEqual(c)(expectedPatternF, patternF)
 
-        c.Expr(q"..${declaration :+ synonym}")
+        c.Expr(q"..${declaration ++ Many(synonym, patternF)}")
       }
     }
 
@@ -91,9 +104,37 @@ object SynonymGenerator {
 
         val q"trait GList[A] { Nil ; Cons(A, GList[A]) }" = annottees.head.tree
 
-        // TODO: write datatypeBody etc. for GLists
+        val gList  = "GList"
+        val gListT = "GListT"
+        val gListF = "GListF"
 
-        c.Expr(q"")
+        val datatypeBody =
+          Variant(gListT, Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("_1", Hole("A")),
+              Field("_2", Hole(gList /* no T */))))))
+
+        val fixedPoint = FixedPoint(DataConstructor(Many(gList), datatypeBody))
+
+        val genericDatatype = DataConstructor(Many("A"), fixedPoint)
+
+        val declaration = generateDeclaration(c)(datatypeBody)
+
+        val synonym = generateSynonym(c)(gList, genericDatatype)
+        val expectedSynonym = q"""
+          type GList[+A] = _root_.fixedpoint.Fix[({
+            type __innerType__[+GList] = GListT[Nil, Cons[A, GList]]
+          })#__innerType__]"""
+        assertEqual(c)(expectedSynonym, synonym)
+
+        val patternF = generatePatternFunctor(c)(gListF, genericDatatype)
+        val expectedPatternF = q"""
+          type GListF[+A, +GList] = GListT[Nil, Cons[A, GList]]
+        """
+        assertEqual(c)(expectedPatternF, patternF)
+
+        c.Expr(q"..${declaration ++ Many(synonym, patternF)}")
       }
     }
 

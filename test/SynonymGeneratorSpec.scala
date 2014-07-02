@@ -22,8 +22,11 @@ class SynonymGeneratorSpec extends FlatSpec {
       Cons(Int, IntList)
     }
 
-    val xs: IntList = Roll[({ type λ[+T] = IntListT[Nil, Cons[Int, T]] })#λ](Nil)
-    //val xs: IntList = Roll[IntListF](Nil) // to generate: the synonym IntListF
+    val nil: IntList = Roll[IntListF](Nil)
+    def cons(x: Int, xs: IntList): IntList = Roll[IntListF](Cons(x, xs))
+
+    val xs: IntList = cons(1, cons(2, cons(3, cons(4, nil))))
+    info(s"xs = $xs")
   }
 
   it should "generate synonyms for generic recursive datatypes" in {
@@ -31,5 +34,26 @@ class SynonymGeneratorSpec extends FlatSpec {
       Nil
       Cons(A, GList[A])
     }
+
+    object InnerModuleForTechnicalReasons {
+      private[this] type GF[+A] = {
+        // covariance in inner type is possible because the synonym GF is local to this file
+        // technical detail: only private[this] works. private[SynonymSpec] does not work.
+        // this is the technical reason to have InnerModuleForTechnicalReasons.
+        type λ[+R] = GListF[A, R]
+      }
+
+      def nil[A]: GList[A] = Roll[GF[A]#λ](Nil)
+      def cons[A](x: A, xs: GList[A]): GList[A] = Roll[GF[A]#λ](Cons(x, xs))
+    }
+    import InnerModuleForTechnicalReasons._
+
+    val xs: GList[Int] = cons(1, cons(2, cons(3, cons(4, nil))))
+    info(s"xs = $xs")
+  }
+
+  it should "not generate recursive synonyms for mutually recursive datatypes" in pending ; {
+    // preprocessor should convert mutually recursive datatypes to singly recursive datatypes for synonym generation.
+    // for declaration generation, preprocessor should produce flat sums of products.
   }
 }
