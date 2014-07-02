@@ -20,22 +20,28 @@ trait Parser {
   //             | Function
   //             | Intersect
   //
-  //    Variant := Name { (Record | TypeVar)* }
+  //    Variant := Name { Case* }
+  //
+  //       Case := Record
+  //             | Name = Datatype -- use "=" for labelling to keep Datatype in scala term expr
   //
   //     Record := Name ( Field* )
   //
   //      Field := Datatype
-  //             | Name : Datatype
+  //             | Name = Datatype -- use "=" for labelling to keep Datatype in scala term expr
   //
-  //     Reader := TypeVar => Datatype
+  //     Reader := TypeVar =>: Datatype
   //
-  //  Intersect := Datatype with Datatype
+  //  Intersect := Datatype WITH Datatype
   //
   //
   // Reserved names
   // ==============
   //
   // __.* (all names starting with two underscores)
+  // =>:  (term-level name of reader constructor)
+  // WITH (term-level name of keyword `with`)
+  //
 
   private[this] type Parser[A] = monad.ContextReaderParser[A]
   private[this] type Singleton[A] = monad.SingletonContextReaderParser[A]
