@@ -44,8 +44,8 @@ object SynonymGenerator {
         val datatype =
           Variant(personT, Many(
             Record("Boss", Many.empty),
-            Record("Manager", Many(Field("dept", Scala("Int")))),
-            Record("Employee", Many(Field("name", Scala("String")), Field("dept", Scala("Int"))))))
+            Record("Manager", Many(Field("dept", TypeVar("Int")))),
+            Record("Employee", Many(Field("name", TypeVar("String")), Field("dept", TypeVar("Int"))))))
 
         val declaration = generateDeclaration(c)(datatype)
         val synonym = generateSynonym(c)(person, DataConstructor(Many.empty, datatype))
@@ -71,8 +71,8 @@ object SynonymGenerator {
           Variant(intListT, Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
-              Field("_1", Scala("Int")),
-              Field("_2", Hole(intList /* no T */))))))
+              Field("_1", TypeVar("Int")),
+              Field("_2", TypeVar(intList /* no T */))))))
 
         val fixedPoint = FixedPoint(DataConstructor(Many(intList), datatypeBody))
 
@@ -112,8 +112,8 @@ object SynonymGenerator {
           Variant(gListT, Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
-              Field("_1", Hole("A")),
-              Field("_2", Hole(gList /* no T */))))))
+              Field("_1", TypeVar("A")),
+              Field("_2", TypeVar(gList /* no T */))))))
 
         val fixedPoint = FixedPoint(DataConstructor(Many(gList), datatypeBody))
 

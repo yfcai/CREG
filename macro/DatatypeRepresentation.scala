@@ -9,32 +9,35 @@ object DatatypeRepresentation {
 
 
   // datatype representation
-  sealed trait Datatype
+  sealed trait Datatype { def name: Name }
 
-  // scala type, or, free type variable
-  case class Scala(get: Name) extends ScalaOrHole
-  // hole, or, bound type variable
-  case class Hole(name: Name) extends RecordOrHole
+  case class TypeVar(name: Name) extends Datatype
+  case class Record(name: Name, fields: Many[Field]) extends Datatype
+  case class Variant(name: Name, cases: Many[Datatype]) extends Datatype
 
-  case class Record(name: Name, fields: Many[Field]) extends RecordOrHole with ScalaOrHole
-  case class Variant(name: Name, cases: Many[RecordOrHole]) extends Datatype
-  case class FixedPoint(cons: DataConstructor) extends Datatype
+  case class FixedPoint(cons: DataConstructor) extends Datatype {
+    def name: Name = cons match {
+      case DataConstructor(Many(recursiveParam), _) =>
+        recursiveParam
+
+      case _ =>
+        sys error s"fixed point of non-unary data constructor:\n\n$cons\n"
+    }
+  }
 
   // covariant function
-  case class CovariantFunction(domain: Scala, range: Datatype) extends Datatype
+  case class CovariantFunction(domain: TypeVar, range: Datatype) extends Datatype {
+    def name: Name = s"(${domain.name} => ${range.name}"
+  }
 
   // with-composition
-  case class Intersect(lhs: Record, rhs: Record) extends Datatype
+  case class Intersect(lhs: Record, rhs: Record) extends Datatype {
+    def name: Name = s"(${lhs.name} with ${rhs.name})"
+  }
 
 
   // datatype representation helpers
   case class DataConstructor(params: Many[Name], body: Datatype)
-
-  sealed trait RecordOrHole extends Datatype {
-    def name: Name
-  }
-
-  sealed trait ScalaOrHole extends Datatype
 
   case class Field(name: Name, get: Datatype)
 }

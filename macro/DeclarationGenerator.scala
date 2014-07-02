@@ -29,14 +29,14 @@ trait DeclarationGenerator extends UniverseConstruction {
   /** @param cases a bunch of named variants
     * @return their names as TypeName
     */
-  def generateCaseNames(c: Context)(cases: Many[RecordOrHole]): Many[c.Tree] =
+  def generateCaseNames(c: Context)(cases: Many[Datatype]): Many[c.Tree] =
     covariantTypeParams(c)(cases.map(_.name))
 
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
     * @return generated code for cases of the variant
     */
-  def generateCases(c: Context)(template: c.TypeName, cases: Many[RecordOrHole]): Many[c.Tree] = {
+  def generateCases(c: Context)(template: c.TypeName, cases: Many[Datatype]): Many[c.Tree] = {
     import c.universe._
     cases.zipWithIndex flatMap {
       case (Record(name, Many()), i) =>
@@ -56,7 +56,6 @@ trait DeclarationGenerator extends UniverseConstruction {
         val templateParams = appliedParamsWithNothing(c)(myType, i, cases.size)
         val decls = generateFreeDecls(c)(fieldNames)
         Many(q"sealed case class $typeName[..$caseParams](..$decls) extends $template[..$templateParams]")
-        // TODO: RECURSE
     }
   }
 
@@ -182,15 +181,15 @@ object DeclarationGenerator {
         val actual = generateDeclaration(c)(
           Variant("HorsemanT", Many(
             Record("Conquest", Many(
-              Field("_1", Scala("A")),
-              Field("_2", Scala("A")),
-              Field("_3", Scala("A")))),
+              Field("_1", TypeVar("A")),
+              Field("_2", TypeVar("A")),
+              Field("_3", TypeVar("A")))),
             Record("War", Many(
-              Field("_1", Scala("A")),
-              Field("_2", Scala("A")),
-              Field("_3", Scala("B")))),
+              Field("_1", TypeVar("A")),
+              Field("_2", TypeVar("A")),
+              Field("_3", TypeVar("B")))),
             Record("Famine", Many(
-              Field("_1", Scala("B")))),
+              Field("_1", TypeVar("B")))),
             Record("Death", Many.empty)
           ))
         )

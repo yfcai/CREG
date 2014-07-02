@@ -9,12 +9,8 @@ trait UniverseConstruction {
   def meaning(c: Context)(rep: Datatype): c.Tree = {
     import c.universe._
     rep match {
-      case Scala(tpe) =>
+      case TypeVar(tpe) =>
         val q"??? : $result" = c.parse(s"??? : ($tpe)")
-        result
-
-      case Hole(name) =>
-        val q"??? : $result" = c.parse(s"??? : ($name)")
         result
 
       case Record(name, fields) =>
@@ -54,18 +50,6 @@ trait UniverseConstruction {
         val q"??? : $result" = q"??? : ($lhsType with $rhsType)"
         result
     }
-  }
-
-  /** @return a variant, scala type, or hole
-    */
-  def repVariant(c: Context)(tpe: c.Type): Datatype = {
-    Scala("Int") // stub
-  }
-
-  /** @return a record, scala type, or hole
-    */
-  def repRecord(c: Context)(tpe: c.Type): Datatype = {
-    Scala("Int") // stub
   }
 
 
@@ -129,8 +113,8 @@ object UniverseConstruction {
             Variant("ListT", Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
-                Field("head", Scala("Int")),
-                Field("tail", Hole("L"))))))))
+                Field("head", TypeVar("Int")),
+                Field("tail", TypeVar("L"))))))))
 
         // scala type corresponding to datatype
         val tpe = meaning(c)(datatype)
@@ -155,8 +139,8 @@ object UniverseConstruction {
             Variant("ListT", Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
-                Field("head", Scala("A")), // should be bound by my[A]
-                Field("tail", Hole("L"))))))))
+                Field("head", TypeVar("A")), // should be bound by my[A]
+                Field("tail", TypeVar("L"))))))))
 
         c.Expr(q"type GenList = ${meaning(c)(datatype)}")
       }
