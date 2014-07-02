@@ -20,12 +20,11 @@ trait UniverseConstruction {
 
       case Variant(name, records) =>
         val q"??? : $result" =
-          q"??? : ${TypeName(name)}[..${records.map(record => meaning(c)(record))}]"
+          q"??? : ${TypeName(name)}[..${records.map(record => meaningOfNominal(c)(record))}]"
         result
 
-      case FixedPoint(DataConstructor(params, body)) =>
+      case FixedPoint(paramName, body) =>
         // to take the fixed point, the data constructor must be unary
-        val Many(paramName) = params
         val fix = getFix(c)
 
         val typeDef = covariantTypeDef(c)(paramName)
@@ -50,6 +49,11 @@ trait UniverseConstruction {
         val q"??? : $result" = q"??? : ($lhsType with $rhsType)"
         result
     }
+  }
+
+  def meaningOfNominal(c: Context)(rep: Nominal): c.Tree = rep match {
+    case Field(name, body) => meaning(c)(body)
+    case data: Datatype    => meaning(c)(data)
   }
 
 
@@ -109,12 +113,12 @@ object UniverseConstruction {
 
         // duplicate test.UniverseConstructionSpec
         val datatype: Datatype =
-          FixedPoint(DataConstructor(Many("L"),
+          FixedPoint("L",
             Variant("ListT", Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
                 Field("head", TypeVar("Int")),
-                Field("tail", TypeVar("L"))))))))
+                Field("tail", TypeVar("L")))))))
 
         // scala type corresponding to datatype
         val tpe = meaning(c)(datatype)
@@ -135,12 +139,12 @@ object UniverseConstruction {
 
         // duplicate test.UniverseConstructionSpec
         val datatype: Datatype =
-          FixedPoint(DataConstructor(Many("L"),
+          FixedPoint("L",
             Variant("ListT", Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
                 Field("head", TypeVar("A")), // should be bound by my[A]
-                Field("tail", TypeVar("L"))))))))
+                Field("tail", TypeVar("L")))))))
 
         c.Expr(q"type GenList = ${meaning(c)(datatype)}")
       }

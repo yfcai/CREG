@@ -9,35 +9,24 @@ object DatatypeRepresentation {
 
 
   // datatype representation
-  sealed trait Datatype { def name: Name }
+  sealed trait Datatype
+  sealed trait Nominal { def name: Name }
 
   case class TypeVar(name: Name) extends Datatype
-  case class Record(name: Name, fields: Many[Field]) extends Datatype
-  case class Variant(name: Name, cases: Many[Datatype]) extends Datatype
+  case class Record(name: Name, fields: Many[Field]) extends Nominal with Datatype
+  case class Variant(name: Name, cases: Many[Nominal]) extends Nominal with Datatype
 
-  case class FixedPoint(cons: DataConstructor) extends Datatype {
-    def name: Name = cons match {
-      case DataConstructor(Many(recursiveParam), _) =>
-        recursiveParam
+  case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype
 
-      case _ =>
-        sys error s"fixed point of non-unary data constructor:\n\n$cons\n"
-    }
-  }
+  // covariant function, produces anonymous types
+  case class Reader(domain: TypeVar, range: Datatype) extends Datatype
 
-  // covariant function
-  case class Reader(domain: TypeVar, range: Datatype) extends Datatype {
-    def name: Name = s"(${domain.name} => ${range.name}"
-  }
-
-  // with-composition
-  case class Intersect(lhs: Datatype, rhs: Datatype) extends Datatype {
-    def name: Name = s"(${lhs.name} with ${rhs.name})"
-  }
+  // with-composition, produces anonymous types
+  case class Intersect(lhs: Datatype, rhs: Datatype) extends Datatype
 
 
   // datatype representation helpers
   case class DataConstructor(params: Many[Name], body: Datatype)
 
-  case class Field(name: Name, get: Datatype)
+  case class Field(name: Name, get: Datatype) extends Nominal
 }

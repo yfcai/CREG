@@ -16,7 +16,7 @@ trait SynonymGenerator extends UniverseConstruction {
 
   def generatePatternFunctor(c: Context)(patternFunctorName: Name, genericFixedPoint: DataConstructor): c.Tree = {
     import c.universe._
-    val DataConstructor(genericParams, FixedPoint(DataConstructor(Many(recursiveParam), datatypeBody))) = genericFixedPoint
+    val DataConstructor(genericParams, FixedPoint(recursiveParam, datatypeBody)) = genericFixedPoint
     val patternFunctorTypeName = TypeName(patternFunctorName)
     val typeParams = covariantTypeDefs(c)(genericParams :+ recursiveParam) // defer to scalac to report name clashes
     val rhs = generateRHS(c)(datatypeBody)
@@ -74,7 +74,7 @@ object SynonymGenerator {
               Field("_1", TypeVar("Int")),
               Field("_2", TypeVar(intList /* no T */))))))
 
-        val fixedPoint = FixedPoint(DataConstructor(Many(intList), datatypeBody))
+        val fixedPoint = FixedPoint(intList, datatypeBody)
 
         val genericDatatype = DataConstructor(Many.empty, fixedPoint)
 
@@ -115,7 +115,7 @@ object SynonymGenerator {
               Field("_1", TypeVar("A")),
               Field("_2", TypeVar(gList /* no T */))))))
 
-        val fixedPoint = FixedPoint(DataConstructor(Many(gList), datatypeBody))
+        val fixedPoint = FixedPoint(gList, datatypeBody)
 
         val genericDatatype = DataConstructor(Many("A"), fixedPoint)
 

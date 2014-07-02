@@ -29,14 +29,14 @@ trait DeclarationGenerator extends UniverseConstruction {
   /** @param cases a bunch of named variants
     * @return their names as TypeName
     */
-  def generateCaseNames(c: Context)(cases: Many[Datatype]): Many[c.Tree] =
+  def generateCaseNames(c: Context)(cases: Many[Nominal]): Many[c.Tree] =
     covariantTypeParams(c)(cases.map(_.name))
 
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
     * @return generated code for cases of the variant
     */
-  def generateCases(c: Context)(template: c.TypeName, cases: Many[Datatype]): Many[c.Tree] = {
+  def generateCases(c: Context)(template: c.TypeName, cases: Many[Nominal]): Many[c.Tree] = {
     import c.universe._
     cases.zipWithIndex flatMap {
       case (Record(name, Many()), i) =>
