@@ -31,7 +31,7 @@ object DatatypeRepresentation {
   }
 
   // with-composition
-  case class Intersect(lhs: Record, rhs: Record) extends Datatype {
+  case class Intersect(lhs: Datatype, rhs: Datatype) extends Datatype {
     def name: Name = s"(${lhs.name} with ${rhs.name})"
   }
 
