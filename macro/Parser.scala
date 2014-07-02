@@ -87,7 +87,7 @@ trait Parser {
     def parse(c: Context)(input: c.Tree): Result[Reader, c.Position] = {
       import c.universe._
       input match {
-        case q"$domain.${ keyword_=>: }($range)" =>
+        case q"$range.${ keyword_=>: }($domain)" =>
           for {
             domainRes <- TypeVarP.parse(c)(domain)
             rangeRes <- DatatypeP.parse(c)(range)
