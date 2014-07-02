@@ -10,10 +10,12 @@ trait UniverseConstruction {
     import c.universe._
     rep match {
       case Scala(tpe) =>
-        Ident(TypeName(tpe))
+        val q"??? : $result" = c.parse(s"??? : ($tpe)")
+        result
 
       case Hole(name) =>
-        Ident(TypeName(name))
+        val q"??? : $result" = c.parse(s"??? : ($name)")
+        result
 
       case Record(name, fields) =>
         val q"??? : $result" =
