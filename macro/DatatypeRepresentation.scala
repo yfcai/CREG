@@ -28,7 +28,24 @@ object DatatypeRepresentation {
 
 
   // datatype representation helpers
-  case class DataConstructor(params: Many[Name], body: Datatype)
+  case class DataConstructor(params: Many[Param], body: Datatype)
 
   case class Field(name: Name, get: Datatype) extends Nominal
+
+  case class Param(name: Name, variance: Flag.VARIANCE)
+
+  object Param {
+    def invariant(name: Name): Param = Param(name, Flag.INVARIANT)
+    def covariant(name: Name): Param = Param(name, Flag.COVARIANT)
+    def contravariant(name: Name): Param = Param(name, Flag.CONTRAVARIANT)
+  }
+
+
+  // non-path-dependent mirror of Context.universe.Flag
+  object Flag {
+    sealed trait VARIANCE { def scalaSymbol: String }
+    case object INVARIANT     extends VARIANCE { def scalaSymbol = ""  }
+    case object COVARIANT     extends VARIANCE { def scalaSymbol = "+" }
+    case object CONTRAVARIANT extends VARIANCE { def scalaSymbol = "-" }
+  }
 }

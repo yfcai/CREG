@@ -85,13 +85,19 @@ trait Parser {
   def mkEmptyVariant(c: Context)(name: c.TypeName, params: List[c.Tree]): DataConstructor =
     DataConstructor(mkGenericTypeParams(c)(params), Variant(mkVariantHeader(c)(name), Many.empty))
 
-  def mkGenericTypeParams(c: Context)(params: List[c.Tree]): Many[Name] = {
+  def mkGenericTypeParams(c: Context)(params: List[c.Tree]): Many[Param] = {
     import c.universe._
+    val myFlag = DatatypeRepresentation.Flag
     Many(params.map(_ match {
       case typeDef @ TypeDef(mods, _, _, _) =>
-        if (mods hasFlag Flag.CONTRAVARIANT)
-          c.warning(typeDef.pos, "got contravariant generic type param. what to do?")
-        typeDef.name.toString
+        val variance =
+          if (mods hasFlag Flag.COVARIANT)
+            myFlag.COVARIANT
+          else if (mods hasFlag Flag.CONTRAVARIANT)
+            myFlag.CONTRAVARIANT
+          else
+            myFlag.INVARIANT
+        Param(typeDef.name.toString, variance)
     }): _*)
   }
 
@@ -312,7 +318,13 @@ object Parser {
             DataConstructor(Many.empty, Variant(TypeVar(tag), Many.empty))
 
           case "Empty3" | "Empty4" =>
-            DataConstructor(Many("W", "X", "Y", "Z"), Variant(TypeVar(tag), Many.empty))
+            import DatatypeRepresentation.Flag._
+            DataConstructor(Many(
+              Param("W", INVARIANT),
+              Param("X", INVARIANT),
+              Param("Y", COVARIANT),
+              Param("Z", CONTRAVARIANT)
+            ), Variant(TypeVar(tag), Many.empty))
         }
 
         assertEqualObjects(expected, actual)

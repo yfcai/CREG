@@ -86,6 +86,17 @@ trait UniverseConstruction {
   def covariantTypeDefs(c: Context)(names: Many[Name]): Many[c.universe.TypeDef] =
     names.map(name => covariantTypeDef(c)(name))
 
+  // make a TypeDef according to variance
+  def mkTypeDef(c: Context)(param: Param): c.universe.TypeDef = {
+    import c.universe._
+    val variance = param.variance.scalaSymbol
+    val q"trait __Trait__ [$typeDef]" = c.parse(s"trait __Trait__ [ $variance ${param.name} ]")
+    typeDef
+  }
+
+def mkTypeDefs(c: Context)(params: Many[Param]): Many[c.universe.TypeDef] =
+  params.map(param => mkTypeDef(c)(param))
+
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._

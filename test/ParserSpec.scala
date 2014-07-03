@@ -12,6 +12,6 @@ class ParserSpec extends FlatSpec {
     @datadecl trait Empty1
     @datadecl trait Empty2 {}
     @datadecl trait Empty3 [W, X, +Y, -Z]
-    @datadecl trait Empty4 [W, X, Y, Z] {}
+    @datadecl trait Empty4 [W, X, +Y, -Z] {}
   }
 }
