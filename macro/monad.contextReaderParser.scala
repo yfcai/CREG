@@ -59,7 +59,11 @@ trait Parser[+A] {
   }
 }
 
-case class ZeroOrMore[+A](parser: Parser[A]) {
+trait MultiParser[+A] {
+  def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position]
+}
+
+case class ZeroOrMore[+A](parser: Parser[A]) extends MultiParser[A] {
   def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
     import c.universe._
     inputs match {

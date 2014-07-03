@@ -11,20 +11,19 @@ trait Parser {
   //      Start := DataDecl
   //             | FamilyDecl
   //
-  //   DataDecl := trait Variant
+  //   DataDecl := trait VariantName [ GenericTypeParam* ] { Case* }
   //
-  // FamilyDecl := trait Name { Datatype* }
+  // FamilyDecl := trait FamilyName [ GenericTypeParam* ] { DataDecl* }
   //
-  //   Datatype := TypeVar
-  //             | Record
-  //             | Variant
-  //             | Function
+  //   Datatype := Variant           -- note the absence of `Record`
+  //             | Reader
   //             | Intersect
+  //             | TypeVar           -- TypeVar can designate any scala type
   //
   //    Variant := TypeVar { Case* } -- entry point from scala types
   //
   //       Case := Record
-  //             | Name = Datatype   -- use "=" for labelling to keep Datatype in scala term expr
+  //             | Name = TypeVar
   //
   //     Record := Name              -- record without fields, a single case object
   //             | Name ( Field+ )   -- record with fields
@@ -52,10 +51,47 @@ trait Parser {
   final val keywordWITH : String = "WITH"
   final val keyword_=>: : String = "=>:"
 
-  // parsers must be lazy val because they're mutually recursive
-  lazy val DatatypeP: Parser[Datatype] = TypeVarP // stub
+  //lazy val DataDeclP: Parser[
 
-  lazy val VariantP: Parser[Variant] = ???
+  // parsers must be lazy val because they're mutually recursive
+  lazy val DatatypeP: Parser[Datatype] =
+    VariantP <+ ReaderP <+ IntersectP <+ TypeVarP
+
+  lazy val VariantP: Parser[Variant] = new Parser[Variant] {
+    def parse(c: Context)(input: c.Tree): Result[Variant, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$variantHeader { ..$cases }" =>
+          for {
+            typeVar <- TypeVarP.parse(c)(variantHeader)
+            cases <- CasesP.parse(c)(cases)
+          }
+          yield Variant(typeVar, Many(cases: _*))
+
+        case _ =>
+          Failure(input.pos, "expect Variant { Case* }")
+      }
+    }
+  }
+
+  lazy val CasesP: MultiParser[Nominal] = ZeroOrMore(CaseP)
+
+  lazy val CaseP: Parser[Nominal] = new Parser[Nominal] {
+    def parse(c: Context)(input: c.Tree): Result[Nominal, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$lhs = $rhs" =>
+          for {
+            label <- IdentifierP.parse(c)(lhs)
+            data <- TypeVarP.parse(c)(rhs)
+          }
+          yield Field(label, data) // labelled data: Name = TypeVar
+
+        case _ =>
+          RecordP.parse(c)(input) // Record
+      }
+    }
+  }
 
   lazy val RecordP: Parser[Record] = RecordWithoutFieldsP <+ RecordWithFieldsP
 
@@ -65,7 +101,7 @@ trait Parser {
   }
 
   lazy val RecordWithFieldsP: Parser[Record] = new Parser[Record] {
-    val FieldsP = ZeroOrMore(FieldP) // is not a contextReaderParser
+    val FieldsP: MultiParser[PossiblyAnonymousField] = ZeroOrMore(FieldP)
 
     def parse(c: Context)(input: c.Tree): Result[Record, c.Position] = {
       import c.universe._
