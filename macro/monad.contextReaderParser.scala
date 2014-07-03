@@ -12,9 +12,13 @@ import scala.reflect.macros.blackbox.Context
 // type `Result[A, c.Position]`.
 
 sealed case class Success[+A](get: A) extends Result[A, Nothing]
-sealed case class Failure[+Position](pos: Position, message: String) extends Result[Nothing, Position]
+sealed case class Failure[+Position](pos: Position, message: String) extends Result[Nothing, Position] {
+  def get: Nothing = sys error s"Failure.get\n\n$pos\n\n$message\n"
+}
 
 sealed trait Result[+A, +Pos] {
+  def get: A
+
   // monadic return & bind
 
   def _return[A]: A => Result[A, Pos] = a => Success(a)

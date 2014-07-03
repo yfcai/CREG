@@ -26,7 +26,8 @@ trait Parser {
   //       Case := Record
   //             | Name = Datatype   -- use "=" for labelling to keep Datatype in scala term expr
   //
-  //     Record := Name ( Field* )
+  //     Record := Name              -- record without fields, a single case object
+  //             | Name ( Field+ )   -- record with fields
   //
   //      Field := Datatype
   //             | Name = Datatype   -- use "=" for labelling to keep Datatype in scala term expr
@@ -52,11 +53,48 @@ trait Parser {
   final val keyword_=>: : String = "=>:"
 
   // parsers must be lazy val because they're mutually recursive
-  lazy val DatatypeP: Parser[Datatype] = ???
+  lazy val DatatypeP: Parser[Datatype] = TypeVarP // stub
 
   lazy val VariantP: Parser[Variant] = ???
 
-  lazy val RecordP: Parser[Record] = ???
+  lazy val RecordP: Parser[Record] = RecordWithoutFieldsP <+ RecordWithFieldsP
+
+  lazy val RecordWithoutFieldsP: Parser[Record] = new Parser[Record] {
+    def parse(c: Context)(input: c.Tree): Result[Record, c.Position] =
+      for { recordName <- IdentifierP.parse(c)(input) } yield Record(recordName, Many.empty)
+  }
+
+  lazy val RecordWithFieldsP: Parser[Record] = new Parser[Record] {
+    val FieldsP = ZeroOrMore(FieldP) // is not a contextReaderParser
+
+    def parse(c: Context)(input: c.Tree): Result[Record, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$recordName ( ..$fields )" =>
+          if (fields.isEmpty)
+            Failure(input.pos, "error: if this record has no field, do not put parentheses after it.")
+          else
+            for {
+              name <- IdentifierP.parse(c)(recordName)
+              possiblyAnonymousFields <- FieldsP.parse(c)(fields)
+            }
+            yield Record(
+              name,
+              Many(possiblyAnonymousFields: _*).zipWithIndex.map {
+                case (AnonymousField(data), i) =>
+                  val label = s"_${i + 1}" // "_1", "_2", "_3" etc; scala will make sure named follows anonymous
+                  Field(label, data)
+
+                case (NamedField(field), _) =>
+                  field
+              }
+            )
+
+        case _ =>
+          Failure(input.pos, "expect record with fields")
+      }
+    }
+  }
 
   /** matching a named param against q"$lhs = $rhs" succeeds,
     *  meaning we can match fields one by one
@@ -137,8 +175,8 @@ trait Parser {
   }
 
   // parses a scala identifier
-  lazy val IdentifierP: Parser[String] = new Parser[String] {
-    def parse(c: Context)(input: c.Tree): Result[String, c.Position] = {
+  lazy val IdentifierP: Parser[Name] = new Parser[Name] {
+    def parse(c: Context)(input: c.Tree): Result[Name, c.Position] = {
       import c.universe._
       input match {
         case Ident(name) =>
@@ -149,5 +187,39 @@ trait Parser {
       }
     }
   }
+}
 
+
+object Parser {
+  object Tests extends Parser with AssertEqual {
+    import scala.language.experimental.macros
+    import scala.annotation.StaticAnnotation
+
+    class record extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro record.impl }
+    object record {
+      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+        import c.universe._
+
+        val q"trait $tag { $input }" = annottees.head.tree
+        val actual = RecordP.parse(c)(input).get
+
+        val expected = tag.toString match {
+          case "WithoutFields" =>
+            Record("SomeRecord", Many.empty)
+
+          case "WithFields" =>
+            Record("SomeRecord", Many(
+              Field("_1", TypeVar("Field1")),
+              Field("_2", TypeVar("Field2")),
+              Field("field3", TypeVar("Field3")),
+              Field("field4", TypeVar("Field4")),
+              Field("_5", TypeVar("Field5"))))
+        }
+
+        assertEqualObjects(expected, actual)
+        c.Expr(q"")
+      }
+    }
+
+  }
 }
