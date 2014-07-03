@@ -54,3 +54,20 @@ trait Parser[+A] {
       self.parse(c)(input) orElse that.parse(c)(input)
   }
 }
+
+case class ZeroOrMore[+A](parser: Parser[A]) {
+  def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
+    import c.universe._
+    inputs match {
+      case Nil =>
+        Success(Nil)
+
+      case head :: tail =>
+        for {
+          a <- parser.parse(c)(head)
+          as <- this.parse(c)(tail)
+        }
+        yield a :: as
+    }
+  }
+}
