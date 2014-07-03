@@ -3,7 +3,7 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 import monad.contextReaderParser._
 
-trait Parser {
+trait Parser extends AbortWithError {
 
   // Grammar
   // =======
@@ -50,6 +50,12 @@ trait Parser {
   // KEYWORDS
   final val keywordWITH : String = "WITH"
   final val keyword_=>: : String = "=>:"
+
+  def parseOrAbort[A](c: Context)(parser: Parser[A], input: c.Tree): A =
+    parser.parse(c)(input) match {
+      case Success(a) => a
+      case Failure(pos, message) => abortWithError(c)(pos, message)
+    }
 
   lazy val DataDeclP: Parser[DataConstructor] = new Parser[DataConstructor] {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
