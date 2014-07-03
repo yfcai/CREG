@@ -26,7 +26,7 @@ trait AssertEqual {
       c.Expr(actual)
   }
 
-  def assertEqualObject(expected: Any, actual: Any): Unit = {
+  def assertEqualObjects(expected: Any, actual: Any): Unit = {
     if (expected != actual) {
       System.err println s"Expected:\n$expected\nActual:\n$actual\n"
       throw new java.lang.AssertionError
