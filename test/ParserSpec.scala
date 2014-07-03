@@ -41,4 +41,10 @@ class ParserSpec extends FlatSpec {
     }
   }
 
+  it should "parse datatypes mentioning known functors" in pending // Company example; mentions List
+
+  it should "parse mutually recursive datatype families" in pending
+
+  it should "parse mutually recursive datatypes mentioning known functors" in pending
+
 }
