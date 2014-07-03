@@ -11,9 +11,9 @@ trait Parser {
   //      Start := DataDecl
   //             | FamilyDecl
   //
-  //   DataDecl := trait VariantName [ GenericTypeParam* ] { Case* }
+  //   DataDecl := trait VariantName [ GenericTypeParam* ] { Case* }   -- annotated @datatype
   //
-  // FamilyDecl := trait FamilyName [ GenericTypeParam* ] { DataDecl* }
+  // FamilyDecl := trait FamilyName [ GenericTypeParam* ] { Variant* } -- annotated @datafamily
   //
   //   Datatype := Variant           -- note the absence of `Record`
   //             | Reader
@@ -51,7 +51,49 @@ trait Parser {
   final val keywordWITH : String = "WITH"
   final val keyword_=>: : String = "=>:"
 
-  //lazy val DataDeclP: Parser[
+  lazy val DataDeclP: Parser[DataConstructor] = new Parser[DataConstructor] {
+    def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
+      import c.universe._
+      input match {
+        // this quasiquote matches all decls with nonempty cases
+        // and possibly empty genericTypeParams
+        case q"trait $variantName [ ..$params ] { ..$cases }" =>
+          for { cases <- CasesP.parse(c)(cases) }
+          yield
+            DataConstructor(
+              mkGenericTypeParams(c)(params),
+              Variant(
+                mkVariantHeader(c)(variantName),
+                Many(cases: _*)))
+
+        // matches decls with empty cases & trailing braces
+        case q"trait $variantName [ ..$params ] {}" =>
+          Success(mkEmptyVariant(c)(variantName, params))
+
+        // matches decls with neither cases nor trailing braces
+        case q"trait $variantName [ ..$params ]" =>
+          Success(mkEmptyVariant(c)(variantName, params))
+
+        case _ =>
+          Failure(input.pos, "expect trait Variant { Record* }")
+      }
+    }
+  }
+
+  def mkVariantHeader(c: Context)(name: c.TypeName): TypeVar = TypeVar(name.toString)
+
+  def mkEmptyVariant(c: Context)(name: c.TypeName, params: List[c.Tree]): DataConstructor =
+    DataConstructor(mkGenericTypeParams(c)(params), Variant(mkVariantHeader(c)(name), Many.empty))
+
+  def mkGenericTypeParams(c: Context)(params: List[c.Tree]): Many[Name] = {
+    import c.universe._
+    Many(params.map(_ match {
+      case typeDef @ TypeDef(mods, _, _, _) =>
+        if (mods hasFlag Flag.CONTRAVARIANT)
+          c.warning(typeDef.pos, "got contravariant generic type param. what to do?")
+        typeDef.name.toString
+    }): _*)
+  }
 
   // parsers must be lazy val because they're mutually recursive
   lazy val DatatypeP: Parser[Datatype] =
@@ -250,6 +292,27 @@ object Parser {
               Field("field3", TypeVar("Field3")),
               Field("field4", TypeVar("Field4")),
               Field("_5", TypeVar("Field5"))))
+        }
+
+        assertEqualObjects(expected, actual)
+        c.Expr(q"")
+      }
+    }
+
+    class datadecl extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro datadecl.impl }
+    object datadecl {
+      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+        import c.universe._
+
+        val actual = DataDeclP.parse(c)(annottees.head.tree).get
+        val DataConstructor(_, Variant(TypeVar(tag), _)) = actual
+
+        val expected = tag.toString match {
+          case "Empty1" | "Empty2" =>
+            DataConstructor(Many.empty, Variant(TypeVar(tag), Many.empty))
+
+          case "Empty3" | "Empty4" =>
+            DataConstructor(Many("W", "X", "Y", "Z"), Variant(TypeVar(tag), Many.empty))
         }
 
         assertEqualObjects(expected, actual)
