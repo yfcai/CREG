@@ -47,10 +47,6 @@ trait Parser extends AbortWithError {
   // shadow trait Parser by Parser[A]
   private[this] type Parser[A] = monad.contextReaderParser.Parser[A]
 
-  // KEYWORDS
-  final val keywordWITH : String = "WITH"
-  final val keyword_=>: : String = "=>:"
-
   def parseOrAbort[A](c: Context)(parser: Parser[A], input: c.Tree): A =
     parser.parse(c)(input) match {
       case Success(a) => a
@@ -215,7 +211,7 @@ trait Parser extends AbortWithError {
     def parse(c: Context)(input: c.Tree): Result[Reader, c.Position] = {
       import c.universe._
       input match {
-        case q"$range.${ keyword_=>: }($domain)" =>
+        case q"$domain =>: $range" => // keyword =>: has to be inlined in quasiquote...
           for {
             domainRes <- TypeVarP.parse(c)(domain)
             rangeRes <- DatatypeP.parse(c)(range)
@@ -223,7 +219,7 @@ trait Parser extends AbortWithError {
           yield Reader(domainRes, rangeRes)
 
         case _ =>
-          Failure(input.pos, s"expect (X ${ keyword_=>: } Y)")
+          Failure(input.pos, s"expect (X =>: Y)")
       }
     }
   }
@@ -232,7 +228,7 @@ trait Parser extends AbortWithError {
     def parse(c: Context)(input: c.Tree): Result[Intersect, c.Position] = {
       import c.universe._
       input match {
-        case q"$lhs.$keywordWITH($rhs)" =>
+        case q"$lhs WITH $rhs" => // keyword WITH has to be inlined in quasiquote...
           for {
             lhsRes <- DatatypeP.parse(c)(lhs)
             rhsRes <- DatatypeP.parse(c)(rhs)
@@ -240,7 +236,7 @@ trait Parser extends AbortWithError {
           yield Intersect(lhsRes, rhsRes)
 
         case _ =>
-          Failure(input.pos, s"expect (X $keywordWITH Y)")
+          Failure(input.pos, s"expect (X WITH Y)")
       }
     }
   }
@@ -316,7 +312,7 @@ object Parser {
       def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
         import c.universe._
 
-        val actual = DataDeclP.parse(c)(annottees.head.tree).get
+        val actual = parseOrAbort(c)(DataDeclP, annottees.head.tree)
         val DataConstructor(_, Variant(TypeVar(tag), _)) = actual
 
         val expected = tag.toString match {
@@ -324,13 +320,59 @@ object Parser {
             DataConstructor(Many.empty, Variant(TypeVar(tag), Many.empty))
 
           case "Empty3" | "Empty4" =>
-            import DatatypeRepresentation.Flag._
-            DataConstructor(Many(
-              Param("W", INVARIANT),
-              Param("X", INVARIANT),
-              Param("Y", COVARIANT),
-              Param("Z", CONTRAVARIANT)
-            ), Variant(TypeVar(tag), Many.empty))
+            DataConstructor(
+              Many(
+                Param.invariant("W"),
+                Param.invariant("X"),
+                Param.covariant("Y"),
+                Param.contravariant("Z")),
+              Variant(TypeVar(tag), Many.empty))
+
+          case "IntList" =>
+            DataConstructor(
+              Many.empty,
+              Variant(TypeVar("IntList"), Many(
+                Record("Nil", Many.empty),
+                Record("Cons", Many(
+                  Field("_1", TypeVar("Int")),
+                  Field("_2", TypeVar("IntList")))))))
+
+          case "WeirdList" =>
+            DataConstructor(
+              Many(
+                Param.contravariant("A"),
+                Param.covariant("B")),
+              Variant(TypeVar("WeirdList"), Many(
+                Field("Nil", TypeVar("B")),
+                Record("Cons", Many(
+                  Field("head", TypeVar("B")),
+                  Field("tail", TypeVar("WeirdList[A, B]")))),
+                Record("With", Many(
+                  Field("_1", Intersect(TypeVar("WeirdList[A, B]"), TypeVar("B"))))),
+                Record("More", Many(
+                  Field("reader",
+                    Reader(
+                      TypeVar("A"),
+                      Intersect(TypeVar("WeirdList[A, B]"), TypeVar("B")))))),
+                Record("Over", Many(
+                  Field("intersect",
+                    Intersect(
+                      Reader(TypeVar("A"), TypeVar("WeirdList[A, B]")),
+                      TypeVar("B"))))))))
+
+          case "Dept" =>
+            DataConstructor(
+              Many.empty,
+              Variant(TypeVar("Dept"), Many(
+                Record("D", Many(
+                  Field("name", TypeVar("String")),
+                  Field("manager",
+                    Variant(TypeVar("Manager"), Many(
+                      Record("E", Many(
+                        Field("name", TypeVar("String")),
+                        Field("salary",
+                          Variant(TypeVar("Salary"), Many(
+                            Record("S", Many(Field("_1", TypeVar("Float")))))))))))))))))
         }
 
         assertEqualObjects(expected, actual)

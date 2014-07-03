@@ -8,10 +8,37 @@ class ParserSpec extends FlatSpec {
     @record trait WithFields { SomeRecord(Field1, Field2, field3 = Field3, field4 = Field4, Field5) }
   }
 
-  "Parser" should "parse data declarations" in {
+  it should "parse empty data declarations" in {
     @datadecl trait Empty1
     @datadecl trait Empty2 {}
     @datadecl trait Empty3 [W, X, +Y, -Z]
     @datadecl trait Empty4 [W, X, +Y, -Z] {}
   }
+
+  it should "parse nonempty data declarations" in {
+    @datadecl trait IntList {
+      Nil
+      Cons(Int, IntList) // CAUTION: recursion! to be handled by preprocessor.
+    }
+
+    @datadecl trait WeirdList[-A, +B] {
+      Nil = B
+      Cons(head = B, tail = WeirdList[A, B])
+      With(WeirdList[A, B] WITH B)
+      More(reader = A =>: (WeirdList[A, B] WITH B))
+      Over(intersect = A =>: WeirdList[A, B]  WITH  B) // `=>:` binds tighter than `WITH`
+    }
+  }
+
+  it should "parse nested data" in {
+    // a part ripped out of the famous Company example
+    @datadecl trait Dept {
+      D(name = String,
+        manager = Manager {
+          E(name = String,
+            salary = Salary { S(Float) })
+        })
+    }
+  }
+
 }
