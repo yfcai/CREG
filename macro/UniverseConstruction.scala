@@ -18,9 +18,9 @@ trait UniverseConstruction {
           q"??? : ${TypeName(name)}[..${fields.map(field => meaning(c)(field.get))}]"
         result
 
-      case Variant(name, records) =>
+      case Variant(typeVar, records) =>
         val q"??? : $result" =
-          q"??? : ${TypeName(name)}[..${records.map(record => meaningOfNominal(c)(record))}]"
+          q"??? : ${meaning(c)(typeVar)}[..${records.map(record => meaningOfNominal(c)(record))}]"
         result
 
       case FixedPoint(paramName, body) =>
@@ -114,7 +114,7 @@ object UniverseConstruction {
         // duplicate test.UniverseConstructionSpec
         val datatype: Datatype =
           FixedPoint("L",
-            Variant("ListT", Many(
+            Variant(TypeVar("ListT"), Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
                 Field("head", TypeVar("Int")),
@@ -140,7 +140,7 @@ object UniverseConstruction {
         // duplicate test.UniverseConstructionSpec
         val datatype: Datatype =
           FixedPoint("L",
-            Variant("ListT", Many(
+            Variant(TypeVar("ListT"), Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
                 Field("head", TypeVar("A")), // should be bound by my[A]

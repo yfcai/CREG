@@ -21,15 +21,15 @@ trait Parser {
   //             | Function
   //             | Intersect
   //
-  //    Variant := Name { Case* }
+  //    Variant := TypeVar { Case* } -- entry point from scala types
   //
   //       Case := Record
-  //             | Name = Datatype -- use "=" for labelling to keep Datatype in scala term expr
+  //             | Name = Datatype   -- use "=" for labelling to keep Datatype in scala term expr
   //
   //     Record := Name ( Field* )
   //
   //      Field := Datatype
-  //             | Name = Datatype -- use "=" for labelling to keep Datatype in scala term expr
+  //             | Name = Datatype   -- use "=" for labelling to keep Datatype in scala term expr
   //
   //     Reader := TypeVar =>: Datatype
   //

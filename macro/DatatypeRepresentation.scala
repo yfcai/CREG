@@ -14,7 +14,9 @@ object DatatypeRepresentation {
 
   case class TypeVar(name: Name) extends Datatype
   case class Record(name: Name, fields: Many[Field]) extends Nominal with Datatype
-  case class Variant(name: Name, cases: Many[Nominal]) extends Nominal with Datatype
+
+  // variant is entry point from scala types, hence the header.
+  case class Variant(header: TypeVar, cases: Many[Nominal]) extends Datatype
 
   case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype
 

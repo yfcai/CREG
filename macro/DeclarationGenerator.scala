@@ -14,7 +14,7 @@ trait DeclarationGenerator extends UniverseConstruction {
   def generateDeclaration(c: Context)(datatype: Variant): Many[c.Tree] = {
     import c.universe._
 
-    val template = mkTemplate(c)(datatype.name)
+    val template = mkTemplate(c)(datatype.header.name)
 
     if (datatype.cases.isEmpty)
       Many(q"sealed trait $template")
@@ -103,7 +103,7 @@ object DeclarationGenerator {
         import c.universe._
         val q"trait $name" = annottees.head.tree
         val actual = generateDeclaration(c)(
-          Variant(name.toString, Many.empty)
+          Variant(TypeVar(name.toString), Many.empty)
         )
         val expected = q"sealed trait ${TypeName(name.toString)}"
         assertEqualBlock(c)(expected, actual)
@@ -116,7 +116,7 @@ object DeclarationGenerator {
         import c.universe._
         val q"trait $variant { $singletonBody }" = annottees.head.tree
         val actual = generateDeclaration(c)(
-          Variant(variant.toString, Many(
+          Variant(TypeVar(variant.toString), Many(
             Record(singletonBody.toString, Many.empty)
           ))
         )
@@ -138,7 +138,7 @@ object DeclarationGenerator {
         import c.universe._
         val q"trait $variant { $case1 ; $case2 ; $case3 ; $case4 }" = annottees.head.tree
         val actual = generateDeclaration(c)(
-          Variant(variant.toString, Many(
+          Variant(TypeVar(variant.toString), Many(
             Record(case1.toString, Many.empty),
             Record(case2.toString, Many.empty),
             Record(case3.toString, Many.empty),
@@ -179,7 +179,7 @@ object DeclarationGenerator {
           }""" = annottees.head.tree
 
         val actual = generateDeclaration(c)(
-          Variant("HorsemanT", Many(
+          Variant(TypeVar("HorsemanT"), Many(
             Record("Conquest", Many(
               Field("_1", TypeVar("A")),
               Field("_2", TypeVar("A")),
