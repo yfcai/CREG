@@ -19,7 +19,7 @@ trait AssertEqual {
     val eRaw = showRaw(expected)
     val aRaw = showRaw(actual)
     if (eRaw != aRaw) {
-      System.err println s"\nExpected:\n$expected\nActual:\n$actual\n\nExpected:\n$eRaw\n\nActual:\n$aRaw\n"
+      System.err println s"\nExpected:\n$expected\n\nActual:\n$actual\n\nExpected:\n$eRaw\n\nActual:\n$aRaw\n"
       throw new java.lang.AssertionError
     }
     else
@@ -28,7 +28,7 @@ trait AssertEqual {
 
   def assertEqualObjects(expected: Any, actual: Any): Unit = {
     if (expected != actual) {
-      System.err println s"Expected:\n$expected\nActual:\n$actual\n"
+      System.err println s"\nExpected:\n$expected\n\nActual:\n$actual\n"
       throw new java.lang.AssertionError
     }
   }
