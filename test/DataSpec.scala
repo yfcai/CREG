@@ -48,6 +48,31 @@ class DataSpec extends FlatSpec {
 
   type FunctorOf[F[+_]] = Functor { type Map[T] = F[T] }
 
+  // RecursivePolynomialFunctor is isomorphic to trait Functor.
+  // It is friendlier to scalac 2.11.1's type inferencer than trait Functor.
+  trait RecursivePolynomialFunctor {
+    type Map[+T]
+
+    // reinterpret `x` in the light of `Map` being a recursive polynomial functor
+    def apply[A](x: Map[A]): RecursivePolynomial[A]
+
+    trait RecursivePolynomial[A] {
+      def gcompos[F[_]: Applicative]: GCompos[F]
+      abstract class GCompos[F[_]](implicit protected[this] val applicative: Applicative[F]) {
+        def apply[B](f: A => F[B]): F[Map[B]]
+      }
+
+      private[this] type CA[X] = A
+      def map[B](f: A => B): Map[B] = gcompos[ID].apply(f)
+      def gfoldl(default: A, combine: (A, A) => A): A = gcompos[CA](new Applicative[CA] {
+        def pure[X](x: X): A = default
+        def call[X, Y](f: A, x: A): A = combine(f, x)
+      })(identity)
+    }
+  }
+
+
+
   "data macro" should "generate enough scala types for the case study" in {
     @datatype trait Term {
       Void
@@ -349,27 +374,29 @@ class DataSpec extends FlatSpec {
     // since GADT not surpported anyway, recursion is marked by name
     @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
 
-    def listF[X] = new Functor {
-      type Map[+T] = ListF[X, T]
-
-      def gcompos[F[_]: Applicative]: GCompos[F] = new GCompos[F] {
-        private[this] val applicative = implicitly[Applicative[F]]
-        import applicative._
-
-        def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = _ match {
-          case Nil => pure(Nil)
-          case Cons(head, tail) =>
-            call(
-              call(
-                pure[X => B => Map[B]](x => b => Cons(x, b)),
-                pure[X](head)),
-              f(tail))
+    object _List {
+      def patternFunctor[Elem] = new RecursivePolynomialFunctor {
+        type Map[+T] = ListF[Elem, T]
+        def apply[A](xs: Map[A]): RecursivePolynomial[A] = new RecursivePolynomial[A] {
+          def gcompos[F[_]: Applicative]: GCompos[F] = new GCompos[F] {
+            import applicative._
+            def apply[B](f: A => F[B]): F[Map[B]] = xs match {
+              case Nil => pure(Nil)
+              case Cons(head, tail) =>
+                call(
+                  call(
+                    pure[Elem => B => Map[B]](x => b => Cons(x, b)),
+                    pure[Elem](head)),
+                  f(tail))
+            }
+          }
         }
       }
     }
 
+    // List is a synonym and has no companion object
     implicit class ListIsFoldable[A](xs: List[A]) {
-      def fold[T](f: ListF[A, T] => T): T = f(listF.map[List[A], T](_ fold f)(xs.unroll))
+      def fold[T](f: ListF[A, T] => T): T = f(_List patternFunctor xs.unroll map (_ fold f))
     }
 
     val nil: List[Nothing] = Roll[({ type λ[+T] = ListF[Nothing, T] })#λ](Nil)
