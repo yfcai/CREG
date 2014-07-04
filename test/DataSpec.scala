@@ -408,7 +408,8 @@ class DataSpec extends FlatSpec {
       case List => ()
     }
 
-    // List is a synonym and has no companion object
+    // List is a synonym and has no companion object recognizable to scalac.
+    // therefore the implicit conversion has to be outside.
     implicit class ListIsFoldable[A](xs: List[A]) {
       def fold[T](f: ListF[A, T] => T): T = f(List patternFunctor xs.unroll map (_ fold f))
     }
