@@ -372,9 +372,18 @@ class DataSpec extends FlatSpec {
 
   it should "generate enough scala types for the list example" in {
     // since GADT not surpported anyway, recursion is marked by name
+
     @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
 
-    object _List {
+    // superclass of object List is nonsensical on purpose
+    // it's there to test that attributes got passed around
+    final case object List extends Set[Int] {
+      // nonsensical implementation of Set[Int] interface
+      def -(x: Int) = Set.empty
+      def +(x: Int) = this - x
+      def contains(x: Int) = false
+      def iterator = Iterator.empty
+
       def patternFunctor[Elem] = new RecursivePolynomialFunctor {
         type Map[+T] = ListF[Elem, T]
         def apply[A](xs: Map[A]): RecursivePolynomial[A] = new RecursivePolynomial[A] {
@@ -394,9 +403,14 @@ class DataSpec extends FlatSpec {
       }
     }
 
+    // test that attributes of companion objects are passed around correctly
+    (List: Set[Int]) match {
+      case List => ()
+    }
+
     // List is a synonym and has no companion object
     implicit class ListIsFoldable[A](xs: List[A]) {
-      def fold[T](f: ListF[A, T] => T): T = f(_List patternFunctor xs.unroll map (_ fold f))
+      def fold[T](f: ListF[A, T] => T): T = f(List patternFunctor xs.unroll map (_ fold f))
     }
 
     val nil: List[Nothing] = Roll[({ type λ[+T] = ListF[Nothing, T] })#λ](Nil)

@@ -9,12 +9,7 @@ object datatype extends Parser with Preprocessor with DeclarationGenerator with 
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
-    if (annottees.size != 1)
-      abortWithError(c)(annottees.head.tree.pos,
-        "Bad use of @datatype. Usage example:\n\n  @datatype trait List[+A] {\n" +
-          "    Nil\n    Cons(head = A, tail = List)\n  }\n.")
-
-    val input = annottees.head.tree
+    val (input, companion) = extractInput(c)(annottees)
 
     try {
       // parser parses DSL
@@ -38,15 +33,71 @@ object datatype extends Parser with Preprocessor with DeclarationGenerator with 
         q"import _root_.scala.language.implicitConversions"
       )
 
-      // TODO: append recursive polynomial functor instances etc to result
-      val result = declarations ++ synonyms
+      // companion object
+      val updatedCompanion: c.Tree = injectIntoObject(c)(companion, Seq.empty) // nothing to inject for now
 
-      c.Expr(q"..${(imports ++ result).toSeq}")
+      // TODO: append recursive polynomial functor instances etc to result
+      val result = imports ++ declarations ++ synonyms ++ Iterator(updatedCompanion)
+
+      c.Expr(q"..${result.toSeq}")
 
     }
     catch {
       case PreprocessorException(message) =>
         abortWithError(c)(input.pos, message)
+    }
+  }
+
+  /** @return (input-syntax-tree, companion-object)
+    *
+    * annoying operation; duplicates parser...
+    */
+  def extractInput(c: Context)(annottees: Seq[c.Expr[Any]]): (c.Tree, c.Tree) = {
+    import c.universe._
+    def giveUp: Nothing =
+      abortWithError(c)(annottees.head.tree.pos,
+        "Bad use of @datatype. Usage example:\n\n  @datatype trait List[+A] {\n" +
+          "    Nil\n    Cons(head = A, tail = List)\n  }\n.")
+
+    annottees.size match {
+      case 0 => giveUp
+      case n if n > 2 => giveUp
+
+      case 1 =>
+        val input = annottees.head.tree
+        getNameOfTrait(c)(input).fold[(c.Tree, c.Tree)](giveUp)(name => (input, q"object ${TermName(name)}"))
+
+      case 2 =>
+        val (fst, snd) = (annottees.head.tree, annottees.last.tree)
+        (getNameOfTrait(c)(fst), getNameOfTrait(c)(snd)) match {
+          case (Some(_), None) => (fst, snd)
+          case (None, Some(_)) => (snd, fst)
+          case _ => giveUp
+        }
+    }
+  }
+
+  def getNameOfTrait(c: Context)(tree: c.Tree): Option[String] = {
+    import c.universe._
+    tree match {
+      case q"trait $name [..$params]" => Some(name.toString)
+      case q"trait $name [..$params] {}" => Some(name.toString)
+      case q"trait $name [..$params] { ..$body }" => Some(name.toString)
+      case _ => None
+    }
+  }
+
+  def injectIntoObject(c: Context)(obj: c.Tree, newDecls: Seq[c.Tree]): c.Tree = {
+    import c.universe._
+    obj match {
+      case q"..$attributes object $objectName extends ..$superClasses { ..$existingDecls }" =>
+        // hack to put attributes back in the object
+        q"object $objectName extends ..$superClasses { ..${newDecls ++ existingDecls} }" match {
+          case ModuleDef(_, a, b) => ModuleDef(attributes, a, b)
+        }
+
+      case _ =>
+        abortWithError(c)(obj.pos, "malformed companion object")
     }
   }
 }
