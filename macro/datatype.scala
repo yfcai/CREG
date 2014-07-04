@@ -4,12 +4,21 @@ import scala.annotation.StaticAnnotation
 
 import DatatypeRepresentation._
 
-object datatype extends Parser with DeclarationGenerator {
+object datatype extends Parser with Preprocessor with DeclarationGenerator {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
+    val Seq(expr) = annottees
+    val input = expr.tree
+
     // parser parses DSL
-    // preprocessor appends T & add Fix
+    val parseTree: DataConstructor = parseOrAbort(c)(DataDeclP, input)
+
+    // generate variants
+    val forDeclarations: Iterator[Variant] = digestForDeclarationGenerator(c)(input, parseTree)
+    val declarations: Iterator[Tree] = forDeclarations flatMap (variant => generateDeclaration(c)(variant))
+
+    // preprocessor add Fix
     // declaration generator generates template classes
     // synonym generator generates synonyms
 
