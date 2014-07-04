@@ -9,10 +9,75 @@ object DatatypeRepresentation {
 
 
   // datatype representation
-  sealed trait Datatype
+  sealed trait Datatype {
+    // traversals
+
+    // real type:
+    //
+    // ∀ T <: Datatype.  T.everywhere : (∀ S <: Datatype.  S → S) → T
+    //
+    def everywhere(f: PartialFunction[Datatype, Datatype]): Datatype =
+            f.applyOrElse(gmapT(_ everywhere f), identity[Datatype])
+
+    def everywhereQ[T](f: PartialFunction[Datatype, T]): Iterator[T] =
+      (f lift this).fold[Iterator[T]](Iterator.empty)(x => Iterator(x)) ++ children.flatMap(_ everywhereQ f)
+
+
+    def gmapT(f: Datatype => Datatype): Datatype = this match {
+      case TypeVar(_) =>
+        this
+
+      case Record(name, fields) =>
+        Record(name, fields map { case Field(name, data) => Field(name, f(data)) })
+
+      case Variant(name, cases) =>
+        Variant(name,
+          cases map {
+            case Field(name, data) => Field(name, f(data))
+            case data: Datatype => f(data).asInstanceOf[Nominal] /* unsafe cast */
+          })
+
+      case FixedPoint(name, body) =>
+        FixedPoint(name, f(body))
+
+      case Reader(domain, range) =>
+        Reader(f(domain).asInstanceOf[TypeVar] /* unsafe cast */, f(range))
+
+      case Intersect(lhs, rhs) =>
+        Intersect(f(lhs), f(rhs))
+    }
+
+    def gmapQ[T](f: PartialFunction[Datatype, T]): Iterator[T] =
+      children flatMap (child => f lift child)
+
+    def children: Iterator[Datatype] = this match {
+      case TypeVar(_) =>
+        Iterator.empty
+
+      case Record(name, fields) =>
+        fields.iterator map (_.get)
+
+      case Variant(name, cases) =>
+        cases.iterator map {
+          case Field(name, data) => data
+          case data: Datatype => data
+        }
+
+      case FixedPoint(name, body) =>
+        Iterator(body)
+
+      case Reader(domain, range) =>
+        Iterator(domain, range)
+
+      case Intersect(lhs, rhs) =>
+        Iterator(lhs, rhs)
+    }
+  }
+
   sealed trait Nominal { def name: Name }
 
   case class TypeVar(name: Name) extends Datatype
+
   case class Record(name: Name, fields: Many[Field]) extends Nominal with Datatype
 
   // variant is entry point from scala types, hence the header.
@@ -28,24 +93,24 @@ object DatatypeRepresentation {
 
 
   // datatype representation helpers
-  case class DataConstructor(params: Many[Param], body: Datatype)
 
   case class Field(name: Name, get: Datatype) extends Nominal
 
-  case class Param(name: Name, variance: Flag.VARIANCE)
+  case class DataConstructor(params: Many[Param], body: Datatype)
+
+  case class Param(name: Name, variance: Param.Variance)
 
   object Param {
-    def invariant(name: Name): Param = Param(name, Flag.INVARIANT)
-    def covariant(name: Name): Param = Param(name, Flag.COVARIANT)
-    def contravariant(name: Name): Param = Param(name, Flag.CONTRAVARIANT)
+    sealed trait Variance { def scalaSymbol: String }
+    object Variance {
+      case object Invariant     extends Variance { def scalaSymbol = ""  }
+      case object Covariant     extends Variance { def scalaSymbol = "+" }
+      case object Contravariant extends Variance { def scalaSymbol = "-" }
+    }
+
+    def invariant    (name: Name): Param = Param(name, Variance.Invariant)
+    def covariant    (name: Name): Param = Param(name, Variance.Covariant)
+    def contravariant(name: Name): Param = Param(name, Variance.Contravariant)
   }
 
-
-  // non-path-dependent mirror of Context.universe.Flag
-  object Flag {
-    sealed trait VARIANCE { def scalaSymbol: String }
-    case object INVARIANT     extends VARIANCE { def scalaSymbol = ""  }
-    case object COVARIANT     extends VARIANCE { def scalaSymbol = "+" }
-    case object CONTRAVARIANT extends VARIANCE { def scalaSymbol = "-" }
-  }
 }

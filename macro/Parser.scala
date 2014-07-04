@@ -89,17 +89,15 @@ trait Parser extends AbortWithError {
 
   def mkGenericTypeParams(c: Context)(params: List[c.Tree]): Many[Param] = {
     import c.universe._
-    val myFlag = DatatypeRepresentation.Flag
     Many(params.map(_ match {
       case typeDef @ TypeDef(mods, _, _, _) =>
-        val variance =
-          if (mods hasFlag Flag.COVARIANT)
-            myFlag.COVARIANT
-          else if (mods hasFlag Flag.CONTRAVARIANT)
-            myFlag.CONTRAVARIANT
-          else
-            myFlag.INVARIANT
-        Param(typeDef.name.toString, variance)
+        val name = typeDef.name.toString
+        if (mods hasFlag Flag.COVARIANT)
+          Param covariant name
+        else if (mods hasFlag Flag.CONTRAVARIANT)
+          Param contravariant name
+        else
+          Param invariant name
     }): _*)
   }
 
