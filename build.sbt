@@ -3,9 +3,9 @@ val sversion = "2.11.1"
 resolvers ++= List("releases").map(Resolver.sonatypeRepo)
 
 
-// macro
+// nominal macro
 
-lazy val macro = project in file("macro") settings (
+lazy val nominal = project in file("nominal") settings (
   scalaVersion := sversion,
   scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
   libraryDependencies ++= List(
@@ -16,9 +16,9 @@ lazy val macro = project in file("macro") settings (
 )
 
 
-// root
+// tests
 
-lazy val root = project in file(".") dependsOn macro settings (
+lazy val test = project in file(".") dependsOn nominal settings (
   scalaVersion := sversion,
   scalaSource in Compile := new File(baseDirectory.value, "empty"),
   scalaSource in Test := new File(baseDirectory.value, "test"),
@@ -29,3 +29,8 @@ lazy val root = project in file(".") dependsOn macro settings (
     compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
   )
 )
+
+
+// root
+
+lazy val root = project.aggregate(nominal, test)

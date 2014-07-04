@@ -1,4 +1,5 @@
 import org.scalatest._
+import nominal._
 
 import scala.language.experimental.macros
 

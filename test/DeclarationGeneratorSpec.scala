@@ -1,4 +1,5 @@
 import org.scalatest._
+import nominal._
 
 class DeclarationGeneratorSpec extends FlatSpec {
   import DeclarationGenerator.Tests._

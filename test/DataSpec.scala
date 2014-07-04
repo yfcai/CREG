@@ -1,4 +1,5 @@
 import org.scalatest._
+import nominal._
 
 class DataSpec extends FlatSpec {
 
@@ -8,6 +9,6 @@ class DataSpec extends FlatSpec {
   case class Roll[+F[+_]](unroll: F[Fix[F]]) extends Fix[F]
 
   "data macro" should "do something?" in {
-    @datatype trait List[A] { Nil ; Cons(A, tail: List[A]) }
+    @datatype trait List[A] { Nil ; Cons(A, tail = List[A]) }
   }
 }

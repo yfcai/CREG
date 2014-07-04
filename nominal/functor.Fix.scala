@@ -1,3 +1,4 @@
+package nominal
 package functor
 
 import language.higherKinds

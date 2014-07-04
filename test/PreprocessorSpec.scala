@@ -1,4 +1,5 @@
 import org.scalatest._
+import nominal._
 import DatatypeRepresentation._
 
 class PreprocessorSpec extends FlatSpec with Preprocessor {

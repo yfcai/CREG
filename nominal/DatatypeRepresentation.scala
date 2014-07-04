@@ -1,3 +1,5 @@
+package nominal
+
 object DatatypeRepresentation {
   // name of records, variants, fields
   type Name = String

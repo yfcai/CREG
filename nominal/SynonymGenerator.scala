@@ -1,3 +1,5 @@
+package nominal
+
 import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
@@ -82,7 +84,7 @@ object SynonymGenerator {
 
         val synonym = generateSynonym(c)(intList, genericDatatype)
         val expectedSynonym = q"""
-          type IntList = _root_.functor.Fix[({
+          type IntList = _root_.nominal.functor.Fix[({
             type __innerType__[+IntList] = IntListT[Nil, Cons[Int, IntList]]
           })#__innerType__]"""
         assertEqual(c)(expectedSynonym, synonym)
@@ -123,7 +125,7 @@ object SynonymGenerator {
 
         val synonym = generateSynonym(c)(gList, genericDatatype)
         val expectedSynonym = q"""
-          type GList[+A] = _root_.functor.Fix[({
+          type GList[+A] = _root_.nominal.functor.Fix[({
             type __innerType__[+GList] = GListT[Nil, Cons[A, GList]]
           })#__innerType__]"""
         assertEqual(c)(expectedSynonym, synonym)

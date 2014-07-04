@@ -1,4 +1,5 @@
 import org.scalatest._
+import nominal._
 
 class SynonymGeneratorSpec extends FlatSpec {
   import SynonymGenerator.Tests._

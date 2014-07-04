@@ -1,3 +1,5 @@
+package nominal
+
 import scala.reflect.macros.blackbox.Context
 
 trait AbortWithError {
