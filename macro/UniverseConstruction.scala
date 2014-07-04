@@ -100,7 +100,7 @@ def mkTypeDefs(c: Context)(params: Many[Param]): Many[c.universe.TypeDef] =
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._
-    val q"??? : $fix [ ID ]" = q"??? : _root_.fixedpoint.Fix [ ID ]"
+    val q"??? : $fix [ ID ]" = q"??? : _root_.functor.Fix [ ID ]"
     fix
   }
 }

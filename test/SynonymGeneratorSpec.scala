@@ -2,7 +2,7 @@ import org.scalatest._
 
 class SynonymGeneratorSpec extends FlatSpec {
   import SynonymGenerator.Tests._
-  import fixedpoint._
+  import functor._
 
   "SynonymGenerator" should "generate a synonym for flat datatypes" in {
     @flat trait Person {

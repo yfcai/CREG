@@ -1,7 +1,7 @@
 import org.scalatest._
 import language.higherKinds
 import DatatypeRepresentation._
-import fixedpoint._
+import functor._
 
 class UniverseConstructionSpec extends FlatSpec {
   import UniverseConstruction.Tests._

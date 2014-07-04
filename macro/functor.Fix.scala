@@ -1,4 +1,4 @@
-package fixedpoint
+package functor
 
 import language.higherKinds
 
