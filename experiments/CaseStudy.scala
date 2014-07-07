@@ -79,13 +79,13 @@ trait CaseStudy {
 
   trait Functor {
     // mapping between objects (scala types)
-    type Bound
-    type Map[+T <: Bound]
+    type Cat // this is a functor from some full subcategory of Scala to the full subcategory induced by Map[Cat].
+    type Map[+T <: Cat]
 
     // reinterpret `x` in the light of `Map` being a recursive polynomial functor
-    def apply[A <: Bound](x: Map[A]): RecursivePolynomial[A]
+    def apply[A <: Cat](x: Map[A]): RecursivePolynomial[A]
 
-    trait RecursivePolynomial[A <: Bound] {
+    trait RecursivePolynomial[A <: Cat] {
       // Nominal-functor-enabled generalization of `compos` in:
       //
       // Bringert and Ranta.
@@ -104,10 +104,10 @@ trait CaseStudy {
       // is it canonical in some way?
 
       // underlying type:  ∀ F : * → *.  ∀ A B.  (A → F B) → Map A → F (Map B)
-      def gcompos[F[_]: Applicative, B <: Bound](f: A => F[B]): F[Map[B]]
+      def gcompos[F[_]: Applicative, B <: Cat](f: A => F[B]): F[Map[B]]
 
       // `flip fmap`: mapping with morphisms, `compos` with identity applicative functor
-      def map[B <: Bound](f: A => B): Map[B] = gcompos[ID, B](f)
+      def map[B <: Cat](f: A => B): Map[B] = gcompos[ID, B](f)
 
       // projecting to the free monoid on `A`, `compos` with the functor mapping everything to A
       private[this] type CA[X] = A
@@ -120,8 +120,11 @@ trait CaseStudy {
     }
   }
 
-  // sugar
-  type FunctorOf[F[+_]] = Functor { type Map[T] = F[T] ; type Bound = Any }
+  trait ScalaFunctor extends Functor { type Cat = Any }
+
+  // The category of all scala types is identical to the full subcategory
+  // induced by `Any`, the supertype of all types
+  type ScalaFunctorOf[F[+_]] = ScalaFunctor { type Map[T] = F[T] }
 
   // fixed point of functor, featuring ill-founded inheritance
   sealed trait Fix[+F[+_]] { def unroll: F[Fix[F]] }
@@ -130,9 +133,9 @@ trait CaseStudy {
   case class Roll[+F[+_]](unroll: F[Fix[F]]) extends Fix[F]
 
   // `fold` cannot be inside trait Fix, for it violates covariance.
-  class Foldable[F[+_]: FunctorOf](t: Fix[F]) {
+  class Foldable[F[+_]: ScalaFunctorOf](t: Fix[F]) {
     def fold[T](f: F[T] => T): T =
-      f(implicitly[FunctorOf[F]].apply(t.unroll).map[T](x => new Foldable(x) fold f))
+      f(implicitly[ScalaFunctorOf[F]].apply(t.unroll).map[T](x => new Foldable(x) fold f))
   }
 
   // Term as the fixed point of the functor TermF
@@ -149,9 +152,8 @@ trait CaseStudy {
   def abs(x: String, body: Term): Term = Roll[TermF](Abs(x, body))
   def app(f: Term, y: Term): Term = Roll[TermF](App(f, y))
 
-  val termF = new Functor {
+  val termF = new ScalaFunctor {
     type Map[+X] = TermF[X]
-    type Bound = Any
 
     def apply[A](t0: TermF[A]) = new RecursivePolynomial[A] {
       def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
@@ -223,14 +225,13 @@ trait CaseStudy {
 
   // System generates:
 
-  val namesF = new Functor {
+  val namesF = new ScalaFunctor {
     namesF =>
 
     private[this] type TF[+N] = {
       type λ[+T] = TermT[Void, Var[N], Abs[N, T], App[T, T]]
     }
 
-    type Bound = Any
     type Map[+N] = Fix[TF[N]#λ]
 
     def apply[A](x: Map[A]) = new RecursivePolynomial[A] {
@@ -342,29 +343,30 @@ trait CaseStudy {
   // System generates:
 
   trait Bifunctor {
-    type Bound1 // these bounds are for replacing variants wholesale.
-    type Bound2 // we may need subtype bounds in trait Functor at some point, too.
-    type Bimap[+T1 <: Bound1, +T2 <: Bound2]
+    // due to subtyping, each scala type (or, each object in Scala category) induces a full subcategory.
+    type Cat1 // full subcategory 1
+    type Cat2 // full subcategory 2
+    type Bimap[+T1 <: Cat1, +T2 <: Cat2]
 
-    def apply[A <: Bound1, B <: Bound2](t: Bimap[A, B]): RecursivePolynomial[A, B]
+    def apply[A <: Cat1, B <: Cat2](t: Bimap[A, B]): RecursivePolynomial[A, B]
 
-    trait RecursivePolynomial[A <: Bound1, B <: Bound2] {
-      def bimap[C <: Bound1, D <: Bound2](f: A => C, g: B => D): Bimap[C, D] = bicompos[ID, C, D](f, g)
+    trait RecursivePolynomial[A <: Cat1, B <: Cat2] {
+      def bimap[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Bimap[C, D] = bicompos[ID, C, D](f, g)
 
       // bicompos: binary extrapolation of gcompos
-      def bicompos[F[_]: Applicative, C <: Bound1, D <: Bound2](f: A => F[C], g: B => F[D]): F[Bimap[C, D]]
+      def bicompos[F[_]: Applicative, C <: Cat1, D <: Cat2](f: A => F[C], g: B => F[D]): F[Bimap[C, D]]
     }
   }
 
   val avoidF = new Bifunctor {
     avoidF =>
 
-    private[this] type H[+V, +A] = {
+    private[this] type H[+V, +A <: Abs[_, _]] = {
       type λ[+T] = TermT[Void, Var[V], A, App[T, T]]
     }
 
-    type Bound1 = Any
-    type Bound2 = Abs[_, _]
+    type Cat1 = Any
+    type Cat2 = Abs[_, _] // a named product subcategory of Scala
 
     type Bimap[+V, +A <: Abs[_, _]] = Fix[H[V, A]#λ]
 
@@ -384,7 +386,15 @@ trait CaseStudy {
 
           case abs @ Abs(_, _) =>
             call(
-              pure[D => Bimap[C, D]](abs => Roll[H[C, D]#λ](abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
+              // the cast on g_abs is because scalac lacks the knowledge that
+              //
+              // ∀ A <: Abs[Any, Any].  ∃ B C.  A =:= Abs[B, C].
+              //
+              // and thus  A <: TermT[⊥, ⊥, A, ⊥].
+              //
+              // Declaring `case class Abs` as `final` does not help.
+              //
+              pure[D => Bimap[C, D]](g_abs => Roll[H[C, D]#λ](g_abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
               g(abs))
 
           case App(t1, t2) =>
@@ -405,7 +415,7 @@ trait CaseStudy {
       type λ[+T] = TermT[Void, Var[V], Abs[String, T], App[T, T]]
     }
 
-    type Bound = Any
+    type Cat = Any
     type Map[+V] = Fix[H[V]#λ]
 
     def apply[A](x: Map[A]) = new RecursivePolynomial[A] {
