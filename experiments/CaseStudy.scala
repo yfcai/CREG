@@ -120,10 +120,11 @@ trait CaseStudy {
     }
   }
 
-  trait ScalaFunctor extends Functor { type Cat = Any }
-
   // The category of all scala types is identical to the full subcategory
   // induced by `Any`, the supertype of all types
+  trait ScalaFunctor extends Functor { type Cat = Any }
+
+  // sugar
   type ScalaFunctorOf[F[+_]] = ScalaFunctor { type Map[T] = F[T] }
 
   // fixed point of functor, featuring ill-founded inheritance
