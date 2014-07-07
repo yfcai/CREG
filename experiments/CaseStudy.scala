@@ -79,50 +79,49 @@ trait CaseStudy {
 
   trait Functor {
     // mapping between objects (scala types)
-    type Map[+T]
+    type Bound
+    type Map[+T <: Bound]
 
-    // mapping between morphisms, compos with identity applicative functor
-    def map[A, B]: (A => B) => Map[A] => Map[B] = gcompos[ID].apply
+    // reinterpret `x` in the light of `Map` being a recursive polynomial functor
+    def apply[A <: Bound](x: Map[A]): RecursivePolynomial[A]
 
-    // de-facto flattening projection to the free monoid of A (i. e., List[A])
-    // to supports SYBP-style gmapQ
-    //
-    // compos with constant applicative functor mapping everything to A
-    //
-    def gfoldl[A](default: A, combine: (A, A) => A): Map[A] => A = {
-      type CA[X] = A
-      gcompos[CA](new Applicative[CA] {
-        def pure[X](x: X): A = default
-        def call[X, Y](f: A, x: A): A = combine(f, x)
-      })(identity)
-    }
+    trait RecursivePolynomial[A <: Bound] {
+      // Nominal-functor-enabled generalization of `compos` in:
+      //
+      // Bringert and Ranta.
+      // A pattern for almost compositional functions.
+      //
+      //
+      // Let F be an applicative functor.
+      //
+      // gcompos[F] = gcompose[F] ∘ functor[Map].map, where
+      //
+      //   functor[Map].map : (A => B) => Map[A] => Map[B]
+      //
+      //   gcompose : ∀X. Map[F[X]] => F[Map[X]]
+      //
+      // gcompose is a natural transformation from Map ∘ F  to  F ∘ Map.
+      // is it canonical in some way?
 
-    // Nominal-functor-enabled generalization of `compos` in:
-    //
-    // Bringert and Ranta.
-    // A pattern for almost compositional functions.
-    //
-    //
-    // Let F be an applicative functor.
-    //
-    // gcompos[F] = gcompose[F] ∘ functor[Map].map, where
-    //
-    //   functor[Map].map : (A => B) => Map[A] => Map[B]
-    //
-    //   gcompose : ∀X. Map[F[X]] => F[Map[X]]
-    //
-    // gcompose is a natural transformation from Map ∘ F  to  F ∘ Map.
-    // is it canonical in some way?
-    //
-    def gcompos[F[_]: Applicative]: GCompos[F]
+      // underlying type:  ∀ F : * → *.  ∀ A B.  (A → F B) → Map A → F (Map B)
+      def gcompos[F[_]: Applicative, B <: Bound](f: A => F[B]): F[Map[B]]
 
-    abstract class GCompos[F[_]: Applicative] {
-      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]]
+      // `flip fmap`: mapping with morphisms, `compos` with identity applicative functor
+      def map[B <: Bound](f: A => B): Map[B] = gcompos[ID, B](f)
+
+      // projecting to the free monoid on `A`, `compos` with the functor mapping everything to A
+      private[this] type CA[X] = A
+      def gfoldl(default: A, combine: (A, A) => A): A =
+        gcompos[CA, A](identity)(
+          new Applicative[CA] {
+            def pure[X](x: X): A = default
+            def call[X, Y](f: A, x: A): A = combine(f, x)
+          })
     }
   }
 
   // sugar
-  type FunctorOf[F[+_]] = Functor { type Map[T] = F[T] }
+  type FunctorOf[F[+_]] = Functor { type Map[T] = F[T] ; type Bound = Any }
 
   // fixed point of functor, featuring ill-founded inheritance
   sealed trait Fix[+F[+_]] { def unroll: F[Fix[F]] }
@@ -131,9 +130,9 @@ trait CaseStudy {
   case class Roll[+F[+_]](unroll: F[Fix[F]]) extends Fix[F]
 
   // `fold` cannot be inside trait Fix, for it violates covariance.
-  implicit class Foldable[F[+_]](t: Fix[F]) {
-    def fold[T](f: F[T] => T)(implicit functor: FunctorOf[F]): T =
-      f(functor.map[Fix[F], T](_.fold(f))(t.unroll))
+  class Foldable[F[+_]: FunctorOf](t: Fix[F]) {
+    def fold[T](f: F[T] => T): T =
+      f(implicitly[FunctorOf[F]].apply(t.unroll).map[T](x => new Foldable(x) fold f))
   }
 
   // Term as the fixed point of the functor TermF
@@ -150,25 +149,26 @@ trait CaseStudy {
   def abs(x: String, body: Term): Term = Roll[TermF](Abs(x, body))
   def app(f: Term, y: Term): Term = Roll[TermF](App(f, y))
 
-  implicit val termF = new Functor {
-    type Map[+T] = TermF[T]
+  val termF = new Functor {
+    type Map[+X] = TermF[X]
+    type Bound = Any
 
-    def gcompos[F[_]: Applicative] = new GCompos[F] {
-      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = {
+    def apply[A](t0: TermF[A]) = new RecursivePolynomial[A] {
+      def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
         val applicative = implicitly[Applicative[F]]
         import applicative._
-        {
+        t0 match {
           case Void =>
-            pure(Void)
+            pure[Map[B]](Void)
 
           case Var(v) =>
-            pure(Var(v))
+            pure[Map[B]](Var(v))
 
           case Abs(x, t) =>
             call(
               call(
                 pure[String => B => Map[B]](x => t => Abs(x, t)),
-                pure(x)),
+                pure[String](x)),
               f(t))
 
           case App(t1, t2) =>
@@ -182,6 +182,7 @@ trait CaseStudy {
     }
   }
 
+  implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)(termF)
 
   // USAGE: PRETTY PRINTING VISITOR
 
@@ -216,24 +217,27 @@ trait CaseStudy {
 
   // User writes:
 
-  def prependUnderscore: Term => Term = namesF map ("_" + _)
+  def prependUnderscore(t: Term): Term = namesF(t) map ("_" + _)
 
   // val namesF = functor( T => Term { Var(T) ; Abs(param = T) } )
 
   // System generates:
 
   val namesF = new Functor {
+    namesF =>
+
     private[this] type TF[+N] = {
       type λ[+T] = TermT[Void, Var[N], Abs[N, T], App[T, T]]
     }
 
+    type Bound = Any
     type Map[+N] = Fix[TF[N]#λ]
 
-    def gcompos[F[_]: Applicative] = new GCompos[F] {
-      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = {
+    def apply[A](x: Map[A]) = new RecursivePolynomial[A] {
+      def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
         val applicative = implicitly[Applicative[F]]
         import applicative._
-        _.unroll match {
+        x.unroll match {
           case Void =>
             pure(Roll[TF[B]#λ](Void))
 
@@ -247,14 +251,14 @@ trait CaseStudy {
               call(
                 pure[B => Map[B] => Map[B]](x => b => Roll[TF[B]#λ](Abs(x, b))),
                 f(x)),
-              apply(f)(b))
+              namesF(b) gcompos f)
 
           case App(g, y) =>
             call(
               call(
                 pure[Map[B] => Map[B] => Map[B]](g => y => Roll[TF[B]#λ](App(g, y))),
-                apply(f)(g)),
-              apply(f)(y))
+                namesF(g) gcompos f),
+              namesF(y) gcompos f)
         }
       }
     }
@@ -274,7 +278,7 @@ trait CaseStudy {
         body - x
 
       case other =>
-        termF.gfoldl[Set[String]](Set.empty, _ ++ _)(other)
+        termF(other).gfoldl(Set.empty, _ ++ _)
     }
 
 
@@ -299,7 +303,7 @@ trait CaseStudy {
   // @return        a term alpha-equivalent to renaming of t according to `alias`
   //                containing no bound or binding occurrence of names in `avoid`
   def avoidCapture(avoid: Set[String], alias: Map[String, String], t: Term): Term =
-    avoidF.bimap(
+    avoidF(t.asInstanceOf[avoidF.Bimap[String, Abs[String, Term]]]).bimap(
       alias withDefault identity
         ,
       (abs: Abs[String, Term]) => {
@@ -309,18 +313,17 @@ trait CaseStudy {
           Abs(x, avoidCapture(avoid, alias, body))
         else
           Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
-      }
-        // System should infer these casts, they are safe up to erasure:
-        //
-        //   Term               = μ T. TermT[Void, Var[String], Abs[String, T], App[T, T]]
-        //
-        //   avoidF.Bimap[V, A] = μ T. TermT[Void, Var[V],      A,              App[T, T]]
-        //
-        // Thus,
-        //
-        //   Term === avoidF.Bimap[String, Abs[String, Term]].
-        //
-    )(t.asInstanceOf[avoidF.Bimap[String, Abs[String, Term]]]).asInstanceOf[Term]
+      }).asInstanceOf[Term]
+  // System should infer these casts, they are safe up to erasure:
+  //
+  //   Term               = μ T. TermT[Void, Var[String], Abs[String, T], App[T, T]]
+  //
+  //   avoidF.Bimap[V, A] = μ T. TermT[Void, Var[V],      A,              App[T, T]]
+  //
+  // Thus,
+  //
+  //   Term === avoidF.Bimap[String, Abs[String, Term]].
+  //
 
   // capture-avoiding substitution
   def subst(x: String, xsub: Term, t: Term): Term =
@@ -343,21 +346,19 @@ trait CaseStudy {
     type Bound2 // we may need subtype bounds in trait Functor at some point, too.
     type Bimap[+T1 <: Bound1, +T2 <: Bound2]
 
-    def bimap[A <: Bound1, B <: Bound2, C <: Bound1, D <: Bound2](f: A => C, g: B => D):
-        Bimap[A, B] => Bimap[C, D] = bicompos[ID].apply(f, g)
+    def apply[A <: Bound1, B <: Bound2](t: Bimap[A, B]): RecursivePolynomial[A, B]
 
-    // bicompos: binary extrapolation of gcompos
-    def bicompos[F[_]: Applicative]: Bicompos[F]
+    trait RecursivePolynomial[A <: Bound1, B <: Bound2] {
+      def bimap[C <: Bound1, D <: Bound2](f: A => C, g: B => D): Bimap[C, D] = bicompos[ID, C, D](f, g)
 
-    abstract class Bicompos[F[_]: Applicative] {
-      def apply
-        [A <: Bound1, B <: Bound2, C <: Bound1, D <: Bound2]
-        (f: A => F[C], g: B => F[D]):
-          Bimap[A, B] => F[Bimap[C, D]]
+      // bicompos: binary extrapolation of gcompos
+      def bicompos[F[_]: Applicative, C <: Bound1, D <: Bound2](f: A => F[C], g: B => F[D]): F[Bimap[C, D]]
     }
   }
 
   val avoidF = new Bifunctor {
+    avoidF =>
+
     private[this] type H[+V, +A] = {
       type λ[+T] = TermT[Void, Var[V], A, App[T, T]]
     }
@@ -367,16 +368,12 @@ trait CaseStudy {
 
     type Bimap[+V, +A <: Abs[_, _]] = Fix[H[V, A]#λ]
 
-
-    def bicompos[F[_]: Applicative]: Bicompos[F] = new Bicompos[F] {
-      def apply
-        [A, B <: Abs[_, _], C, D <: Abs[_, _]]
-        (f: A => F[C], g: B => F[D]):
-          Bimap[A, B] => F[Bimap[C, D]] =
+    def apply[A, B <: Abs[_, _]](x: Bimap[A, B]) = new RecursivePolynomial[A, B] {
+      def bicompos[F[_], C, D <: Abs[_, _]]
+        (f: A => F[C], g: B => F[D])(implicit applicative: Applicative[F]): F[Bimap[C, D]] =
       {
-        val applicative = implicitly[Applicative[F]]
         import applicative._
-        _.unroll match {
+        x.unroll match {
           case Void =>
             pure(Roll[H[C, D]#λ](Void))
 
@@ -394,25 +391,28 @@ trait CaseStudy {
             call(
               call(
                 pure[Bimap[C, D] => Bimap[C, D] => Bimap[C, D]](t1 => t2 => Roll[H[C, D]#λ](App(t1, t2))),
-                apply(f, g)(t1)),
-              apply(f, g)(t2))
+                avoidF(t1) bicompos (f, g)),
+              avoidF(t2) bicompos (f, g))
         }
       }
     }
   }
 
   val varF = new Functor {
+    varF =>
+
     private[this] type H[+V] = {
       type λ[+T] = TermT[Void, Var[V], Abs[String, T], App[T, T]]
     }
 
+    type Bound = Any
     type Map[+V] = Fix[H[V]#λ]
 
-    def gcompos[F[_]: Applicative] = new GCompos[F] {
-      def apply[A, B](f: A => F[B]): Map[A] => F[Map[B]] = {
+    def apply[A](x: Map[A]) = new RecursivePolynomial[A] {
+      def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
         val applicative = implicitly[Applicative[F]]
         import applicative._
-        _.unroll match {
+        x.unroll match {
           case Void =>
             pure(Roll[H[B]#λ](Void))
 
@@ -426,14 +426,14 @@ trait CaseStudy {
               call(
                 pure[String => Map[B] => Map[B]](x => b => Roll[H[B]#λ](Abs(x, b))),
                 pure(x)),
-              apply(f)(b))
+              varF(b) gcompos f)
 
           case App(t1, t2) =>
             call(
               call(
                 pure[Map[B] => Map[B] => Map[B]](t1 => t2 => Roll[H[B]#λ](App(t1, t2))),
-                apply(f)(t1)),
-              apply(f)(t2))
+                varF(t1) gcompos f),
+              varF(t2) gcompos f)
         }
       }
     }
@@ -477,5 +477,4 @@ object CaseStudyApp extends CaseStudy with App {
       }
       println()
   }
-
 }
