@@ -63,69 +63,68 @@ trait CaseStudy {
   sealed case class Abs[+Param, +Body](param: Param, body: Body) extends TermT[⊥, ⊥, Abs[Param, Body], ⊥]
   sealed case class App[+T1, +T2](_1: T1, _2: T2) extends TermT[⊥, ⊥, ⊥, App[T1, T2]]
 
-  def dontcare = sys error "don't care"
-
-  trait Applicative[F[_]] {
-    def pure[A](x: A): F[A]
-    def call[A, B](f: F[A => B], x: F[A]): F[B]
+  // applicative functors
+  trait Applicative {
+    type Map[X]
+    def pure[A](x: A): Map[A]
+    def call[A, B](f: Map[A => B], x: Map[A]): Map[B]
   }
 
-  type ID[X] = X
+  type IsApplicative[F[_]] = Applicative { type Map[X] = F[X] }
 
-  implicit object ID extends Applicative[ID] {
+  type Identity[+X] = X
+
+  implicit object Identity extends Applicative {
+    type Map[+X] = Identity[X]
     def pure[A](x: A): A = x
     def call[A, B](f: A => B, x: A): B = f(x)
   }
 
-  trait Functor {
+  type Const[A] = { type λ[+X] = A }
+
+  def Const[A](default: A, combine: (A, A) => A): Applicative { type Map[+X] = A } =
+    new Applicative {
+      type Map[+X] = A
+      def pure[X](x: X): A = default
+      def call[X, Y](f: A, x: A): A = combine(f, x)
+    }
+
+  // traversable functors
+  // http://www.soi.city.ac.uk/~ross/papers/Applicative.pdf
+  trait Traversable {
     // mapping between objects (scala types)
     type Cat // this is a functor from some full subcategory of Scala to the full subcategory induced by Map[Cat].
     type Map[+T <: Cat]
 
-    // reinterpret `x` in the light of `Map` being a recursive polynomial functor
-    def apply[A <: Cat](x: Map[A]): RecursivePolynomial[A]
+    def traverse[F[_]: IsApplicative, A <: Cat, B <: Cat](f: A => F[B], x: Map[A]): F[Map[B]]
 
-    trait RecursivePolynomial[A <: Cat] {
-      // Nominal-functor-enabled generalization of `compos` in:
-      //
-      // Bringert and Ranta.
-      // A pattern for almost compositional functions.
-      //
-      //
-      // Let F be an applicative functor.
-      //
-      // gcompos[F] = gcompose[F] ∘ functor[Map].map, where
-      //
-      //   functor[Map].map : (A => B) => Map[A] => Map[B]
-      //
-      //   gcompose : ∀X. Map[F[X]] => F[Map[X]]
-      //
-      // gcompose is a natural transformation from Map ∘ F  to  F ∘ Map.
-      // is it canonical in some way?
+    // reinterpret `x` in the light of `Map` being a traversable functor
+    def apply[A <: Cat](x: Map[A]): View[A] = new View(x)
 
-      // underlying type:  ∀ F : * → *.  ∀ A B.  (A → F B) → Map A → F (Map B)
-      def gcompos[F[_]: Applicative, B <: Cat](f: A => F[B]): F[Map[B]]
+    // a value of type Map[A] supports almost-compositionality and map-reduce
+    class View[A <: Cat](get: Map[A]) {
+      def compos[F[_]: IsApplicative, B <: Cat](f: A => F[B]): F[Map[B]] = traverse(f, get)
 
-      // `flip fmap`: mapping with morphisms, `compos` with identity applicative functor
-      def map[B <: Cat](f: A => B): Map[B] = gcompos[ID, B](f)
+      def map[B <: Cat](f: A => B): Map[B] = compos[Identity, B](f)
 
-      // projecting to the free monoid on `A`, `compos` with the functor mapping everything to A
-      private[this] type CA[X] = A
-      def gfoldl(default: A, combine: (A, A) => A): A =
-        gcompos[CA, A](identity)(
-          new Applicative[CA] {
+      def reduce(default: A, combine: (A, A) => A): A =
+        compos[Const[A]#λ, A](identity)(
+          new Applicative {
+            type Map[X] = A
             def pure[X](x: X): A = default
             def call[X, Y](f: A, x: A): A = combine(f, x)
           })
     }
   }
 
+
   // The category of all scala types is identical to the full subcategory
-  // induced by `Any`, the supertype of all types
-  trait ScalaFunctor extends Functor { type Cat = Any }
+  // induced by `Any`, the supertype of all types. Since this category is
+  // the biggest full subcategory, functors defined on it are endofunctors.
+  trait TraversableEndofunctor extends Traversable { type Cat = Any }
 
   // sugar
-  type ScalaFunctorOf[F[+_]] = ScalaFunctor { type Map[T] = F[T] }
+  type IsTraversableEndofunctor[F[+_]] = TraversableEndofunctor { type Map[T] = F[T] }
 
   // fixed point of functor, featuring ill-founded inheritance
   sealed trait Fix[+F[+_]] { def unroll: F[Fix[F]] }
@@ -134,9 +133,9 @@ trait CaseStudy {
   case class Roll[+F[+_]](unroll: F[Fix[F]]) extends Fix[F]
 
   // `fold` cannot be inside trait Fix, for it violates covariance.
-  class Foldable[F[+_]: ScalaFunctorOf](t: Fix[F]) {
+  class Foldable[F[+_]: IsTraversableEndofunctor](t: Fix[F]) {
     def fold[T](f: F[T] => T): T =
-      f(implicitly[ScalaFunctorOf[F]].apply(t.unroll).map[T](x => new Foldable(x) fold f))
+      f(implicitly[IsTraversableEndofunctor[F]].apply(t.unroll).map[T](x => new Foldable(x) fold f))
   }
 
   // Term as the fixed point of the functor TermF
@@ -153,34 +152,32 @@ trait CaseStudy {
   def abs(x: String, body: Term): Term = Roll[TermF](Abs(x, body))
   def app(f: Term, y: Term): Term = Roll[TermF](App(f, y))
 
-  val termF = new ScalaFunctor {
+  val termF = new TraversableEndofunctor {
     type Map[+X] = TermF[X]
 
-    def apply[A](t0: TermF[A]) = new RecursivePolynomial[A] {
-      def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
-        val applicative = implicitly[Applicative[F]]
-        import applicative._
-        t0 match {
-          case Void =>
-            pure[Map[B]](Void)
+    def traverse[F[_]: IsApplicative, A, B](f: A => F[B], t0: Map[A]): F[Map[B]] = {
+      val applicative = implicitly[IsApplicative[F]]
+      import applicative.{pure, call}
+      t0 match {
+        case Void =>
+          pure[Map[B]](Void)
 
-          case Var(v) =>
-            pure[Map[B]](Var(v))
+        case Var(v) =>
+          pure[Map[B]](Var(v))
 
-          case Abs(x, t) =>
+        case Abs(x, t) =>
+          call(
             call(
-              call(
-                pure[String => B => Map[B]](x => t => Abs(x, t)),
-                pure[String](x)),
-              f(t))
+              pure[String => B => Map[B]](x => t => Abs(x, t)),
+              pure[String](x)),
+            f(t))
 
-          case App(t1, t2) =>
+        case App(t1, t2) =>
+          call(
             call(
-              call(
-                pure[B => B => Map[B]](t1 => t2 => App(t1, t2)),
-                f(t1)),
-              f(t2))
-        }
+              pure[B => B => Map[B]](t1 => t2 => App(t1, t2)),
+              f(t1)),
+            f(t2))
       }
     }
   }
@@ -226,7 +223,7 @@ trait CaseStudy {
 
   // System generates:
 
-  val namesF = new ScalaFunctor {
+  val namesF = new TraversableEndofunctor {
     namesF =>
 
     private[this] type TF[+N] = {
@@ -235,33 +232,31 @@ trait CaseStudy {
 
     type Map[+N] = Fix[TF[N]#λ]
 
-    def apply[A](x: Map[A]) = new RecursivePolynomial[A] {
-      def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
-        val applicative = implicitly[Applicative[F]]
-        import applicative._
-        x.unroll match {
-          case Void =>
-            pure(Roll[TF[B]#λ](Void))
+    def traverse[F[_]: IsApplicative, A, B](f: A => F[B], x: Map[A]): F[Map[B]] = {
+      val applicative = implicitly[IsApplicative[F]]
+      import applicative.{pure, call}
+      x.unroll match {
+        case Void =>
+          pure(Roll[TF[B]#λ](Void))
 
-          case Var(x) =>
-            call(
-              pure[B => Map[B]](x => Roll[TF[B]#λ](Var(x))),
-              f(x))
+        case Var(x) =>
+          call(
+            pure[B => Map[B]](x => Roll[TF[B]#λ](Var(x))),
+            f(x))
 
-          case Abs(x, b) =>
+        case Abs(x, b) =>
+          call(
             call(
-              call(
-                pure[B => Map[B] => Map[B]](x => b => Roll[TF[B]#λ](Abs(x, b))),
-                f(x)),
-              namesF(b) gcompos f)
+              pure[B => Map[B] => Map[B]](x => b => Roll[TF[B]#λ](Abs(x, b))),
+              f(x)),
+            traverse(f, b))
 
-          case App(g, y) =>
+        case App(g, y) =>
+          call(
             call(
-              call(
-                pure[Map[B] => Map[B] => Map[B]](g => y => Roll[TF[B]#λ](App(g, y))),
-                namesF(g) gcompos f),
-              namesF(y) gcompos f)
-        }
+              pure[Map[B] => Map[B] => Map[B]](g => y => Roll[TF[B]#λ](App(g, y))),
+              traverse(f, g)),
+            traverse(f, y))
       }
     }
   }
@@ -280,7 +275,7 @@ trait CaseStudy {
         body - x
 
       case other =>
-        termF(other).gfoldl(Set.empty, _ ++ _)
+        termF(other) reduce (Set.empty, _ ++ _)
     }
 
 
@@ -328,7 +323,7 @@ trait CaseStudy {
   //
 
   // capture-avoiding substitution
-  def subst(x: String, xsub: Term, t: Term): Term =
+  def subst1(x: String, xsub: Term, t: Term): Term =
     avoidCapture(freevars(xsub) + x, Map.empty, t).fold[Term] {
       case Var(y) if x == y =>
         xsub
@@ -337,29 +332,38 @@ trait CaseStudy {
         Roll[TermF](other) // System should roll automatically
     }
 
+  // alternative capture-avoiding substitution by monad
+  def subst2(x: String, xsub: Term, t: Term): Term =
+    varF.join(varF(avoidCapture(freevars(xsub) + x, Map.empty, t)).map {
+      y => if (x == y) xsub else varF pure y
+    })
+
   // val avoidF = bifunctor( (V, A) => Term { Var = Var(V), Abs = A } )
 
   // val varF = functor( N => Term { Var(N) } )
 
   // System generates:
 
-  trait Bifunctor {
+  trait TraversableBifunctor {
     // due to subtyping, each scala type (or, each object in Scala category) induces a full subcategory.
     type Cat1 // full subcategory 1
     type Cat2 // full subcategory 2
     type Bimap[+T1 <: Cat1, +T2 <: Cat2]
 
-    def apply[A <: Cat1, B <: Cat2](t: Bimap[A, B]): RecursivePolynomial[A, B]
+    def traverse[F[_]: IsApplicative, A <: Cat1, B <: Cat2, C <: Cat1, D <: Cat2]
+      (f: A => F[C], g: B => F[D], x: Bimap[A, B]): F[Bimap[C, D]]
 
-    trait RecursivePolynomial[A <: Cat1, B <: Cat2] {
-      def bimap[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Bimap[C, D] = bicompos[ID, C, D](f, g)
+    def apply[A <: Cat1, B <: Cat2](x: Bimap[A, B]): View[A, B] = new View(x)
 
-      // bicompos: binary extrapolation of gcompos
-      def bicompos[F[_]: Applicative, C <: Cat1, D <: Cat2](f: A => F[C], g: B => F[D]): F[Bimap[C, D]]
+    class View[A <: Cat1, B <: Cat2](get: Bimap[A, B]) {
+      def bicompos[F[_]: IsApplicative, C <: Cat1, D <: Cat2]
+        (f: A => F[C], g: B => F[D]): F[Bimap[C, D]] = traverse(f, g, get)
+
+      def bimap[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Bimap[C, D] = bicompos[Identity, C, D](f, g)
     }
   }
 
-  val avoidF = new Bifunctor {
+  val avoidF = new TraversableBifunctor {
     avoidF =>
 
     private[this] type H[+V, +A <: Abs[_, _]] = {
@@ -371,81 +375,102 @@ trait CaseStudy {
 
     type Bimap[+V, +A <: Abs[_, _]] = Fix[H[V, A]#λ]
 
-    def apply[A, B <: Abs[_, _]](x: Bimap[A, B]) = new RecursivePolynomial[A, B] {
-      def bicompos[F[_], C, D <: Abs[_, _]]
-        (f: A => F[C], g: B => F[D])(implicit applicative: Applicative[F]): F[Bimap[C, D]] =
-      {
-        import applicative._
-        x.unroll match {
-          case Void =>
-            pure(Roll[H[C, D]#λ](Void))
+    def traverse[F[_], A, B <: Abs[_, _], C, D <: Abs[_, _]]
+        (f: A => F[C], g: B => F[D], x: Bimap[A, B])(implicit applicative: IsApplicative[F]): F[Bimap[C, D]] =
+    {
+      import applicative._
+      x.unroll match {
+        case Void =>
+          pure(Roll[H[C, D]#λ](Void))
 
-          case Var(x) =>
-            call(
-              pure[C => Bimap[C, D]](x => Roll[H[C, D]#λ](Var(x))),
-              f(x))
+        case Var(x) =>
+          call(
+            pure[C => Bimap[C, D]](x => Roll[H[C, D]#λ](Var(x))),
+            f(x))
 
-          case abs @ Abs(_, _) =>
-            call(
-              // the cast on g_abs is because scalac lacks the knowledge that
-              //
-              // ∀ A <: Abs[Any, Any].  ∃ B C.  A =:= Abs[B, C].
-              //
-              // and thus  A <: TermT[⊥, ⊥, A, ⊥].
-              //
-              // Declaring `case class Abs` as `final` does not help.
-              //
-              pure[D => Bimap[C, D]](g_abs => Roll[H[C, D]#λ](g_abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
-              g(abs))
+        case abs @ Abs(_, _) =>
+          call(
+            // the cast on g_abs is because scalac lacks the knowledge that
+            //
+            // ∀ A <: Abs[Any, Any].  ∃ B C.  A =:= Abs[B, C].
+            //
+            // and thus  A <: TermT[⊥, ⊥, A, ⊥].
+            //
+            // Declaring `case class Abs` as `final` does not help.
+            //
+            pure[D => Bimap[C, D]](g_abs => Roll[H[C, D]#λ](g_abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
+            g(abs))
 
-          case App(t1, t2) =>
+        case App(t1, t2) =>
+          call(
             call(
-              call(
-                pure[Bimap[C, D] => Bimap[C, D] => Bimap[C, D]](t1 => t2 => Roll[H[C, D]#λ](App(t1, t2))),
-                avoidF(t1) bicompos (f, g)),
-              avoidF(t2) bicompos (f, g))
-        }
+              pure[Bimap[C, D] => Bimap[C, D] => Bimap[C, D]](t1 => t2 => Roll[H[C, D]#λ](App(t1, t2))),
+              traverse(f, g, t1)),
+            traverse(f, g, t2))
       }
     }
   }
 
-  val varF = new Functor {
-    varF =>
+  trait TraversableMonad extends TraversableEndofunctor with Applicative {
+    type Map[+X]
 
+    def pure[A](x: A): Map[A]
+    def join[A](x: Map[Map[A]]): Map[A]
+    def traverse[F[_]: IsApplicative, A, B](f: A => F[B], x: Map[A]): F[Map[B]]
+
+    def bind[A, B](m: Map[A], f: A => Map[B]): Map[B] = join(this(m) map f)
+    def call[A, B](f: Map[A => B], x: Map[A]): Map[B] = bind[A => B, B](f, f => bind[A, B](x, x => pure(f(x))))
+
+    override def apply[A](x: Map[A]): View[A] = new View(x)
+
+    class View[A](get: Map[A]) extends super.View[A](get) {
+      def flatMap[B](f: A => Map[B]): Map[B] = bind(get, f)
+      // `map` is given by `traverse` already
+      // if the monadic & traversable laws hold, then `map` defined in terms of `compos`
+      // should be equal to `map` defined in terms of `bind` and `pure`.
+    }
+  }
+
+  val varF = new  TraversableMonad {
     private[this] type H[+V] = {
       type λ[+T] = TermT[Void, Var[V], Abs[String, T], App[T, T]]
     }
 
-    type Cat = Any
     type Map[+V] = Fix[H[V]#λ]
 
-    def apply[A](x: Map[A]) = new RecursivePolynomial[A] {
-      def gcompos[F[_]: Applicative, B](f: A => F[B]): F[Map[B]] = {
-        val applicative = implicitly[Applicative[F]]
-        import applicative._
-        x.unroll match {
-          case Void =>
-            pure(Roll[H[B]#λ](Void))
+    def pure[A](x: A): Map[A] = Roll[H[A]#λ](Var(x))
 
-          case Var(x) =>
-            call(
-              pure[B => Map[B]](x => Roll[H[B]#λ](Var(x))),
-              f(x))
+    def join[A](x: Map[Map[A]]): Map[A] = x.unroll match {
+      case Void => Roll[H[A]#λ](Void)
+      case Var(t) => t
+      case Abs(x, b) => Roll[H[A]#λ](Abs(x, join(b)))
+      case App(t1, t2) => Roll[H[A]#λ](App(join(t1), join(t2)))
+    }
 
-          case Abs(x, b) =>
-            call(
-              call(
-                pure[String => Map[B] => Map[B]](x => b => Roll[H[B]#λ](Abs(x, b))),
-                pure(x)),
-              varF(b) gcompos f)
+    def traverse[F[_]: IsApplicative, A, B](f: A => F[B], x: Map[A]): F[Map[B]] = {
+      val ap = implicitly[IsApplicative[F]]
+      x.unroll match {
+        case Void =>
+          ap.pure(Roll[H[B]#λ](Void))
 
-          case App(t1, t2) =>
-            call(
-              call(
-                pure[Map[B] => Map[B] => Map[B]](t1 => t2 => Roll[H[B]#λ](App(t1, t2))),
-                varF(t1) gcompos f),
-              varF(t2) gcompos f)
-        }
+        case Var(x) =>
+          ap.call(
+            ap.pure[B => Map[B]](x => Roll[H[B]#λ](Var(x))),
+            f(x))
+
+        case Abs(x, b) =>
+          ap.call(
+            ap.call(
+              ap.pure[String => Map[B] => Map[B]](x => b => Roll[H[B]#λ](Abs(x, b))),
+              ap.pure(x)),
+            traverse(f, b))
+
+        case App(t1, t2) =>
+          ap.call(
+            ap.call(
+              ap.pure[Map[B] => Map[B] => Map[B]](t1 => t2 => Roll[H[B]#λ](App(t1, t2))),
+              traverse(f, t1)),
+            traverse(f, t2))
       }
     }
   }
@@ -483,8 +508,10 @@ object CaseStudyApp extends CaseStudy with App {
         ("y", app("x", "y"))
       ).foreach {
         case (y, ysub) =>
-          val s1 = subst(y, ysub, term)
-          show(s"subst($y, ${pretty{ysub}}, $name)", s1)
+          val s1 = subst1(y, ysub, term)
+          val s2 = subst2(y, ysub, term)
+          show(s"subst1($y, ${pretty{ysub}}, $name)", s1)
+          show(s"subst2($y, ${pretty{ysub}}, $name)", s2)
       }
       println()
   }
