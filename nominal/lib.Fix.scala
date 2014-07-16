@@ -1,5 +1,5 @@
 package nominal
-package functor
+package lib
 
 import language.higherKinds
 

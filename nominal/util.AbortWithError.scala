@@ -1,4 +1,5 @@
 package nominal
+package util
 
 import scala.reflect.macros.blackbox.Context
 

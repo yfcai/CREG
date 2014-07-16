@@ -1,4 +1,5 @@
 package nominal
+package compiler
 
 import scala.reflect.macros.blackbox.Context
 
@@ -28,7 +29,7 @@ trait SynonymGenerator extends UniverseConstruction {
 
 object SynonymGenerator {
   /** test macros */
-  object Tests extends SynonymGenerator with DeclarationGenerator with AssertEqual {
+  object Tests extends SynonymGenerator with DeclarationGenerator with util.AssertEqual {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
 
@@ -84,7 +85,7 @@ object SynonymGenerator {
 
         val synonym = generateSynonym(c)(intList, genericDatatype)
         val expectedSynonym = q"""
-          type IntList = _root_.nominal.functor.Fix[({
+          type IntList = _root_.nominal.lib.Fix[({
             type __innerType__[+IntList] = IntListT[Nil, Cons[Int, IntList]]
           })#__innerType__]"""
         assertEqual(c)(expectedSynonym, synonym)
@@ -125,7 +126,7 @@ object SynonymGenerator {
 
         val synonym = generateSynonym(c)(gList, genericDatatype)
         val expectedSynonym = q"""
-          type GList[+A] = _root_.nominal.functor.Fix[({
+          type GList[+A] = _root_.nominal.lib.Fix[({
             type __innerType__[+GList] = GListT[Nil, Cons[A, GList]]
           })#__innerType__]"""
         assertEqual(c)(expectedSynonym, synonym)

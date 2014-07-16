@@ -1,7 +1,7 @@
 import org.scalatest._
 import language.higherKinds
-import nominal._
-import functor._
+import nominal.compiler._
+import nominal.lib._
 import DatatypeRepresentation._
 
 class UniverseConstructionSpec extends FlatSpec {

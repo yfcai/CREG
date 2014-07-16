@@ -1,4 +1,5 @@
 package nominal
+package experiment
 
 import scala.reflect.macros.blackbox.Context
 import scala.language.experimental.macros

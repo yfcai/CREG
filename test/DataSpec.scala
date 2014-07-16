@@ -1,6 +1,6 @@
 import org.scalatest._
 import nominal._
-import functor._
+import nominal.lib._
 
 class DataSpec extends FlatSpec {
   import language.implicitConversions

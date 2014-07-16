@@ -2,7 +2,7 @@ import org.scalatest._
 import nominal._
 
 class DeclarationGeneratorSpec extends FlatSpec {
-  import DeclarationGenerator.Tests._
+  import compiler.DeclarationGenerator.Tests._
 
   "DeclarationGenerator" should "generate an empty sealed trait for 0 variants" in {
     @empty trait Empty1T

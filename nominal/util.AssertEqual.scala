@@ -1,8 +1,9 @@
 package nominal
+package util
 
 import scala.reflect.macros.blackbox.Context
 
-import DatatypeRepresentation.Many
+import compiler.DatatypeRepresentation.Many
 
 trait AssertEqual {
   def assertEqualBlock(c: Context)(expected: c.Tree, actual: Many[c.Tree]): c.Expr[Any] = {

@@ -1,8 +1,10 @@
 package nominal
+
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.annotation.StaticAnnotation
 
+import compiler._
 import DatatypeRepresentation._
 
 object datatype extends Parser with Preprocessor with DeclarationGenerator with SynonymGenerator {

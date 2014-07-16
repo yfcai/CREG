@@ -1,4 +1,5 @@
 package nominal
+package compiler
 
 object DatatypeRepresentation {
   // name of records, variants, fields

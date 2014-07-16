@@ -1,5 +1,5 @@
 import org.scalatest._
-import nominal._
+import nominal.compiler.Parser
 
 class ParserSpec extends FlatSpec {
   import Parser.Tests._

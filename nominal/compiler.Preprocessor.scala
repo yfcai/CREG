@@ -1,9 +1,10 @@
 package nominal
+package compiler
 
 import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
-trait Preprocessor extends AbortWithError {
+trait Preprocessor extends util.AbortWithError {
 
   sealed case class PreprocessorException(message: String) extends Exception(message)
 

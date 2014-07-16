@@ -1,5 +1,5 @@
 import org.scalatest._
-import nominal._
+import nominal.experiment.normalize
 
 import language.experimental.macros
 import language.higherKinds

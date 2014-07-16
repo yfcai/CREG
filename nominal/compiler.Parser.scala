@@ -1,11 +1,12 @@
 package nominal
+package compiler
 
 import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
-import monad.contextReaderParser._
+import contextReaderParser._
 
-trait Parser extends AbortWithError {
+trait Parser extends util.AbortWithError {
 
   // Grammar
   // =======
@@ -47,7 +48,7 @@ trait Parser extends AbortWithError {
   //
 
   // shadow trait Parser by Parser[A]
-  private[this] type Parser[A] = monad.contextReaderParser.Parser[A]
+  private[this] type Parser[A] = contextReaderParser.Parser[A]
 
   def parseOrAbort[A](c: Context)(parser: Parser[A], input: c.Tree): A =
     parser.parse(c)(input) match {
@@ -277,7 +278,7 @@ trait Parser extends AbortWithError {
 
 
 object Parser {
-  object Tests extends Parser with AssertEqual {
+  object Tests extends Parser with util.AssertEqual {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
 

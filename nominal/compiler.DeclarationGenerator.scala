@@ -1,4 +1,5 @@
 package nominal
+package compiler
 
 import scala.reflect.macros.blackbox.Context
 
@@ -95,7 +96,7 @@ trait DeclarationGenerator extends UniverseConstruction {
 
 object DeclarationGenerator {
   /** test macros */
-  object Tests extends DeclarationGenerator with AssertEqual {
+  object Tests extends DeclarationGenerator with util.AssertEqual {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
 
