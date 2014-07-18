@@ -83,12 +83,12 @@ object SynonymGenerator {
 
         val declaration = generateDeclaration(c)(datatypeBody)
 
-        val synonym = generateSynonym(c)(intList, genericDatatype)
-        val expectedSynonym = q"""
+        val synonym = generateConcreteSynonym(c)(intList, fixedPoint)
+        val q"""
           type IntList = _root_.nominal.lib.Fix[({
-            type __innerType__[+IntList] = IntListT[Nil, Cons[Int, IntList]]
-          })#__innerType__]"""
-        assertEqual(c)(expectedSynonym, synonym)
+            type $innerTypeL[+IntList] = IntListT[Nil, Cons[Int, IntList]]
+          })#$innerTypeR]""" = synonym
+        assert(innerTypeL == innerTypeR)
 
         val patternF = generatePatternFunctor(c)(intListF, genericDatatype)
         val expectedPatternF = q"""
@@ -125,11 +125,11 @@ object SynonymGenerator {
         val declaration = generateDeclaration(c)(datatypeBody)
 
         val synonym = generateSynonym(c)(gList, genericDatatype)
-        val expectedSynonym = q"""
+        val q"""
           type GList[+A] = _root_.nominal.lib.Fix[({
-            type __innerType__[+GList] = GListT[Nil, Cons[A, GList]]
-          })#__innerType__]"""
-        assertEqual(c)(expectedSynonym, synonym)
+            type $innerTypeL[+GList] = GListT[Nil, Cons[A, GList]]
+          })#$innerTypeR]""" = synonym
+        assert(innerTypeL == innerTypeR)
 
         val patternF = generatePatternFunctor(c)(gListF, genericDatatype)
         val expectedPatternF = q"""

@@ -68,8 +68,9 @@ trait DeclarationGenerator extends UniverseConstruction {
     fieldNames.map {
       case name =>
         import c.universe._
-        val q"case class __case_class__($decl)" =
-          q"case class __case_class__(${TermName(name)}: ${TypeName(name)})"
+        val caseClassIn = TypeName(c freshName "CaseClass")
+        val q"case class $caseClassOut($decl)" =
+          q"case class $caseClassIn(${TermName(name)}: ${TypeName(name)})"
         decl
     }
 

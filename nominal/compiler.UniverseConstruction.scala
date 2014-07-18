@@ -29,14 +29,14 @@ trait UniverseConstruction {
       case FixedPoint(paramName, body) =>
         // to take the fixed point, the data constructor must be unary
         val fix = getFix(c)
-
+        val innerType = mkInnerType(c)
         val typeDef = covariantTypeDef(c)(paramName)
 
         val q"??? : $result" =
           q"""
             ??? : $fix[({
-              type __innerType__[$typeDef] = ${meaning(c)(body)}
-            })#__innerType__]
+              type $innerType[$typeDef] = ${meaning(c)(body)}
+            })#$innerType]
           """
         result
 
@@ -53,6 +53,8 @@ trait UniverseConstruction {
         result
     }
   }
+
+  def mkInnerType(c: Context): c.TypeName = c.universe.TypeName(c freshName "innerType")
 
   def meaningOfNominal(c: Context)(rep: Nominal): c.Tree = rep match {
     case Field(name, body) => meaning(c)(body)
@@ -81,8 +83,8 @@ trait UniverseConstruction {
     // strangely, macros can adapt TypeName arguments of a trait to TypeDefs,
     // but cannot adapt those of a type synonym.
     // hence the quote+unquote here.
-
-    val q"trait __Trait__ [$typeDef]" = q"trait __Trait__ [$param]"
+    val traitIn = TypeName(c freshName "Trait")
+    val q"trait $traitOut[$typeDef]" = q"trait $traitIn[$param]"
     typeDef
   }
 
@@ -93,7 +95,8 @@ trait UniverseConstruction {
   def mkTypeDef(c: Context)(param: Param): c.universe.TypeDef = {
     import c.universe._
     val variance = param.variance.scalaSymbol
-    val q"trait __Trait__ [$typeDef]" = c.parse(s"trait __Trait__ [ $variance ${param.name} ]")
+    val traitIn = TypeName(c freshName "Trait")
+    val q"trait $traitOut[$typeDef]" = c.parse(s"trait $traitIn[ $variance ${param.name} ]")
     typeDef
   }
 

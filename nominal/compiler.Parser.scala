@@ -42,7 +42,6 @@ trait Parser extends util.AbortWithError {
   // Reserved names
   // ==============
   //
-  // __.* (all names starting with two underscores)
   // =>:  (term-level name of reader constructor)
   // WITH (term-level name of keyword `with`)
   //
