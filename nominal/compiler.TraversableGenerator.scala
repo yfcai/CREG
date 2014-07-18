@@ -179,6 +179,51 @@ trait TraversableGenerator extends SynonymGenerator {
         }
 
       case Record(name, fields) =>
+
+        val testing = q"x match { case A => c }"
+        println(s"\n$testing")
+        println(showRaw(testing) + "\n")
+        /*
+         // empty record, case object variant case, named unit...
+         x match {
+           case A => c
+         }
+         Match(
+           Ident(TermName("x")),
+           List(
+             CaseDef(Ident(TermName("A")), EmptyTree, Ident(TermName("c")))
+           )
+         )
+
+         // records with fields
+         x match {
+           case A((b @ _)) => c
+         }
+         Match(
+           Ident(TermName("x")),
+           List(
+             CaseDef(
+               Apply(Ident(TermName("A")), List(Bind(TermName("b"), Ident(termNames.WILDCARD)))),
+               EmptyTree,
+               Ident(TermName("c"))
+             )
+           )
+         )
+
+         // catch-all match. less relevant.
+         x match {
+           case (y @ _) => z
+         }
+         Match(
+           Ident(TermName("x")),
+           List(
+             CaseDef(Bind(TermName("y"), Ident(termNames.WILDCARD)), EmptyTree, Ident(TermName("z")))
+           )
+         )
+         */
+
+        // yay! CaseDef is a tree!
+        CaseDef(Bind(TermName("y"), Ident(termNames.WILDCARD)), EmptyTree, Ident(TermName("z"))): Tree
         q"???" // still to do
 
       case Reader(domain, range) =>
