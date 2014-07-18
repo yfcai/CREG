@@ -7,7 +7,7 @@ import scala.annotation.StaticAnnotation
 import compiler._
 import DatatypeRepresentation._
 
-object datatype extends Parser with Preprocessor with DeclarationGenerator with SynonymGenerator {
+object datatype extends Parser with Preprocessor with DeclarationGenerator with SynonymGenerator with TraversableGenerator {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
@@ -30,10 +30,7 @@ object datatype extends Parser with Preprocessor with DeclarationGenerator with 
       // synonym generator generates synonyms
 
       // import language features needed for generated code
-      val imports = Iterator(
-        q"import _root_.scala.language.higherKinds",
-        q"import _root_.scala.language.implicitConversions"
-      )
+      val imports = scalaLanguageFeatureImports(c).iterator
 
       // companion object
       val updatedCompanion: c.Tree = injectIntoObject(c)(companion, Seq.empty) // nothing to inject for now

@@ -10,7 +10,7 @@ lazy val nominal = project in file("nominal") settings (
   scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
   libraryDependencies ++= List(
     "org.scala-lang" % "scala-reflect" % sversion,
-    //"org.scala-lang" % "scala-compiler" % sversion, // uncomment this for scala.tools.reflect.ToolBox
+    "org.scala-lang" % "scala-compiler" % sversion, // for scala.tools.reflect.ToolBoxError
     compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
   )
 )
@@ -26,6 +26,7 @@ lazy val test = project in file(".") dependsOn nominal settings (
   scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
   libraryDependencies ++= List(
     "org.scalatest" % "scalatest_2.11" % "2.1.4",
+    "org.scala-lang" % "scala-compiler" % sversion, // for scala.tools.reflect.ToolBoxError
     compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
   )
 )

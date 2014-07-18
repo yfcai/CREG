@@ -91,17 +91,30 @@ trait UniverseConstruction {
   def covariantTypeDefs(c: Context)(names: Many[Name]): Many[c.universe.TypeDef] =
     names.map(name => covariantTypeDef(c)(name))
 
+  def mkTypeDef(c: Context)(param: Param): c.universe.TypeDef = mkBoundedTypeDef(c)(param, Map.empty)
+
   // make a TypeDef according to variance
-  def mkTypeDef(c: Context)(param: Param): c.universe.TypeDef = {
+  def mkBoundedTypeDef(c: Context)(param: Param, bounds: Map[Name, Datatype]): c.universe.TypeDef = {
     import c.universe._
     val variance = param.variance.scalaSymbol
-    val traitIn = TypeName(c freshName "Trait")
-    val q"trait $traitOut[$typeDef]" = c.parse(s"trait $traitIn[ $variance ${param.name} ]")
-    typeDef
+    val traitIn = TypeName(c freshName "Trait") // TODO: use bounds
+    if (bounds contains param.name) {
+      val bound = meaning(c)(bounds(param.name))
+      val q"trait $traitOut[$typeDef]" = c.parse(s"trait $traitIn[ $variance ${param.name} <: $bound ]")
+      typeDef
+    }
+    else {
+      val q"trait $traitOut[$typeDef]" = c.parse(s"trait $traitIn[ $variance ${param.name} ]")
+      typeDef
+    }
   }
 
-def mkTypeDefs(c: Context)(params: Many[Param]): Many[c.universe.TypeDef] =
-  params.map(param => mkTypeDef(c)(param))
+  def nameOfAny: String = "_root_.scala.Any"
+
+  def mkTypeDefs(c: Context)(params: Many[Param]): Many[c.universe.TypeDef] = mkBoundedTypeDefs(c)(params, Map.empty)
+
+  def mkBoundedTypeDefs(c: Context)(params: Many[Param], bounds: Map[Name, Datatype]): Many[c.universe.TypeDef] =
+    params.map(param => mkBoundedTypeDef(c)(param, bounds))
 
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {

@@ -86,7 +86,9 @@ object DatatypeRepresentation {
   // variant is entry point from scala types, hence the header.
   case class Variant(header: TypeVar, cases: Many[Nominal]) extends Datatype
 
-  case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype
+  case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype {
+    def patternFunctor: DataConstructor = DataConstructor(Many(Param covariant name), body)
+  }
 
   // covariant function, produces anonymous types
   case class Reader(domain: TypeVar, range: Datatype) extends Datatype
@@ -99,7 +101,9 @@ object DatatypeRepresentation {
 
   case class Field(name: Name, get: Datatype) extends Nominal
 
-  case class DataConstructor(params: Many[Param], body: Datatype)
+  case class DataConstructor(params: Many[Param], body: Datatype) {
+    def arity: Int = params.size
+  }
 
   case class Param(name: Name, variance: Param.Variance)
 

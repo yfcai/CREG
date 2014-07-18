@@ -6,14 +6,20 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
 trait SynonymGenerator extends UniverseConstruction {
-  def generateSynonym(c: Context)(name: Name, genericDatatype: DataConstructor): c.Tree = {
+  def generateSynonym(c: Context)(name: Name, genericDatatype: DataConstructor): c.Tree =
+    generateBoundedSynonym(c)(name, genericDatatype, Map.empty)
+
+  def generateBoundedSynonym(c: Context)(name: Name, genericDatatype: DataConstructor, bounds: Map[Name, Datatype]): c.Tree = {
     import c.universe._
     val DataConstructor(params, datatypeBody) = genericDatatype
     val typeName = TypeName(name)
-    val typeDefs = mkTypeDefs(c)(params)
+    val typeDefs = mkBoundedTypeDefs(c)(params, bounds)
     val rhs = generateRHS(c)(datatypeBody)
     q"type $typeName [ ..$typeDefs ] = $rhs"
   }
+
+  def generateConcreteSynonym(c: Context)(name: Name, concreteDatatype: Datatype): c.Tree =
+    generateSynonym(c)(name, DataConstructor(Many.empty, concreteDatatype))
 
   def generateRHS(c: Context)(datatype: Datatype): c.Tree = meaning(c)(datatype)
 
@@ -25,6 +31,9 @@ trait SynonymGenerator extends UniverseConstruction {
     val rhs = generateRHS(c)(datatypeBody)
     q"type $patternFunctorTypeName [ ..$typeParams ] = $rhs"
   }
+
+  def generateConcretePatternFunctor(c: Context)(patternFunctorName: Name, fixedPoint: FixedPoint): c.Tree =
+    generatePatternFunctor(c)(patternFunctorName, DataConstructor(Many.empty, fixedPoint))
 }
 
 object SynonymGenerator {
@@ -51,7 +60,7 @@ object SynonymGenerator {
             Record("Employee", Many(Field("name", TypeVar("String")), Field("dept", TypeVar("Int"))))))
 
         val declaration = generateDeclaration(c)(datatype)
-        val synonym = generateSynonym(c)(person, DataConstructor(Many.empty, datatype))
+        val synonym = generateConcreteSynonym(c)(person, datatype)
         val expected = q"type Person = PersonT[Boss, Manager[Int], Employee[String, Int]]"
         assertEqual(c)(expected, synonym)
 
@@ -79,8 +88,6 @@ object SynonymGenerator {
 
         val fixedPoint = FixedPoint(intList, datatypeBody)
 
-        val genericDatatype = DataConstructor(Many.empty, fixedPoint)
-
         val declaration = generateDeclaration(c)(datatypeBody)
 
         val synonym = generateConcreteSynonym(c)(intList, fixedPoint)
@@ -90,7 +97,7 @@ object SynonymGenerator {
           })#$innerTypeR]""" = synonym
         assert(innerTypeL == innerTypeR)
 
-        val patternF = generatePatternFunctor(c)(intListF, genericDatatype)
+        val patternF = generateConcretePatternFunctor(c)(intListF, fixedPoint)
         val expectedPatternF = q"""
           type IntListF[+IntList] = IntListT[Nil, Cons[Int, IntList]]
         """
