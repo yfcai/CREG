@@ -30,7 +30,13 @@ trait TraversableGenerator extends SynonymGenerator {
     imports ++ subcategories :+ mapSynonym :+ defTraverse
   }
 
+  /* fragile section begins */
   def mappingOnObjects: String = "Map"
+
+  def getApplicativeMapOnObjects(c: Context)(applicative: c.TermName): c.Tree = {
+    import c.universe._
+    tq"$applicative.Map"
+  }
 
   def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
 
@@ -43,6 +49,7 @@ trait TraversableGenerator extends SynonymGenerator {
   }
 
   def fullyQualifiedTraversableTrait: String = "_root_.nominal.lib.Traversable"
+  /* fragile section ends */
 
   def newTraversable(c: Context)(arity: Int, body: Many[c.Tree]): c.Tree = {
     import c.universe._
@@ -68,7 +75,7 @@ trait TraversableGenerator extends SynonymGenerator {
     }
   }
 
-  /** def traverse[F[_]: IsApplicative, A <: Cat, B <: Cat](f: A => F[B], t0: Map[A]): F[Map[B]]
+  /** def traverse[F[+_]: IsApplicative, A <: Cat, B <: Cat](f: A => F[B], t0: Map[A]): F[Map[B]]
     */
   def generateDefTraverse(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): c.Tree = {
     import c.universe._
@@ -76,7 +83,7 @@ trait TraversableGenerator extends SynonymGenerator {
     val tF: TypeName = TypeName(c freshName "F")
     val tA: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "A"))
     val tB: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "B"))
-    val q"trait Trait[$typeDefF]" = q"trait Trait[$tF[_]]"
+    val q"trait Trait[$typeDefF]" = q"trait Trait[$tF[+_]]"
     val unmangleA = Map((tA, functor.params).zipped.map({ case (a, p) => (a.toString, p.name) }): _*)
     val unmangleB = Map((tB, functor.params).zipped.map({ case (b, p) => (b.toString, p.name) }): _*)
     val unmangledTypeNames = unmangleA ++ unmangleB
@@ -126,12 +133,7 @@ trait TraversableGenerator extends SynonymGenerator {
       unmangleB.map(_.swap),
       env, applicative)
 
-    val result = q"def traverse[..$typeDefs](..$explicitParams)(implicit $applicative : $applicativeType): $resultType = $body"
-
-    println(s"\nTRAVERSE: $result\n")
-    println(s"TRAVERSE BODY: $body\n")
-
-    result
+    q"def traverse[..$typeDefs](..$explicitParams)(implicit $applicative : $applicativeType): $resultType = $body"
   }
 
   def mkValDef(c: Context)(termName: c.TermName, tpe: c.Tree): c.universe.ValDef = {
@@ -175,6 +177,22 @@ trait TraversableGenerator extends SynonymGenerator {
           mkPure(mA)
 
       case fixedpoint @ FixedPoint(x, body) =>
+        // type synonyms, reduces clutter & code explosion
+        //
+        // takes synonym generation into own hand
+        // s. t. type variables denoting recursive positions auto-expand,
+        // making `body` the 1-step unrolling of the recursive datatype
+        val argData = (fixedpoint rename mangleA).asInstanceOf[FixedPoint]
+        val mBData = (fixedpoint rename mangleB).asInstanceOf[FixedPoint]
+        val mAType = TypeName(c freshName x + "A")
+        val argSynonym = generateConcreteSynonym(c)(mAType.toString, argData)
+        val mBType = TypeName(x)
+        val fixSynonym = generateConcreteSynonym(c)(x, mBData)
+        val unrolledFix = TypeName(c freshName x + "U")
+        val unrolledSynonym = generateConcreteSynonym(c)(unrolledFix.toString, mBData.body)
+        val resultType = TypeName(c freshName "F_" + x)
+        val resultSynonym = q"type $resultType = ${getApplicativeMapOnObjects(c)(applicative)}[$mBType]"
+
         // `recurse`: fresh label for jumping to this point
         val recurse = TermName(c freshName "recurse")
         val recursiveCall: Tree => Tree = x => q"$recurse($x)"
@@ -184,12 +202,16 @@ trait TraversableGenerator extends SynonymGenerator {
         val unrolled = q"$mA.unroll"
         val newMangleA = mangleA - x
         val newMangleB = mangleB - x
-        val recurseBody = generateDefTraverseBody(c)(unrolled, body, newMangleA, newMangleB, newEnv, applicative)
-        // tie label and code together
-        val mAType     = meaning(c)(fixedpoint rename mangleA)
-        val resultType = meaning(c)(fixedpoint rename mangleB)
-        val recursiveDef = q"def $recurse($mA : $mAType): $resultType = $recurseBody"
-        q"{$recursiveDef ; $recurse($mA)}"
+        val unrolledBody = generateDefTraverseBody(c)(unrolled, body, newMangleA, newMangleB, newEnv, applicative)
+
+        // get unfolded part of the synonym
+        val tq"$fix[$patternFunctor]" = meaning(c)(mBData)
+        val roll = q"${getRoll(c)}.apply[$patternFunctor] _"
+        val pureRoll = q"$applicative.pure[$unrolledFix => $mBType]($roll)"
+        val autoRolled = q"$applicative.call($pureRoll, $unrolledBody)"
+
+        val recursiveDef = q"def $recurse($mA : $mAType): $resultType = $autoRolled"
+        q"{$argSynonym ; $fixSynonym ; $unrolledSynonym ; $resultSynonym ; $recursiveDef ; $recurse($mA)}"
 
       case Variant(header, cases) =>
         if (cases.isEmpty)
@@ -315,12 +337,12 @@ object TraversableGenerator {
     val List2 =
       DataConstructor(Many(Param covariant "A"),
         FixedPoint("List",
-          Variant("ListF", Many(
+          Variant("ListT", Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
               Field("head",
                 FixedPoint("List",
-                  Variant("ListF", Many(
+                  Variant("ListT", Many(
                     Record("Nil", Many.empty),
                     Record("Cons", Many(
                       Field("head", TypeVar("A")),
