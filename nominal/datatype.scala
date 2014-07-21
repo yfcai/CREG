@@ -24,7 +24,7 @@ object datatype extends Parser with Preprocessor with DeclarationGenerator with 
       val synonymFood: SynonymGeneratorFood = digestForSynonymGenerator(c)(input, parseTree)
       val synonyms: Iterator[Tree] =
         (Iterator(generateSynonym(c)(synonymFood.dataSynonym._1, synonymFood.dataSynonym._2)) ++
-          synonymFood.patternFunctor.map({ case (name, data) => generatePatternFunctor(c)(name, data) }).iterator)
+          synonymFood.patternFunctor.map({ case (name, data) => generatePatternFunctorSynonym(c)(name, data) }).iterator)
       // preprocessor add Fix
       // declaration generator generates template classes
       // synonym generator generates synonyms

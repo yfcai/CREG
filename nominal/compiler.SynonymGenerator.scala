@@ -23,7 +23,7 @@ trait SynonymGenerator extends UniverseConstruction {
 
   def generateRHS(c: Context)(datatype: Datatype): c.Tree = meaning(c)(datatype)
 
-  def generatePatternFunctor(c: Context)(patternFunctorName: Name, genericFixedPoint: DataConstructor): c.Tree = {
+  def generatePatternFunctorSynonym(c: Context)(patternFunctorName: Name, genericFixedPoint: DataConstructor): c.Tree = {
     import c.universe._
     val DataConstructor(genericParams, FixedPoint(recursiveParam, datatypeBody)) = genericFixedPoint
     val patternFunctorTypeName = TypeName(patternFunctorName)
@@ -33,7 +33,7 @@ trait SynonymGenerator extends UniverseConstruction {
   }
 
   def generateConcretePatternFunctor(c: Context)(patternFunctorName: Name, fixedPoint: FixedPoint): c.Tree =
-    generatePatternFunctor(c)(patternFunctorName, DataConstructor(Many.empty, fixedPoint))
+    generatePatternFunctorSynonym(c)(patternFunctorName, DataConstructor(Many.empty, fixedPoint))
 }
 
 object SynonymGenerator {
@@ -138,7 +138,7 @@ object SynonymGenerator {
           })#$innerTypeR]""" = synonym
         assert(innerTypeL == innerTypeR)
 
-        val patternF = generatePatternFunctor(c)(gListF, genericDatatype)
+        val patternF = generatePatternFunctorSynonym(c)(gListF, genericDatatype)
         val expectedPatternF = q"""
           type GListF[+A, +GList] = GListT[Nil, Cons[A, GList]]
         """

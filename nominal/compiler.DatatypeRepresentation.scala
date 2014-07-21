@@ -75,6 +75,14 @@ object DatatypeRepresentation {
       case Intersect(lhs, rhs) =>
         Iterator(lhs, rhs)
     }
+
+    // variable renaming
+    def rename(table: Map[Name, Name]): Datatype = this match {
+      case TypeVar(x) if table contains x => TypeVar(table(x))
+      case TypeVar(x) => TypeVar(x)
+      case FixedPoint(x, body) => FixedPoint(x, body rename (table - x))
+      case other => other gmapT (_ rename table)
+    }
   }
 
   sealed trait Nominal { def name: Name }
@@ -86,12 +94,17 @@ object DatatypeRepresentation {
   // variant is entry point from scala types, hence the header.
   case class Variant(header: TypeVar, cases: Many[Nominal]) extends Datatype
 
+  object Variant {
+    // overloaded constructor
+    def apply(headerName: Name, cases: Many[Nominal]): Variant = Variant(TypeVar(headerName), cases)
+  }
+
   case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype {
     def patternFunctor: DataConstructor = DataConstructor(Many(Param covariant name), body)
   }
 
   // covariant function, produces anonymous types
-  case class Reader(domain: TypeVar, range: Datatype) extends Datatype
+  case class Reader(domain: Datatype, range: Datatype) extends Datatype
 
   // with-composition, produces anonymous types
   case class Intersect(lhs: Datatype, rhs: Datatype) extends Datatype

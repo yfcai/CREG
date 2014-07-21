@@ -32,6 +32,10 @@ trait TraversableGenerator extends SynonymGenerator {
 
   def mappingOnObjects: String = "Map"
 
+  def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
+
+  def getRoll(c: Context): c.Tree = c parse "_root_.nominal.lib.Roll"
+
   def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
     import c.universe._
     val q"??? : $tpe" = q"??? : _root_.nominal.lib.Applicative.Endofunctor[$f]"
@@ -73,9 +77,9 @@ trait TraversableGenerator extends SynonymGenerator {
     val tA: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "A"))
     val tB: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "B"))
     val q"trait Trait[$typeDefF]" = q"trait Trait[$tF[_]]"
-    val unmangledTypeNames =
-      Map((tA, functor.params).zipped.map({ case (a, p) => (a.toString, p.name) }): _*) ++
-        (tB, functor.params).zipped.map({ case (b, p) => (b.toString, p.name) })
+    val unmangleA = Map((tA, functor.params).zipped.map({ case (a, p) => (a.toString, p.name) }): _*)
+    val unmangleB = Map((tB, functor.params).zipped.map({ case (b, p) => (b.toString, p.name) }): _*)
+    val unmangledTypeNames = unmangleA ++ unmangleB
     val typeDefs: Many[TypeDef] =
       typeDefF +: mkBoundedTypeDefs(c)(
         (tA ++ tB) map (Param invariant _.toString),
@@ -107,7 +111,7 @@ trait TraversableGenerator extends SynonymGenerator {
     val applicative: TermName = TermName(c freshName "applicative")
     val q"??? : $applicativeType" = q"??? : ${applicativeEndofunctor(c)(tF)}"
 
-    // mapping type params to corresponding function calls
+    // mapping functor.params corresponding function calls
     val env: Map[DatatypeRepresentation.Name, Tree => Tree] =
       Map(
         (functor.params, functions).zipped.map {
@@ -115,15 +119,17 @@ trait TraversableGenerator extends SynonymGenerator {
             (param.name, (x: c.Tree) => q"$function($x)")
         } : _*)
 
-    // recursive call to traverse
-    val recursiveCall: Tree => Tree =
-      x => q"traverse(..${functions.map(f => q"$f") :+ x})"
-
-    val body: Tree = generateDefTraverseBody(c)(q"$mA", functor.body, env, applicative, recursiveCall)
+    val body: Tree = generateDefTraverseBody(c)(
+      q"$mA",
+      functor.body,
+      unmangleA.map(_.swap),
+      unmangleB.map(_.swap),
+      env, applicative)
 
     val result = q"def traverse[..$typeDefs](..$explicitParams)(implicit $applicative : $applicativeType): $resultType = $body"
 
-    println(s"\n$result\n")
+    println(s"\nTRAVERSE: $result\n")
+    println(s"TRAVERSE BODY: $body\n")
 
     result
   }
@@ -146,27 +152,44 @@ trait TraversableGenerator extends SynonymGenerator {
     * @param applicative the name of the Applicative.Endofunctor instance
     */
   def generateDefTraverseBody(c: Context)(
-    mA: c.Tree, datatype: Datatype,
+    mA: c.Tree,
+    datatype: Datatype,
+    mangleA: Map[DatatypeRepresentation.Name, DatatypeRepresentation.Name],
+    mangleB: Map[DatatypeRepresentation.Name, DatatypeRepresentation.Name],
     env: Map[DatatypeRepresentation.Name, c.Tree => c.Tree],
-    applicative: c.TermName,
-    recursiveCall: c.Tree => c.Tree):
+    applicative: c.TermName
+  ):
       c.Tree =
   {
     import c.universe._
+
+    def argType    = meaning(c)(datatype rename mangleA)
+    def resultType = meaning(c)(datatype rename mangleB)
+    def mkPure(x: Tree): Tree = q"$applicative.pure[$resultType]($x)"
 
     datatype match {
       case TypeVar(x) =>
         if (env contains x)
           q"${env(x)(mA)}"
-        else {
-          val tpe = meaning(c)(datatype)
-          q"$applicative.pure[$tpe]($mA)"
-        }
+        else
+          mkPure(mA)
 
-      case FixedPoint(x, body) =>
+      case fixedpoint @ FixedPoint(x, body) =>
+        // `recurse`: fresh label for jumping to this point
+        val recurse = TermName(c freshName "recurse")
+        val recursiveCall: Tree => Tree = x => q"$recurse($x)"
+        // on subsequent fixed-point variables, jump back to this point
+        val newEnv = env.updated(x, recursiveCall)
+        // body of things to jump into
         val unrolled = q"$mA.unroll"
-        val newEnv = env.updated(x, recursiveCall) // takes care of capture avoidance for free
-        generateDefTraverseBody(c)(unrolled, body, newEnv, applicative, recursiveCall)
+        val newMangleA = mangleA - x
+        val newMangleB = mangleB - x
+        val recurseBody = generateDefTraverseBody(c)(unrolled, body, newMangleA, newMangleB, newEnv, applicative)
+        // tie label and code together
+        val mAType     = meaning(c)(fixedpoint rename mangleA)
+        val resultType = meaning(c)(fixedpoint rename mangleB)
+        val recursiveDef = q"def $recurse($mA : $mAType): $resultType = $recurseBody"
+        q"{$recursiveDef ; $recurse($mA)}"
 
       case Variant(header, cases) =>
         if (cases.isEmpty)
@@ -175,56 +198,19 @@ trait TraversableGenerator extends SynonymGenerator {
           // for now, require subfields of variants be records
           // if they are not, then they should be reconstructed as records
           // with type reification.
-          q"???"
+          require(cases.map(_.isInstanceOf[Record]).min,
+            s"expect cases of traversable variant be records; got:\n\n  $datatype")
+          Match(mA,
+            cases.map(record =>
+              generateRecordBody(c)(
+                mA, record.asInstanceOf[Record], mangleA, mangleB, env, applicative)).toList)
         }
 
-      case Record(name, fields) =>
-
-        val testing = q"x match { case A => c }"
-        println(s"\n$testing")
-        println(showRaw(testing) + "\n")
-        /*
-         // empty record, case object variant case, named unit...
-         x match {
-           case A => c
-         }
-         Match(
-           Ident(TermName("x")),
-           List(
-             CaseDef(Ident(TermName("A")), EmptyTree, Ident(TermName("c")))
-           )
-         )
-
-         // records with fields
-         x match {
-           case A((b @ _)) => c
-         }
-         Match(
-           Ident(TermName("x")),
-           List(
-             CaseDef(
-               Apply(Ident(TermName("A")), List(Bind(TermName("b"), Ident(termNames.WILDCARD)))),
-               EmptyTree,
-               Ident(TermName("c"))
-             )
-           )
-         )
-
-         // catch-all match. less relevant.
-         x match {
-           case (y @ _) => z
-         }
-         Match(
-           Ident(TermName("x")),
-           List(
-             CaseDef(Bind(TermName("y"), Ident(termNames.WILDCARD)), EmptyTree, Ident(TermName("z")))
-           )
-         )
-         */
-
-        // yay! CaseDef is a tree!
-        CaseDef(Bind(TermName("y"), Ident(termNames.WILDCARD)), EmptyTree, Ident(TermName("z"))): Tree
-        q"???" // still to do
+      case record @ Record(_, _) =>
+        // put naked record in identity
+        // should generate warning or not?
+        //   c.warning(q"".pos, s"naked record $datatype")
+        Match(mA, List(generateRecordBody(c)(mA, record, mangleA, mangleB, env, applicative)))
 
       case Reader(domain, range) =>
         // by function composition, can build `domain => F[ σ(range) ]`.
@@ -238,11 +224,76 @@ trait TraversableGenerator extends SynonymGenerator {
     }
   }
 
+  def generateRecordBody(c: Context)(
+    mA: c.Tree,
+    datatype: Record,
+    mangleA: Map[DatatypeRepresentation.Name, DatatypeRepresentation.Name],
+    mangleB: Map[DatatypeRepresentation.Name, DatatypeRepresentation.Name],
+    env: Map[DatatypeRepresentation.Name, c.Tree => c.Tree],
+    applicative: c.TermName
+  ): c.universe.CaseDef = {
+    import c.universe._
+    // dupe code...
+    def argType    = meaning(c)(datatype rename mangleA)
+    def resultType = meaning(c)(datatype rename mangleB)
+    def mkPure(x: Tree): Tree = q"$applicative.pure[$resultType]($x)"
+    datatype match {
+      case Record(name, fields) =>
+        if (fields.size == 0) {
+          val ident = Ident(TermName(name))
+          cq"$ident => ${mkPure(ident)}"
+        }
+        else {
+          val caseName = TermName(name)
+          val fieldNames = fields.map(field => TermName(c freshName field.name))
+          val fieldBindings = fieldNames.map(name => Bind(name, q"${termNames.WILDCARD}"))
+          val body = mkCallTree(c)(
+            applicative,
+            mkPureConstructor(c)((datatype rename mangleB).asInstanceOf[Record], applicative) +:
+              fieldNames.zip(fields).map({
+                case (name, Field(_, body)) =>
+                  generateDefTraverseBody(c)(q"$name", body, mangleA, mangleB, env, applicative)
+              }))
+          cq"$caseName(..$fieldBindings) => $body"
+        }
+    }
+  }
+
+  def mkCallTree(c: Context)(applicative: c.TermName, leaves: Many[c.Tree]): c.Tree = {
+    import c.universe._
+    leaves.reduceLeft[c.Tree]({
+      case (callTree, nextArg) =>
+        q"$applicative.call($callTree, $nextArg)"
+    })
+  }
+
+  def mkPureConstructor(c: Context)(
+    record: Record, // mangled already
+    applicative: c.TermName):
+        c.Tree =
+  {
+    import c.universe._
+    val resultType = meaning(c)(uncurryFunctionType(record.fields.map(_.get), record))
+
+    val params = record.fields.map(field => TermName(c freshName field.name))
+    val reconstructedRecord = q"${TermName(record.name)}(..$params)"
+    val fun = params.foldRight(reconstructedRecord) {
+      case (param, body) =>
+        Function(List(mkValDef(c)(param, TypeTree())), body)
+    }
+
+    q"$applicative.pure[$resultType]($fun)"
+  }
+
+  // turn multi-argument function types into nested readers
+  def uncurryFunctionType(args: Many[Datatype], result: Datatype): Datatype =
+    args.foldRight(result) { case (arg, res) => Reader(arg, res) }
+
   def scalaLanguageFeatureImports(c: Context): Many[c.Tree] = {
     import c.universe._
     Many(
-        q"import _root_.scala.language.higherKinds",
-        q"import _root_.scala.language.implicitConversions")
+      q"import _root_.scala.language.higherKinds",
+      q"import _root_.scala.language.implicitConversions")
   }
 }
 
@@ -261,6 +312,21 @@ object TraversableGenerator {
       DataConstructor(Many(Param covariant "X", Param covariant "Y"),
         Record("Tuple2", Many(Field("_1", TypeVar("X")), Field("_2", TypeVar("Y")))))
 
+    val List2 =
+      DataConstructor(Many(Param covariant "A"),
+        FixedPoint("List",
+          Variant("ListF", Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("head",
+                FixedPoint("List",
+                  Variant("ListF", Many(
+                    Record("Nil", Many.empty),
+                    Record("Cons", Many(
+                      Field("head", TypeVar("A")),
+                      Field("tail", TypeVar("List")))))))),
+              Field("tail", TypeVar("List"))))))))
+              
 
     // test generation of `type Cat = ...`
     class c123 extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro Impl.c123 }
@@ -270,33 +336,20 @@ object TraversableGenerator {
     def c2MapError: String = macro Impl.c2MapError
 
     object Impl {
-      // constant functor on everything
-      def c1(c: Context) = {
-        import c.universe._
-        q"""object C1 extends nominal.lib.Traversable {
-          ..${generateTraversableBody(c)(ConstInt, Map.empty)}
-        }"""
-      }
-
-      // identity functor on integers
-      def c2(c: Context) = {
-        import c.universe._
-        q"""object C2 extends nominal.lib.Traversable {
-          ..${generateTraversableBody(c)(Identity, Map("X" -> TypeVar("Int")))}
-        }"""
-      }
-
-      // product functor with 2nd component limited to Either[Int, Boolean]
-      def c3(c: Context) = {
-        import c.universe._
-        q"""object C3 extends nominal.lib.Traversable2 {
-          ..${generateTraversableBody(c)(Product, Map("Y" -> TypeVar("Either[Int, Boolean]"))) }
-        }"""
-      }
-
       def c123(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
         import c.universe._
-        c.Expr(q"..${c1(c) :: c2(c) :: c3(c) :: Nil}")
+        c.Expr(q"""
+          // constant functor on everything
+          val C1 = ${generateTraversable(c)(ConstInt, Map.empty)}
+
+          // identity functor on integers
+          val C2 = ${generateTraversable(c)(Identity, Map("X" -> TypeVar("Int")))}
+
+          // product functor with 2nd component limited to Either[Int, Boolean]
+          val C3 = ${generateTraversable(c)(Product, Map("Y" -> TypeVar("Either[Int, Boolean]")))}
+
+          val List2 = ${generateTraversable(c)(List2, Map.empty)}
+        """)
       }
 
       // must be called with a context where c123 is already expanded

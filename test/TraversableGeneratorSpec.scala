@@ -1,13 +1,21 @@
 import org.scalatest._
 import nominal.compiler._
+import nominal.datatype
 
 import scala.tools.reflect.ToolBoxError
 
 class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
   import TraversableGenerator.Tests._
 
+  @datatype trait List[+A] {
+    Nil
+    Cons(head = A, tail = List)
+  }
+
   // if this compiles at all, then generated code implements Traversable interface correctly
   @c123 object Dummy
+
+  type TC3 = C3.Map[String, Either[Int, Boolean]]
 
   "TraversableGenerator" should "generate subcategory bounds" in {
     implicitly[C1.Cat  =:= Any]
@@ -27,4 +35,12 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
     //
     //   def x = ??? : C2.Map[Boolean]
   }
+
+  it should "generate traversals for tuples" in {
+    val x: TC3 = ("hello", Left(5))
+    val y: TC3 = C3(x).map(_ + " world!", _.left.map(_ + 1))
+    assert(y == ("hello world!", Left(6)))
+  }
+
+  it should "generate traversals for lists of lists" in pending
 }
