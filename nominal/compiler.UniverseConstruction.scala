@@ -225,7 +225,8 @@ trait UniverseConstruction extends util.AbortWithError {
 
   }
 
-  def representGeneratedRecord(c: Context)(tpe: c.Type, fields: List[DoICare]): Record = {
+  // require `tpe` to be dealiased
+  private[this] def representGeneratedRecord(c: Context)(tpe: c.Type, fields: List[DoICare]): Record = {
     val symbol = tpe.typeSymbol
 
     // only require records to be concrete if they are nonleaves
