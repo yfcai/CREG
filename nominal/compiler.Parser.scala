@@ -8,8 +8,8 @@ import contextReaderParser._
 
 trait Parser extends util.AbortWithError {
 
-  // Grammar
-  // =======
+  // Grammar: Datatype
+  // =================
   //
   //      Start := DataDecl
   //             | FamilyDecl
@@ -39,6 +39,14 @@ trait Parser extends util.AbortWithError {
   //  Intersect := Datatype WITH Datatype
   //
   //
+  // Grammar: Functor
+  // ================
+  //
+  //    Functor := ParamList => Datatype
+  //
+  //  ParamList := Name | (Name, Name, ...)  -- both cases are identical on AST level
+  //
+  //
   // Reserved names
   // ==============
   //
@@ -54,6 +62,26 @@ trait Parser extends util.AbortWithError {
       case Success(a) => a
       case Failure(pos, message) => abortWithError(c)(pos, message)
     }
+
+  lazy val FunctorP: Parser[DataConstructor] = new Parser[DataConstructor] {
+    def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
+      import c.universe._
+      input match {
+        case Function(valDefs, body) =>
+          for { datatype <- DatatypeP.parse(c)(body) }
+          yield
+            DataConstructor(
+              valDefs map {
+                case ValDef(modifiers, TermName(name), typeTree, emptyTree) =>
+                  Param covariant name // all functor params are covariant
+              },
+              datatype)
+
+        case _ =>
+          Failure(input.pos, "expect a functor of the form  (TypeParam..) => Datatype")
+      }
+    }
+  }
 
   lazy val DataDeclP: Parser[DataConstructor] = new Parser[DataConstructor] {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
@@ -277,7 +305,7 @@ trait Parser extends util.AbortWithError {
 
 
 object Parser {
-  object Tests extends Parser with util.AssertEqual {
+  object Tests extends Parser with util.AssertEqual with util.Persist {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
 
@@ -377,6 +405,15 @@ object Parser {
 
         assertEqualObjects(expected, actual)
         c.Expr(q"")
+      }
+    }
+
+    class functor extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro functorImpl }
+    def functorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+      import c.universe._
+      annottees.head.tree match {
+        case ValDef(mods, name, tpe, tree) =>
+          c.Expr(ValDef(mods, name, tpe, persist(c)(parseOrAbort(c)(FunctorP, tree))))
       }
     }
 

@@ -4,5 +4,5 @@ T3. from scala types to representation of datatypes (macro; runtime.universe.Typ
 T4. from representation of datatypes to scala types (macro)...OK
 T5. from n-hole contexts of datatypes to n-nary functors (macro)...OK
 T6. from scala expressions to datatypes (macro / parser-metaphor)...OK
-T7. from scala closures to n-hole contexts (macro / parser-metaphor)
+T7. from scala closures to n-hole contexts (macro / parser-metaphor)...OK
 T8. subtyping equirecursion of datatypes (implicit macro)

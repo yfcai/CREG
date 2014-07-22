@@ -1,5 +1,6 @@
 import org.scalatest._
-import nominal.compiler.Parser
+import nominal.compiler._
+import nominal.compiler.DatatypeRepresentation._
 
 class ParserSpec extends FlatSpec {
   import Parser.Tests._
@@ -40,6 +41,27 @@ class ParserSpec extends FlatSpec {
             salary = Salary { S(Float) })
         })
     }
+  }
+
+  it should "parse functors" in {
+    @functor val id = x => x
+    assert(id == DataConstructor(Many(Param covariant "x"), TypeVar("x")))
+
+    @functor val list = A => List { Nil ; Cons(head = A, tail = List) }
+    assert(list ==
+      DataConstructor(
+        Many(Param covariant "A"),
+        Variant("List", Many( // note that parser does not auto-create fixed points
+          Record("Nil", Many.empty),
+          Record("Cons", Many(
+            Field("head", TypeVar("A")),
+            Field("tail", TypeVar("List"))))))))
+
+    @functor val list2 = A => List[List[A]]
+    assert(list2 ==
+      DataConstructor(
+        Many(Param covariant "A"),
+        TypeVar("List[List[A]]"))) // note that type applications are not expanded
   }
 
   it should "parse datatypes mentioning known functors" in pending // Company example; mentions List
