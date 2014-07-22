@@ -51,6 +51,13 @@ trait Traversable2 {
 
   def apply[A <: Cat1, B <: Cat2](mAB: Map[A, B]): View[A, B] = new View(mAB)
 
+  // if you want to have named parameters, e. g.,
+  //
+  //   avoidF(term).map(_var = rename, abs = avoidCapture)
+  //
+  // then the View trait gotta be generated. it looks
+  // more trouble due to possible name clashes than
+  // it's worth, though.
   class View[A <: Cat1, B <: Cat2](mAB: Map[A, B]) {
     def traverse[F[+_]: Applicative.Endofunctor, C <: Cat1, D <: Cat2]
                 (f: A => F[C], g: B => F[D]): F[Map[C, D]] = Traversable2.this.traverse(f, g, mAB)
