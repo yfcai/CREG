@@ -12,7 +12,7 @@ object DatatypeRepresentation {
 
 
   // datatype representation
-  sealed trait Datatype {
+  sealed trait Datatype extends java.io.Serializable {
     // traversals
 
     // real type:

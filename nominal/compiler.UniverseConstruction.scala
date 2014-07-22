@@ -5,7 +5,12 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait UniverseConstruction {
+trait UniverseConstruction extends util.AbortWithError {
+
+  // ====================== //
+  // FROM DATATYPE TO SCALA //
+  // ====================== //
+
   /** @param rep    our representation of a datatype
     * @return       scala's representation of a type
     */
@@ -52,6 +57,15 @@ trait UniverseConstruction {
         val q"??? : $result" = q"??? : ($lhsType with $rhsType)"
         result
     }
+  }
+
+  /** @param rep datatype representation
+    *
+    * @return corresponding scala type with all type synonyms resolved
+    */
+  def scalaType(c: Context)(rep: Datatype): c.Type = {
+    import c.universe._
+    c.typecheck(q"??? : ${meaning(c)(rep)}").tpe.dealias
   }
 
   def mkInnerType(c: Context): c.TypeName = c.universe.TypeName(c freshName "innerType")
@@ -122,10 +136,121 @@ trait UniverseConstruction {
     val q"??? : $fix [ ID ]" = q"??? : _root_.nominal.lib.Fix [ ID ]"
     fix
   }
+
+
+  // ====================== //
+  // FROM SCALA TO DATATYPE //
+  // ====================== //
+
+  def representation(c: Context)(tpe: c.Type, care: Set[Name]): Datatype =
+    carePackage(c)(tpe, care).get
+
+  /** I care about a Type if
+    * 1. it is a leaf, not a class, and matches the name of a variable under my care
+    * 2. it is a branch and I care about a child of its.
+    *
+    * If I care about a type, then I treat it as a part of a datatype
+    * declaration, where all variants are abstract and all records are concrete.
+    *
+    * If I don't care about a type, then I treat it as a type constant.
+    */
+  sealed trait DoICare { def shouldCare: Boolean ; def get: Datatype }
+  case class IDontCare(get: TypeVar) extends DoICare { def shouldCare = false }
+  case class IDoCare(get: Datatype) extends DoICare { def shouldCare = true }
+  def carePackage(c: Context)(tpe: c.Type, care: Set[Name]): DoICare =
+    if (tpe.typeArgs.isEmpty) {
+      val symbol = tpe.typeSymbol
+      val name = symbol.name.toString
+      val shouldCare = ! symbol.isClass  &&  care(name)
+      if (shouldCare)
+        IDoCare(TypeVar(name))
+      else
+        IDontCare(TypeVar(symbol.fullName))
+    }
+    else {
+      val symbol = tpe.typeSymbol
+      val childCare = tpe.typeArgs.map(child => carePackage(c)(child, care))
+      // I should care about `tpe` if I care about at least one of its children
+      val shouldCare = childCare.map(_.shouldCare).max
+      if (shouldCare) {
+        require(symbol.isClass,
+          """|violation of expectation: type on a cared path is not a class.
+             |Every type on a cared path should be a generated datatype.
+             |We assume that every abstract type is a variant and every
+             |concrete type is a record.
+             |""".stripMargin)
+
+        // assume all variants are abstract & all records are concrete.
+        if (symbol.isAbstract) {
+          // if I do care about this type & it's a variant,
+          // then children's IDontCare packages are useless.
+          // they have to be records.
+          val cases: Many[Nominal] = childCare.zip(tpe.typeArgs) map {
+            case (IDoCare(record @ Record(_, _)), _) =>
+              record
+
+            case (IDoCare(nonRecord), _) =>
+              abortWithError(c)(
+                c.universe.EmptyTree.pos,
+                s"tentative variant $tpe expects record/case class, got $nonRecord")
+
+            case (IDontCare(_), typeArg) =>
+              representGeneratedRecord(c)(
+                typeArg,
+                typeArg.typeArgs.map(tpe => carePackage(c)(tpe, care)))
+          }
+          IDoCare(Variant(TypeVar(symbol.fullName), cases))
+        }
+        else {
+          // this thing is a record. That's easier to deal with.
+          // children that are variants can simply be treated as
+          // type constants.
+          IDoCare(representGeneratedRecord(c)(tpe, childCare))
+        }
+      }
+      else {
+        // cast is safe: `shouldCare` is false only if all children are `IDontCare`
+        val children = childCare.map(_.asInstanceOf[TypeVar].name)
+        // if I don't care about `tpe`, then it will become a type constant
+        // with all children fully qualified
+        IDontCare(TypeVar(s"${symbol.fullName}[${children mkString ", "}]"))
+      }
+    }
+
+  def representGeneratedRecord(c: Context)(tpe: c.Type, fields: List[DoICare]): Record = {
+    val symbol = tpe.typeSymbol
+
+    // only require records to be concrete if they are nonleaves
+    // (traits for case objects are abstract, but they are records without fields)
+    if (! fields.isEmpty)
+      require(
+        symbol.isClass && ! symbol.isAbstract,
+        s"generated records must be concrete classes; got $tpe")
+
+    Record(
+      symbol.name.toString,
+      fields.zipWithIndex.map {
+        case (carePkg, i) =>
+          Field(
+            // unfortunately, field names are not recoverable at this point.
+            // using _1, _2, ...
+            s"_${i + 1}",
+            carePkg.get)
+      })
+  }
+
+  def dodgeFreeTypeVariables(c: Context)(tpe: c.Tree, care: Set[Name]): c.Type = {
+    import c.universe._
+    val dummy = TypeName(c freshName "Dummy")
+    val method = TermName(c freshName "method")
+    val typeDefs = mkTypeDefs(c)(care.toSeq map (Param invariant _))
+    val wrapper = q"class $dummy { def $method[..$typeDefs]: ${tpe} = ??? } ; new $dummy"
+    c.typecheck(wrapper).tpe.member(method).typeSignature.finalResultType.dealias
+  }
 }
 
 object UniverseConstruction {
-  object Tests extends UniverseConstruction with util.AssertEqual {
+  object Tests extends UniverseConstruction with util.AssertEqual with util.Persist {
     import language.experimental.macros
     import scala.annotation.StaticAnnotation
 
@@ -177,6 +302,17 @@ object UniverseConstruction {
                 Field("tail", TypeVar("L")))))))
 
         c.Expr(q"type GenList = ${meaning(c)(datatype)}")
+      }
+    }
+
+    class rep extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro repImpl }
+    def repImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+      import c.universe._
+      annottees.head.tree match {
+        case ValDef(mods, name, tt @ TypeTree(), q"rep[$tpe]($careExpr)") =>
+          val care = c.eval(c.Expr(careExpr)).asInstanceOf[Set[DatatypeRepresentation.Name]]
+          val data = representation(c)(dodgeFreeTypeVariables(c)(tpe, care), care)
+          c.Expr(ValDef(mods, name, tt, persist(c)(data)))
       }
     }
 

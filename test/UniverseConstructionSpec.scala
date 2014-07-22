@@ -4,20 +4,15 @@ import nominal.compiler._
 import nominal.lib._
 import DatatypeRepresentation._
 
+import nominal.datatype
+
 class UniverseConstructionSpec extends FlatSpec {
   import UniverseConstruction.Tests._
 
-  // sample generated datatype
-  sealed trait ListT[+Nil, +Cons]
-  sealed trait Nil extends ListT[Nil, Nothing]
-  case object Nil extends Nil
-  sealed case class Cons[+A, +L](head: A, tail: L) extends ListT[Nothing, Cons[A, L]]
+  @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
 
-  // ListF should NOT be visible to users.
-  // the uncurried ListF should be visible to users.
-  private[this] type ListF[+A] = { type λ[+L] = ListT[Nil, Cons[A, L]] }
-
-  private[this] type List[+A] = Fix[ListF]
+  def nil[A]: List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Nil)
+  def cons[A](head: A, tail: List[A]): List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Cons(head, tail))
 
   "UniverseConstruction" should "be able to interpret list of integers" in {
     @interpretIntList trait IntList {
@@ -29,11 +24,7 @@ class UniverseConstructionSpec extends FlatSpec {
             Field("tail", Hole("L"))))))))
     }
 
-    val xs: IntList = {
-      val nil: IntList = Roll[ListF[Int]#λ](Nil)
-      def cons(x: Int, xs: IntList) = Roll[ListF[Int]#λ](Cons(x, xs))
-      cons(1, cons(2, cons(3, cons(4, nil))))
-    }
+    val xs: IntList = cons(1, cons(2, cons(3, cons(4, nil))))
 
     info(s"xs = $xs")
   }
@@ -54,16 +45,26 @@ class UniverseConstructionSpec extends FlatSpec {
 
     val my = mkMy[Int]
 
-    val xs: my.List = {
-      val nil: my.List = Roll[ListF[Int]#λ](Nil)
-      def cons(x: Int, xs: my.List) = Roll[ListF[Int]#λ](Cons(x, xs))
-      cons(1, cons(2, cons(3, cons(4, nil))))
-    }
+    val xs: my.List = cons(1, cons(2, cons(3, cons(4, nil))))
 
     info(s"xs = $xs")
   }
 
-  "UniverseConstruction" should "be able to reify generated datatypes" in (pending) ; {
+  @datatype trait Maybe[+A] {
+    Nothin_
+    Just(A)
+  }
+
+  "UniverseConstruction" should "reify nonrecursive datatypes" in {
+    @rep val maybeA = rep [Maybe[A]] (Set("A"))
+    assert(maybeA ==
+      Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
+        Record("Nothin_", Many.empty),
+        Record("Just", Many(
+          Field("_1", TypeVar("A")))))))
+  }
+
+  it should "reify recursive datatypes" in pending ; {
     // reify[List[Int]]
     //       ==
     // FixedPoint(DataConstructor(Many("L"),
