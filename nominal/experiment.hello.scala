@@ -22,6 +22,15 @@ object hello {
           """
       }
     }
+
+    val w = q"class Dummy { def method[A]: List[A] = ??? }; new Dummy"
+    val x = c.typecheck(w).tpe.member(TermName("method")).typeSignature.finalResultType
+    println
+    println(x)
+    println
+    println(showRaw(x))
+    println
+
     c.Expr[Any](result)
   }
 }
