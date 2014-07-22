@@ -23,12 +23,17 @@ object hello {
       }
     }
 
+    // if a type is not a class & has one of the names we care about,
+    // then assume it to be one of the names we care about.
+    // everything above it should be interpreted as ADT:
+    // if abstract, then variant.
+    // if not abstract, then record.
     val w = q"class Dummy { def method[A]: List[A] = ??? }; new Dummy"
     val x = c.typecheck(w).tpe.member(TermName("method")).typeSignature.finalResultType
     println
-    println(x)
+    println("hello:\n" + x)
     println
-    println(showRaw(x))
+    println("hello:\n" + showRaw(x))
     println
 
     c.Expr[Any](result)
