@@ -15,7 +15,13 @@ object normalize {
         // rhs is a concrete type
         val tpe = c.typecheck(q"??? : $rhs").tpe
         val name = TermName(normalized.toString)
-        q"""object $name { override def toString: String = ${tpe.dealias.toString} }"""
+        q"""
+          object $name {
+            override def toString: String = ${tpe.dealias.toString}
+
+            def fullName: String = ${tpe.typeSymbol.fullName}
+          }
+        """
       }
       else {
         // rhs may mention abstract types
