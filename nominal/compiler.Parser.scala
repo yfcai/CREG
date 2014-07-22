@@ -412,7 +412,7 @@ object Parser {
     def functorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
       import c.universe._
       annottees.head.tree match {
-        case ValDef(mods, name, tpe, tree) =>
+        case ValDef(mods, name, tpe @ TypeTree(), tree) =>
           c.Expr(ValDef(mods, name, tpe, persist(c)(parseOrAbort(c)(FunctorP, tree))))
       }
     }
