@@ -157,7 +157,10 @@ trait UniverseConstruction extends util.AbortWithError {
   sealed trait DoICare { def shouldCare: Boolean ; def get: Datatype }
   case class IDontCare(get: TypeVar) extends DoICare { def shouldCare = false }
   case class IDoCare(get: Datatype) extends DoICare { def shouldCare = true }
-  def carePackage(c: Context)(tpe: c.Type, care: Set[Name]): DoICare =
+  def carePackage(c: Context)(tpe0: c.Type, care: Set[Name]): DoICare = {
+    // dealiasing is not recursive. do it here.
+    val tpe = tpe0.dealias
+
     if (tpe.typeArgs.isEmpty) {
       val symbol = tpe.typeSymbol
       val name = symbol.name.toString
@@ -217,6 +220,8 @@ trait UniverseConstruction extends util.AbortWithError {
       }
     }
 
+  }
+
   def representGeneratedRecord(c: Context)(tpe: c.Type, fields: List[DoICare]): Record = {
     val symbol = tpe.typeSymbol
 
@@ -245,7 +250,7 @@ trait UniverseConstruction extends util.AbortWithError {
     val method = TermName(c freshName "method")
     val typeDefs = mkTypeDefs(c)(care.toSeq map (Param invariant _))
     val wrapper = q"class $dummy { def $method[..$typeDefs]: ${tpe} = ??? } ; new $dummy"
-    c.typecheck(wrapper).tpe.member(method).typeSignature.finalResultType.dealias
+    c.typecheck(wrapper).tpe.member(method).typeSignature.finalResultType
   }
 }
 

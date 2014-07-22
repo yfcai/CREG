@@ -62,6 +62,22 @@ class UniverseConstructionSpec extends FlatSpec {
         Record("Nothin_", Many.empty),
         Record("Just", Many(
           Field("_1", TypeVar("A")))))))
+
+    @rep val justA = rep [Just[A]] (Set("A"))
+    assert(justA ==
+      Record("Just", Many(
+        Field("_1", TypeVar("A")))))
+
+    @rep val maybe2 = rep [Maybe[Maybe[A]]] (Set("A"))
+    assert(maybe2 ==
+      Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
+        Record("Nothin_", Many.empty),
+        Record("Just", Many(
+          Field("_1",
+            Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
+              Record("Nothin_", Many.empty),
+              Record("Just", Many(
+                Field("_1", TypeVar("A"))))))))))))
   }
 
   it should "reify recursive datatypes" in pending ; {
