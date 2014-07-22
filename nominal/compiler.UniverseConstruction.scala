@@ -183,7 +183,10 @@ trait UniverseConstruction extends util.AbortWithError {
              |concrete type is a record.
              |""".stripMargin)
 
-        // assume all variants are abstract & all records are concrete.
+        // assume all variants are abstract & all records are concrete,
+        // given that `tpe` is not a leaf.
+        //
+        // empty records are leaves and their types are abstract.
         if (symbol.isAbstract) {
           // if I do care about this type & it's a variant,
           // then children's IDontCare packages are useless.
