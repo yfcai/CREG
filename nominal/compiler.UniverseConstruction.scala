@@ -228,6 +228,7 @@ trait UniverseConstruction extends util.AbortWithError {
   def representGeneratedRecord(c: Context)(tpe0: c.Type, fields: List[DoICare]): Record = {
     val tpe = tpe0.dealias
     val symbol = tpe.typeSymbol
+    val typeParams = tpe.typeConstructor.typeParams
 
     // only require records to be concrete if they are nonleaves
     // (traits for case objects are abstract, but they are records without fields)
@@ -238,13 +239,9 @@ trait UniverseConstruction extends util.AbortWithError {
 
     Record(
       symbol.name.toString,
-      fields.zipWithIndex.map {
-        case (carePkg, i) =>
-          Field(
-            // unfortunately, field names are not recoverable at this point.
-            // using _1, _2, ...
-            s"_${i + 1}",
-            carePkg.get)
+      fields.zip(typeParams).map {
+        case (carePkg, param) =>
+          Field(param.name.toString, carePkg.get)
       })
   }
 
