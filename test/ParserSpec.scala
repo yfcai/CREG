@@ -57,11 +57,41 @@ class ParserSpec extends FlatSpec {
             Field("head", TypeVar("A")),
             Field("tail", TypeVar("List"))))))))
 
+    // after preprocessing, list2 & list2v1 & list2v2 should generate the same functor.
+
     @functor val list2 = A => List[List[A]]
     assert(list2 ==
       DataConstructor(
         Many(Param covariant "A"),
         TypeVar("List[List[A]]"))) // note that type applications are not expanded
+
+    @functor val list2v1 = A => List { Cons(head = List { Cons(head = A) }) }
+    assert(list2v1 ==
+      DataConstructor(
+        Many(Param covariant "A"),
+        Variant("List", Many(
+          Record("Cons", Many(
+            Field("head",
+              Variant("List", Many(
+                Record("Cons", Many(
+                  Field("head",
+                    TypeVar("A")))))))))))))
+
+    @functor val list2v2 = A => List { Cons(head = List[A]) }
+    assert(list2v2 ==
+      DataConstructor(
+        Many(Param covariant "A"),
+        Variant("List", Many(
+          Record("Cons", Many(
+            Field("head",
+              TypeVar("List[A]"))))))))
+
+    @functor val listv = N => List { Nil = N }
+    assert(listv ==
+      DataConstructor(
+        Many(Param covariant "N"),
+        Variant("List", Many(
+          Field("Nil", TypeVar("N"))))))
   }
 
   it should "parse datatypes mentioning known functors" in pending // Company example; mentions List
