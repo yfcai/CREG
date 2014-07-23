@@ -145,8 +145,78 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   // FROM SCALA TO DATATYPE //
   // ====================== //
 
+  def nothingType: String = "_root_.scala.Nothing"
+
+  /** flesh out parsed datatype with some cases/fields omitted */
+  def fleshOut(c: Context)(raw: DataConstructor): DataConstructor = {
+    val care = raw.params.view.map(_.name).toSet
+
+    // have to consider that the whole body is a typevar
+    val tpe  = raw.body match {
+      case typeVar @ TypeVar(_) =>
+        fullyApplyToNothing(c)(typeVar, care)
+
+      case Variant(header, _) =>
+        fullyApplyToNothing(c)(header, care)
+
+      case _ =>
+        treeToType(c)(c.universe.TypeTree())
+    }
+
+    val body = representation(c)(tpe, care, Some(raw.body))
+    DataConstructor(raw.params, body)
+  }
+
   def representation(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype]): Datatype =
     carePackage(c)(tpe, care, overrider).get
+
+  /** starting type hidden in an overrider; in other words, the entry point */
+  def startingType(c: Context)(body: Datatype, care: Set[Name]): Option[c.Type] = 
+    body match {
+      case Variant(header, _) =>
+        //println(s"\n$body\n")//DEBUG // should dodge free vars here...
+        Some(fullyApplyToNothing(c)(header, care))
+
+      case Record(_, _) | TypeVar(_) =>
+        None
+
+      case Intersect(_, _) | Reader(_, _) =>
+        // not supported yet
+        ???
+
+      case _ =>
+        abortWithError(c)(
+          c.universe.EmptyTree.pos,
+          s"expect parse tree produced by DatatypeP, got:\n  $body")
+    }
+
+  // if it's a type, then return it's meaning.
+  // if it's a type constructor, then fully apply to nothings & return it.
+  //
+  // cai 23.07.2014
+  // I don't know how to parse a type constructor,
+  // so I give the constructor 0, 1, 2, ..., 22 type arguments until the whole thing typechecks,
+  // and give up if it does not.
+  def fullyApplyToNothing(c: Context)(firstTry: TypeVar, care: Set[Name]): c.Type = {
+    val maxTypeParams = 22
+    var nextTry = firstTry
+    (1 to (maxTypeParams + 1)) foreach { i =>
+      try {
+        return dodgeFreeTypeVariables(c)(meaning(c)(nextTry), care)
+      }
+      catch {
+        case e: scala.reflect.macros.TypecheckException
+            if (e.getMessage matches "type .* takes type parameters")
+            || (e.getMessage matches """wrong number of type arguments for .*, should be \d+""")
+            =>
+          // let's add more parameters and try again
+          nextTry = TypeVar(firstTry.name + s"[${(1 to i) map (_ => nothingType) mkString ", "}]")
+      }
+    }
+    abortWithError(c)(
+      c.universe.EmptyTree.pos,
+      s"panic! ${firstTry.name} has more than $maxTypeParams type parameters?!")
+  }
 
   /** I care about a Type if
     * 1. it is a leaf, not a class, and matches the name of a variable under my care
@@ -164,7 +234,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
 
   def carePackage(c: Context)(tpe0: c.Type, care: Set[Name], overrider: Option[Datatype]): DoICare = {
     // dealiasing is not recursive. do it here.
-    val tpe = tpe0.dealias
+    val tpe = (overrider flatMap (x => startingType(c)(x, care)) getOrElse tpe0).dealias
 
     if (tpe.typeArgs.isEmpty) {
       val symbol = tpe.typeSymbol
@@ -181,6 +251,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
       // match overrider with children
       val suboverriders: Many[Option[Datatype]] = matchSuboverriders(c)(tpe, care, overrider)
 
+      // recursive calls
       val childCare = tpe.typeArgs.zip(suboverriders).map {
         case (child, overrider) =>
           carePackage(c)(child, care, overrider)
@@ -437,17 +508,14 @@ object UniverseConstruction {
       }
     }
 
-    class typedFunctor extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro typedFunctorImpl }
-    def typedFunctorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+    class functor extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro functorImpl }
+    def functorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
       import c.universe._
       annottees.head.tree match {
-        case ValDef(mods, name, typeTree, tree) =>
+        case ValDef(mods, name, emptyType @ TypeTree(), tree) =>
           val input   = parseOrAbort(c)(FunctorP, tree)
-          val care    = input.params.view.map(_.name).toSet
-          val tpe     = dodgeFreeTypeVariables(c)(typeTree, care)
-          val body    = representation(c)(tpe, care, Some(input.body))
-          val functor = DataConstructor(input.params, body)
-          c.Expr(ValDef(mods, name, TypeTree(), persist(c)(functor)))
+          val functor = fleshOut(c)(input)
+          c.Expr(ValDef(mods, name, emptyType, persist(c)(functor)))
       }
     }
   }

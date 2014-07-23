@@ -55,9 +55,11 @@ class UniverseConstructionSpec extends FlatSpec {
     Just(get = A)
   }
 
+  @datatype trait Trio[+A, +B, +C] { MkTrio(A, B, C) }
+
   "UniverseConstruction" should "reify nonrecursive datatypes" in {
     @rep val maybeA = rep [Maybe[A]] (Set("A"))
-    @typedFunctor val maybeF: Maybe[A] = A => Maybe { Just(A) }
+    @functor val maybeF = A => Maybe { Just(A) }
     assert(maybeA ==
       Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
         Record("Nothin_", Many.empty),
@@ -76,7 +78,8 @@ class UniverseConstructionSpec extends FlatSpec {
         Field("get", TypeVar("A")))))
 
     @rep val maybe2 = rep [Maybe[Maybe[A]]] (Set("A"))
-    @typedFunctor val maybe2F: Maybe[Maybe[A]] = A => Maybe { Just(Maybe { Just(A) }) }
+    @functor val maybe2F   = A => Maybe { Just(Maybe { Just(A) }) }
+    @functor val maybe2Fv1 = A => Maybe[Maybe[A]] { Nothin_ }
     assert(maybe2 ==
       Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
         Record("Nothin_", Many.empty),
@@ -86,7 +89,22 @@ class UniverseConstructionSpec extends FlatSpec {
               Record("Nothin_", Many.empty),
               Record("Just", Many(
                 Field("get", TypeVar("A"))))))))))))
-    assert(maybe2F.body == maybe2)
+    assert(maybe2F  .body == maybe2)
+    assert(maybe2Fv1.body == maybe2)
+  }
+
+  it should "reify nonrecursive datatypes with multiple type parameters" in {
+    @functor val trioFv1 = A => Trio { MkTrio(A, A, A) }
+    @functor val trioFv2 = A => Trio[A, A, A]
+    assert(trioFv1 ==
+      DataConstructor(
+        Many(Param covariant "A"),
+        Variant(TypeVar(this.getClass.getName + ".TrioT"), Many(
+          Record("MkTrio", Many(
+            Field("_1", TypeVar("A")),
+            Field("_2", TypeVar("A")),
+            Field("_3", TypeVar("A"))))))))
+    assert(trioFv1 == trioFv2)
   }
 
   it should "reify recursive datatypes" in pending ; {
