@@ -5,7 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait UniverseConstruction extends util.AbortWithError {
+trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
 
   // ====================== //
   // FROM DATATYPE TO SCALA //
@@ -63,9 +63,12 @@ trait UniverseConstruction extends util.AbortWithError {
     *
     * @return corresponding scala type with all type synonyms resolved
     */
-  def scalaType(c: Context)(rep: Datatype): c.Type = {
+  def scalaType(c: Context)(rep: Datatype): c.Type =
+    treeToType(c)(meaning(c)(rep))
+
+  def treeToType(c: Context)(typeTree: c.Tree): c.Type = {
     import c.universe._
-    c.typecheck(q"??? : ${meaning(c)(rep)}").tpe.dealias
+    c.typecheck(q"??? : $typeTree").tpe.dealias
   }
 
   def mkInnerType(c: Context): c.TypeName = c.universe.TypeName(c freshName "innerType")
@@ -142,12 +145,13 @@ trait UniverseConstruction extends util.AbortWithError {
   // FROM SCALA TO DATATYPE //
   // ====================== //
 
-  def representation(c: Context)(tpe: c.Type, care: Set[Name]): Datatype =
-    carePackage(c)(tpe, care).get
+  def representation(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype]): Datatype =
+    carePackage(c)(tpe, care, overrider).get
 
   /** I care about a Type if
     * 1. it is a leaf, not a class, and matches the name of a variable under my care
-    * 2. it is a branch and I care about a child of its.
+    * 2. it is a branch and I care about a child of its
+    * 3. it matches one of the overriders
     *
     * If I care about a type, then I treat it as a part of a datatype
     * declaration, where all variants are abstract and all records are concrete.
@@ -157,24 +161,33 @@ trait UniverseConstruction extends util.AbortWithError {
   sealed trait DoICare { def shouldCare: Boolean ; def get: Datatype }
   case class IDontCare(get: TypeVar) extends DoICare { def shouldCare = false }
   case class IDoCare(get: Datatype) extends DoICare { def shouldCare = true }
-  def carePackage(c: Context)(tpe0: c.Type, care: Set[Name]): DoICare = {
+
+  def carePackage(c: Context)(tpe0: c.Type, care: Set[Name], overrider: Option[Datatype]): DoICare = {
     // dealiasing is not recursive. do it here.
     val tpe = tpe0.dealias
 
     if (tpe.typeArgs.isEmpty) {
       val symbol = tpe.typeSymbol
       val name = symbol.name.toString
-      val shouldCare = ! symbol.isClass  &&  care(name)
+      val shouldCare = overrider.nonEmpty || ! symbol.isClass  &&  care(name)
       if (shouldCare)
-        IDoCare(TypeVar(name))
+        IDoCare(overrider getOrElse TypeVar(name))
       else
         IDontCare(TypeVar(symbol.fullName))
     }
     else {
       val symbol = tpe.typeSymbol
-      val childCare = tpe.typeArgs.map(child => carePackage(c)(child, care))
+
+      // match overrider with children
+      val suboverriders: Many[Option[Datatype]] = matchSuboverriders(c)(tpe, care, overrider)
+
+      val childCare = tpe.typeArgs.zip(suboverriders).map {
+        case (child, overrider) =>
+          carePackage(c)(child, care, overrider)
+      }
+
       // I should care about `tpe` if I care about at least one of its children
-      val shouldCare = childCare.map(_.shouldCare).max
+      val shouldCare = overrider.nonEmpty || childCare.map(_.shouldCare).max
       if (shouldCare) {
         require(symbol.isClass,
           """|violation of expectation: type on a cared path is not a class.
@@ -188,6 +201,14 @@ trait UniverseConstruction extends util.AbortWithError {
         //
         // empty records are leaves and their types are abstract.
         if (symbol.isAbstract) {
+
+          // if there's an overrider, it should not be anything that cannot expand to a variant
+          require(
+            overrider.isEmpty ||
+              overrider.get.isInstanceOf[Variant] ||
+              overrider.get.isInstanceOf[TypeVar],
+            s"got abstract class $tpe, expect:\n  ${overrider.get}")
+
           // if I do care about this type & it's a variant,
           // then children's IDontCare packages are useless.
           // they have to be records.
@@ -203,11 +224,21 @@ trait UniverseConstruction extends util.AbortWithError {
             case (IDontCare(_), typeArg) =>
               representGeneratedRecord(c)(
                 typeArg,
-                typeArg.typeArgs.map(tpe => carePackage(c)(tpe, care)))
+                typeArg.typeArgs.zip(suboverriders).map {
+                  case (tpe, overrider) =>
+                    carePackage(c)(tpe, care, overrider)
+                })
           }
           IDoCare(Variant(TypeVar(symbol.fullName), cases))
         }
         else {
+          // if there is an overrider, it should not be anything that cannot expand to a record
+          require(
+            overrider.isEmpty ||
+              overrider.get.isInstanceOf[Record] ||
+              overrider.get.isInstanceOf[TypeVar],
+            s"got concrete class $tpe, expect:\n  ${overrider.get}")
+
           // this thing is a record. That's easier to deal with.
           // children that are variants can simply be treated as
           // type constants.
@@ -223,6 +254,90 @@ trait UniverseConstruction extends util.AbortWithError {
       }
     }
 
+  }
+
+  // requires `tpe` be dealiased
+  def matchSuboverriders(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype]):
+      Many[Option[Datatype]] = {
+    def nones = tpe.typeArgs.map(_ => None)
+    overrider match {
+      case None =>
+        nones
+
+      case Some(typeVar @ TypeVar(_)) =>
+        // for the first time, try to expand overrider
+        val expandedOverrider = try {
+          representation(c)(scalaType(c)(typeVar), care, None)
+        }
+        catch {
+          case e: reflect.macros.TypecheckException =>
+            typeVar
+        }
+
+        if (expandedOverrider.isInstanceOf[TypeVar])
+          // `typeVar` cannot be expanded
+          nones
+        else
+          matchSuboverriders(c)(tpe, care, Some(expandedOverrider))
+
+      case Some(variant @ Variant(header, cases)) =>
+        matchChildrenOverriders(c)(tpe, variant, cases)
+
+      case Some(record @ Record(name, fields)) =>
+        matchChildrenOverriders(c)(tpe, record, fields)
+
+      case Some(FixedPoint(name, body)) =>
+        // TODO: think about it.
+        ???
+
+      case Some(Reader(domain, range)) =>
+        // what answer makes sense?
+        ???
+
+      case Some(Intersect(_, _)) =>
+        // not sure what to do here
+        ???
+    }
+  }
+
+  // requires `tpe` be dealiased
+  def matchChildrenOverriders(c: Context)(tpe: c.Type, parent: Datatype, overriders: Many[Nominal]):
+      Many[Option[Datatype]] =
+  {
+    val children = tpe.typeArgs
+    val params = tpe.typeConstructor.typeParams.map(symbol => symbol.name.toString)
+    val indexedOverriders: Map[Int, Option[Datatype]] =
+      overriders.map({
+        case FixedPoint(_, _) =>
+          sys error s"500 internal error: found fixed point as a case of a variant!?"
+
+        case overrider =>
+          var i = params.indexOf(overrider.name)
+
+          //DEBUG
+          if (overrider.name == "A")
+            println(s"\nparent = $parent\noverrider = $overrider\n")
+          //DEBUG: FOUND Record(A, Vector()) // disturbing
+
+          // if overrider did not provide a name,
+          // attempt to map the index back.
+          // therefore we must forbid names of the form "_i"
+          // where i is not the index.
+          if (i == -1)
+            tupleIndex(overrider.name) map (i = _)
+
+          if (i != -1)
+            (i, Some(overrider.get))
+          else
+            abortWithError(c)(
+              c.universe.EmptyTree.pos,
+              s"`${tpe.typeConstructor}[${params.mkString(", ")}]` has no member called `${overrider.name}`")
+      })(collection.breakOut)
+
+    children.zipWithIndex.map {
+      case (child, i) =>
+        indexedOverriders.getOrElse(i, None)
+    }
   }
 
   def representGeneratedRecord(c: Context)(tpe0: c.Type, fields: List[DoICare]): Record = {
@@ -256,7 +371,7 @@ trait UniverseConstruction extends util.AbortWithError {
 }
 
 object UniverseConstruction {
-  object Tests extends UniverseConstruction with util.AssertEqual with util.Persist {
+  object Tests extends UniverseConstruction with Parser with util.AssertEqual with util.Persist {
     import language.experimental.macros
     import scala.annotation.StaticAnnotation
 
@@ -317,10 +432,23 @@ object UniverseConstruction {
       annottees.head.tree match {
         case ValDef(mods, name, tt @ TypeTree(), q"rep[$tpe]($careExpr)") =>
           val care = c.eval(c.Expr(careExpr)).asInstanceOf[Set[DatatypeRepresentation.Name]]
-          val data = representation(c)(dodgeFreeTypeVariables(c)(tpe, care), care)
+          val data = representation(c)(dodgeFreeTypeVariables(c)(tpe, care), care, None)
           c.Expr(ValDef(mods, name, tt, persist(c)(data)))
       }
     }
 
+    class typedFunctor extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro typedFunctorImpl }
+    def typedFunctorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+      import c.universe._
+      annottees.head.tree match {
+        case ValDef(mods, name, typeTree, tree) =>
+          val input   = parseOrAbort(c)(FunctorP, tree)
+          val care    = input.params.view.map(_.name).toSet
+          val tpe     = dodgeFreeTypeVariables(c)(typeTree, care)
+          val body    = representation(c)(tpe, care, Some(input.body))
+          val functor = DataConstructor(input.params, body)
+          c.Expr(ValDef(mods, name, TypeTree(), persist(c)(functor)))
+      }
+    }
   }
 }

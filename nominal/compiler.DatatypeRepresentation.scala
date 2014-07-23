@@ -85,11 +85,13 @@ object DatatypeRepresentation {
     }
   }
 
-  sealed trait Nominal { def name: Name }
+  sealed trait Nominal { def name: Name ; def get: Datatype }
 
   case class TypeVar(name: Name) extends Datatype
 
-  case class Record(name: Name, fields: Many[Field]) extends Nominal with Datatype
+  case class Record(name: Name, fields: Many[Field]) extends Nominal with Datatype {
+    def get = this
+  }
 
   // variant is entry point from scala types, hence the header.
   case class Variant(header: TypeVar, cases: Many[Nominal]) extends Datatype
@@ -101,6 +103,7 @@ object DatatypeRepresentation {
 
   case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype {
     def patternFunctor: DataConstructor = DataConstructor(Many(Param covariant name), body)
+    def get = this
   }
 
   // covariant function, produces anonymous types
