@@ -6,7 +6,7 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 import contextReaderParser._
 
-trait Parser extends util.AbortWithError {
+trait Parser extends util.AbortWithError with util.TupleIndex {
 
   // Grammar: Datatype
   // =================
@@ -52,6 +52,7 @@ trait Parser extends util.AbortWithError {
   //
   // =>:  (term-level name of reader constructor)
   // WITH (term-level name of keyword `with`)
+  // _\d+ (tuple components _1, _2, _3, ...; _i must be the (i - 1)th field)
   //
 
   // shadow trait Parser by Parser[A]
@@ -187,7 +188,7 @@ trait Parser extends util.AbortWithError {
         case q"$recordName ( ..$fields )" =>
           if (fields.isEmpty)
             Failure(input.pos, "error: if this record has no field, do not put parentheses after it.")
-          else
+          else {
             for {
               name <- IdentifierP.parse(c)(recordName)
               possiblyAnonymousFields <- FieldsP.parse(c)(fields)
@@ -199,10 +200,28 @@ trait Parser extends util.AbortWithError {
                   val label = s"_${i + 1}" // "_1", "_2", "_3" etc; scala will make sure named follows anonymous
                   Field(label, data)
 
-                case (NamedField(field), _) =>
+                case (NamedField(field), i) =>
+                  // test that no field violates naming convention
+                  // that _i occurs only at the (i - 1)th position
+                  val wellFormed = tupleIndex(field.name).map(_ == i).getOrElse(true)
+                  if (! wellFormed) {
+                    val j = i + 1
+                    val th = (j % 10) match {
+                      case 1 => "st"
+                      case 2 => "nd"
+                      case 3 => "rd"
+                      case _ => "th"
+                    }
+                    abortWithError(c)(
+                      fields(i).pos,
+                      s"if the $j$th field's name has to begin with an underscore, " +
+                        s"then it must be _$j.")
+                  }
+
                   field
               }
             )
+          }
 
         case _ =>
           Failure(input.pos, "expect record with fields")
@@ -269,7 +288,7 @@ trait Parser extends util.AbortWithError {
     }
   }
 
-  // TypeVarP succeeds on code that can be interpreted as scala type.
+  // TypeVarP succeeds on code that can be parsed as scala type.
   //
   // will branching-by-exception cause performance issues?
   //
