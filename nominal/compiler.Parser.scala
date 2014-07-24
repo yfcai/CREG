@@ -46,6 +46,10 @@ trait Parser extends util.AbortWithError with util.TupleIndex {
   //
   //  ParamList := Name | (Name, Name, ...)  -- both cases are identical on AST level
   //
+  //  ----- OR -----
+  //
+  //   NamedFun := def Name[Params+] = Datatype
+  //
   //
   // Reserved names
   // ==============

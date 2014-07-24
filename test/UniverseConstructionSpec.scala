@@ -107,7 +107,12 @@ class UniverseConstructionSpec extends FlatSpec {
     assert(trioFv1 == trioFv2)
   }
 
-  it should "reify recursive datatypes" in pending ; {
+  it should "reify recursive datatypes" in {
+    @functor val list = A => List[A]
+    @functor val intF = L => List { Cons(Int, L) }
+    info(list.toString)
+    info(intF.toString)
+
     // reify[List[Int]]
     //       ==
     // FixedPoint(DataConstructor(Many("L"),

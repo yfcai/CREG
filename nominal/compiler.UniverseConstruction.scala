@@ -134,7 +134,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
     params.map(param => mkBoundedTypeDef(c)(param, bounds))
 
   // location of the Fix[_[_]] trait
-  def getFix(c: Context) = {
+  def getFix(c: Context): c.Tree = {
     import c.universe._
     val q"??? : $fix [ ID ]" = q"??? : _root_.nominal.lib.Fix [ ID ]"
     fix
@@ -267,11 +267,37 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
              |concrete type is a record.
              |""".stripMargin)
 
+        // deal with fixed point
+        if (isFixedPointOfSomeFunctor(c)(tpe)) {
+          import c.universe._
+
+          // name the fixed point
+          val fixedPointName = c.freshName("Fixed").toString
+          assert(
+            ! care(fixedPointName),
+            s"500 internal error: Context.freshName produces the clashing name $fixedPointName")
+          val newCare = care + fixedPointName
+
+          // get the functor
+          val List(functor) = tpe.typeArgs
+          val unrolledTpe = functor.etaExpand.resultType.substituteTypes(
+            functor.typeParams,
+            List(dodgeFreeTypeVariables(c)(tq"${TypeName(fixedPointName)}", newCare)))
+
+          // since I care about tpe, I should also care about it when it's unrolled
+          val IDoCare(result) = carePackage(c)(unrolledTpe, newCare, overrider)
+
+          if (result hasFreeOccurrencesOf fixedPointName)
+            IDoCare(FixedPoint(fixedPointName, result))
+          else
+            IDoCare(result)
+        }
+        // having dealt with fixed point types,
         // assume all variants are abstract & all records are concrete,
         // given that `tpe` is not a leaf.
         //
         // empty records are leaves and their types are abstract.
-        if (symbol.isAbstract) {
+        else if (symbol.isAbstract) {
 
           // if there's an overrider, it should not be anything that cannot expand to a variant
           require(
@@ -325,6 +351,13 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
       }
     }
 
+  }
+
+  // requires `tpe` be dealiased
+  def isFixedPointOfSomeFunctor(c: Context)(tpe: c.Type): Boolean = {
+    import c.universe._
+    val fix = treeToType(c)(tq"${getFix(c)}[({ type ID[+X] = X })#ID]")
+    fix.typeConstructor.typeSymbol.fullName == tpe.typeConstructor.typeSymbol.fullName
   }
 
   // requires `tpe` be dealiased

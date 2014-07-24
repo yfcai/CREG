@@ -83,6 +83,18 @@ object DatatypeRepresentation {
       case FixedPoint(x, body) => FixedPoint(x, body rename (table - x))
       case other => other gmapT (_ rename table)
     }
+
+    def hasFreeOccurrencesOf(name: Name): Boolean = this match {
+      case TypeVar(x) =>
+        x == name
+
+      case FixedPoint(x, body) =>
+        x != name && body.hasFreeOccurrencesOf(name)
+
+      case other =>
+        val trueForChildren = other.gmapQ({ case t => t.hasFreeOccurrencesOf(name) })
+        trueForChildren.nonEmpty && trueForChildren.max
+    }
   }
 
   sealed trait Nominal { def name: Name ; def get: Datatype }
