@@ -61,7 +61,7 @@ class UniverseConstructionSpec extends FlatSpec {
     @rep val maybeA = rep [Maybe[A]] (Set("A"))
     @functor val maybeF = A => Maybe { Just(A) }
     assert(maybeA ==
-      Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
+      Variant(TypeVar(this.getClass.getName + ".this.MaybeT"), Many(
         Record("Nothin_", Many.empty),
         Record("Just", Many(
           Field("get", TypeVar("A")))))))
@@ -81,11 +81,11 @@ class UniverseConstructionSpec extends FlatSpec {
     @functor val maybe2F   = A => Maybe { Just(Maybe { Just(A) }) }
     @functor val maybe2Fv1 = A => Maybe[Maybe[A]] { Nothin_ }
     assert(maybe2 ==
-      Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
+      Variant(TypeVar(this.getClass.getName + ".this.MaybeT"), Many(
         Record("Nothin_", Many.empty),
         Record("Just", Many(
           Field("get",
-            Variant(TypeVar(this.getClass.getName + ".MaybeT"), Many(
+            Variant(TypeVar(this.getClass.getName + ".this.MaybeT"), Many(
               Record("Nothin_", Many.empty),
               Record("Just", Many(
                 Field("get", TypeVar("A"))))))))))))
@@ -99,7 +99,7 @@ class UniverseConstructionSpec extends FlatSpec {
     assert(trioFv1 ==
       DataConstructor(
         Many(Param covariant "A"),
-        Variant(TypeVar(this.getClass.getName + ".TrioT"), Many(
+        Variant(TypeVar(this.getClass.getName + ".this.TrioT"), Many(
           Record("MkTrio", Many(
             Field("_1", TypeVar("A")),
             Field("_2", TypeVar("A")),
@@ -107,11 +107,40 @@ class UniverseConstructionSpec extends FlatSpec {
     assert(trioFv1 == trioFv2)
   }
 
+  /** @return
+    *   "" if `arg` does not match DataConstructor(..., FixedPoint(...))
+    *   name of the fixed point if it does
+    */
+  def getFixedPointName(arg: DataConstructor): String = arg match {
+    case DataConstructor(_, FixedPoint(name, _)) =>
+      name
+
+    case _ =>
+      ""
+  }
+
   it should "reify recursive datatypes" in {
     @functor val list = A => List[A]
+    val listName = getFixedPointName(list)
+    assert(list ==
+      DataConstructor(
+        Many(Param covariant "A"),
+        FixedPoint(listName,
+          Variant(TypeVar(this.getClass.getName + ".this.ListT"), Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("_1", TypeVar("A")),
+              Field("tail", TypeVar(listName)))))))))
+
     @functor val intF = L => List { Cons(Int, L) }
-    info(list.toString)
-    info(intF.toString)
+    assert(intF ==
+      DataConstructor(
+        Many(Param covariant "L"),
+        Variant(TypeVar(this.getClass.getName + ".this.ListT"), Many(
+          Record("Nil", Many.empty),
+          Record("Cons", Many(
+            Field("_1", TypeVar("Int")),
+            Field("tail", TypeVar("L"))))))))
 
     // reify[List[Int]]
     //       ==

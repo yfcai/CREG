@@ -231,7 +231,10 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   case class IDontCare(get: TypeVar) extends DoICare { def shouldCare = false }
   case class IDoCare(get: Datatype) extends DoICare { def shouldCare = true }
 
-  def quoteUnquote(c: Context)(tpe: c.Type): c.Tree = { import c.universe._ ; tq"$tpe" }
+  def typeToCode(c: Context)(tpe: c.Type): String = {
+    import c.universe._
+    tq"$tpe".toString
+  }
 
   def carePackage(c: Context)(tpe0: c.Type, care: Set[Name], overrider: Option[Datatype]): DoICare = {
     // dealiasing is not recursive. do it here.
@@ -244,7 +247,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
       if (shouldCare)
         IDoCare(overrider getOrElse TypeVar(name))
       else
-        IDontCare(TypeVar(symbol.fullName))
+        IDontCare(TypeVar(typeToCode(c)(tpe)))
     }
     else {
       // deal with fixed point
@@ -269,7 +272,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
           case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
             Some(Variant(
               // e. g., replace "List" by "ListT[..., ...]"
-              TypeVar(quoteUnquote(c)(unrolledTpe).toString),
+              TypeVar(typeToCode(c)(unrolledTpe)),
 
               // e. g., replace "List" in body by recursive calls
               nominals map { nominal =>
@@ -351,7 +354,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
                       carePackage(c)(tpe, care, overrider)
                   })
             }
-            IDoCare(Variant(TypeVar(symbol.fullName), cases))
+            IDoCare(Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases))
           }
           else {
             // if there is an overrider, it should not be anything that cannot expand to a record
@@ -372,7 +375,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
           val children = childCare.map(_.asInstanceOf[TypeVar].name)
           // if I don't care about `tpe`, then it will become a type constant
           // with all children fully qualified
-          IDontCare(TypeVar(s"${symbol.fullName}[${children mkString ", "}]"))
+          IDontCare(TypeVar(s"${typeToCode(c)(tpe.typeConstructor)}[${children mkString ", "}]"))
         }
       }
     }
@@ -383,6 +386,9 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   def isFixedPointOfSomeFunctor(c: Context)(tpe: c.Type): Boolean = {
     import c.universe._
     val fix = treeToType(c)(tq"${getFix(c)}[({ type ID[+X] = X })#ID]")
+
+    // Type.typeSymbol.fullName is unreliable for code generation.
+    // hope it's good enough to distinguish types from each other.
     fix.typeConstructor.typeSymbol.fullName == tpe.typeConstructor.typeSymbol.fullName
   }
 
