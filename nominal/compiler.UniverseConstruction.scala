@@ -371,7 +371,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
         }
         else {
           // cast is safe: `shouldCare` is false only if all children are `IDontCare`
-          val children = childCare.map(_.asInstanceOf[TypeVar].name)
+          val children = childCare.map(_.asInstanceOf[IDontCare].get.name)
           // if I don't care about `tpe`, then it will become a type constant
           // with all children fully qualified
           IDontCare(TypeVar(s"${typeToCode(c)(tpe.typeConstructor)}[${children mkString ", "}]"))
