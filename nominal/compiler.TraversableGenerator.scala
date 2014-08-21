@@ -216,17 +216,21 @@ trait TraversableGenerator extends SynonymGenerator {
       case Variant(header, cases) =>
         if (cases.isEmpty)
           c parse s"""_root_.scala.sys error "instance of empty variant $header""""
-        else {
-          // for now, require subfields of variants be records
-          // if they are not, then they should be reconstructed as records
-          // with type reification.
-          require(cases.map(_.isInstanceOf[Record]).min,
-            s"expect cases of traversable variant be records; got:\n\n  $datatype")
+        else
           Match(mA,
-            cases.map(record =>
-              generateRecordBody(c)(
-                mA, record.asInstanceOf[Record], mangleA, mangleB, env, applicative)).toList)
-        }
+            cases.map(_ match {
+              case record @ Record(_, _) =>
+                generateRecordBody(c)(mA, record, mangleA, mangleB, env, applicative)
+
+              case RecordAssignment(recordDecl, typeVar) =>
+                generateSumPosition(c)(recordDecl, typeVar, mangleA, mangleB, env, applicative)
+
+              case otherwise =>
+                abortWithError(c)(
+                  mA.pos,
+                  s"generating traversable instance for ${header.name}, got unexpected case:\n\n  $otherwise\n.")
+
+            }).toList)
 
       case record @ Record(_, _) =>
         // put naked record in identity
@@ -246,17 +250,48 @@ trait TraversableGenerator extends SynonymGenerator {
     }
   }
 
-  def generateRecordBody(c: Context)(
-    mA: c.Tree,
-    datatype: Record,
-    mangleA: Map[DatatypeRepresentation.Name, DatatypeRepresentation.Name],
-    mangleB: Map[DatatypeRepresentation.Name, DatatypeRepresentation.Name],
-    env: Map[DatatypeRepresentation.Name, c.Tree => c.Tree],
+  // parameter in a sum position
+  def generateSumPosition(c: Context)(
+    record: Record,
+    typeVar: TypeVar,
+    mangleA: Map[Name, Name],
+    mangleB: Map[Name, Name],
+    env: Map[Name, c.Tree => c.Tree],
     applicative: c.TermName
   ): c.universe.CaseDef = {
     import c.universe._
-    // dupe code...
-    def argType    = meaning(c)(datatype rename mangleA)
+    val recordIdent = Ident(TermName(record.name))
+    val myName = TermName(c freshName record.name)
+    val wildcards = record.fields.map(_ => termNames.WILDCARD)
+
+    val argType    = meaning(c)(typeVar rename mangleA)
+    val resultType = meaning(c)(typeVar rename mangleB)
+
+    // special case needed here due to SI-1503
+    val arg = if (wildcards.isEmpty) q"$recordIdent" else q"$myName"
+
+    val argCast = q"$arg.asInstanceOf[$argType]"
+
+    val body = generateDefTraverseBody(c)(argCast, typeVar, mangleA, mangleB, env, applicative)
+
+    val bodyCast = q"$body.asInstanceOf[$applicative.Map[this.Map[$resultType]]]"
+
+    if (wildcards.isEmpty)
+      // special case needed here due to SI-1503
+      cq"$recordIdent => $bodyCast"
+    else
+      cq"$myName @ $recordIdent(..$wildcards) => $bodyCast"
+  }
+
+  def generateRecordBody(c: Context)(
+    mA: c.Tree,
+    datatype: Record,
+    mangleA: Map[Name, Name],
+    mangleB: Map[Name, Name],
+    env: Map[Name, c.Tree => c.Tree],
+    applicative: c.TermName
+  ): c.universe.CaseDef = {
+    import c.universe._
     def resultType = meaning(c)(datatype rename mangleB)
     def mkPure(x: Tree): Tree = q"$applicative.pure[$resultType]($x)"
     datatype match {
@@ -348,7 +383,42 @@ object TraversableGenerator {
                       Field("head", TypeVar("A")),
                       Field("tail", TypeVar("List")))))))),
               Field("tail", TypeVar("List"))))))))
-              
+
+    val NilF =
+      DataConstructor(Many(Param covariant "X"),
+        FixedPoint("List",
+          Variant("ListT", Many(
+            RecordAssignment(Record("Nil", Many.empty), TypeVar("X")),
+            Record("Cons", Many(
+              Field("head", TypeVar("Int")),
+              Field("tail", TypeVar("List"))))))))
+
+    val NilT =
+      DataConstructor(Many(Param covariant "X"),
+        Variant("ListT", Many(
+          RecordAssignment(Record("Nil", Many.empty), TypeVar("X")),
+          Record("Cons", Many(
+            Field("head", TypeVar("Int")),
+            Field("tail", TypeVar("List[Int]")))))))
+
+    val ConsF =
+      DataConstructor(Many(Param covariant "X"),
+        FixedPoint("List",
+          Variant("ListT", Many(
+            Record("Nil", Many.empty),
+            RecordAssignment(
+              Record("Cons", Many(
+                Field("head", TypeVar("Int")),
+                Field("tail", TypeVar("List")))),
+              TypeVar("X"))))))
+
+    val LF =
+      DataConstructor(Many(Param covariant "X"),
+        Variant("PlusT", Many(
+          RecordAssignment(
+            Record("LHS", Many(Field("get", TypeVar("Nothing")))),
+            TypeVar("X")),
+          Record("RHS", Many(Field("get", TypeVar("Int")))))))
 
     // test generation of `type Cat = ...`
     class c123 extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro Impl.c123 }
@@ -360,6 +430,12 @@ object TraversableGenerator {
     object Impl {
       def c123(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
         import c.universe._
+
+        //DEBUG BEGINS
+        val code = generateTraversable(c)(NilT, Map("X" -> TypeVar("Nil")))
+        println(code)
+        //DEBUG ENDS
+
         c.Expr(q"""
           // constant functor on everything
           val C1 = ${generateTraversable(c)(ConstInt, Map.empty)}
@@ -371,7 +447,13 @@ object TraversableGenerator {
           val C3 = ${generateTraversable(c)(Product, Map("Y" -> TypeVar("Either[Int, Boolean]")))}
 
           val List2 = ${generateTraversable(c)(List2, Map.empty)}
+
+          val LF = ${generateTraversable(c)(LF, Map("X" -> TypeVar("LHS[Any]")))}
+
+          val NilT = ${generateTraversable(c)(NilT, Map("X" -> TypeVar("Nil")))}
         """)
+          //val ConsF = ${generateTraversable(c)(ConsF, Map("X" -> TypeVar("Cons[Any, Any]")))}
+          //val NilF = ${generateTraversable(c)(NilF, Map("X" -> TypeVar("Nil")))} // TODO pending
       }
 
       // must be called with a context where c123 is already expanded

@@ -13,6 +13,11 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
     Cons(head = A, tail = List)
   }
 
+  @datatype trait Plus[+A, +B] {
+    LHS(get = A)
+    RHS(get = B)
+  }
+
   // if this compiles at all, then generated code implements Traversable interface correctly
   @c123 object Dummy
 
@@ -69,5 +74,21 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
               cons(2, cons(3, cons(4, nil))), cons(
                 cons(2, cons(3, cons(4, cons(5, nil)))),
                 nil))))))
+  }
+
+  it should "generate traversals for recursion at variant case position" in {
+    val hello: Plus[String, Int] = LHS("hello")
+    val helloWorld = LF(hello) map (lhs => lhs copy lhs.get + " world")
+    assert(helloWorld == LHS("hello world"))
+
+    val nil = NilT(Nil) map identity // if it compiles, then this succeeds
+    assert(nil == Nil)
+
+    // TODO: ConsT
+
+    // TODO: recursive cases: NilF, ConsF
+
+    //var usage = 0
+    //val result = NilF(x14) map { case _ => usage += 1 ; Nil }
   }
 }

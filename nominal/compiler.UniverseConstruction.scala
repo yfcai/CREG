@@ -2,6 +2,7 @@ package nominal
 package compiler
 
 import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.TypecheckException
 
 import DatatypeRepresentation._
 
@@ -74,8 +75,9 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   def mkInnerType(c: Context): c.TypeName = c.universe.TypeName(c freshName "innerType")
 
   def meaningOfNominal(c: Context)(rep: Nominal): c.Tree = rep match {
-    case Field(name, body) => meaning(c)(body)
-    case data: Datatype    => meaning(c)(data)
+    case Field(name, body)            => meaning(c)(body)
+    case RecordAssignment(_, typeVar) => meaning(c)(typeVar)
+    case data: Datatype               => meaning(c)(data)
   }
 
 
@@ -146,6 +148,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   // ====================== //
 
   def nothingType: String = "_root_.scala.Nothing"
+  def anyType: String = "_root_.scala.Any"
 
   /** flesh out parsed datatype with some cases/fields omitted */
   def fleshOut(c: Context)(raw: DataConstructor): DataConstructor = {
@@ -190,13 +193,13 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
     }
 
   // if it's a type, then return it's meaning.
-  // if it's a type constructor, then fully apply to nothings & return it.
+  // if it's a type constructor, then fully apply to `defaultArg` & return it.
   //
   // cai 23.07.2014
   // I don't know how to parse a type constructor,
   // so I give the constructor 0, 1, 2, ..., 22 type arguments until the whole thing typechecks,
   // and give up if it does not.
-  def fullyApplyToNothing(c: Context)(firstTry: TypeVar, care: Set[Name]): c.Type = {
+  def fullyApplyTo(default: String, c: Context)(firstTry: TypeVar, care: Set[Name]): c.Type = {
     val maxTypeParams = 22
     var nextTry = firstTry
     (1 to (maxTypeParams + 1)) foreach { i =>
@@ -209,13 +212,19 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
             || (e.getMessage matches """wrong number of type arguments for .*, should be \d+""")
             =>
           // let's add more parameters and try again
-          nextTry = TypeVar(firstTry.name + s"[${(1 to i) map (_ => nothingType) mkString ", "}]")
+          nextTry = TypeVar(firstTry.name + s"[${(1 to i) map (_ => default) mkString ", "}]")
       }
     }
     abortWithError(c)(
       c.universe.EmptyTree.pos,
       s"panic! ${firstTry.name} has more than $maxTypeParams type parameters?!")
   }
+
+  def fullyApplyToNothing(c: Context)(firstTry: TypeVar, care: Set[Name]): c.Type =
+    fullyApplyTo(nothingType, c)(firstTry, care)
+
+  def fullyApplyToAny(c: Context)(firstTry: TypeVar, care: Set[Name]): c.Type =
+    fullyApplyTo(anyType, c)(firstTry, care)
 
   /** I care about a Type if
     * 1. it is a leaf, not a class, and matches the name of a variable under my care

@@ -37,6 +37,7 @@ object DatatypeRepresentation {
         Variant(name,
           cases map {
             case Field(name, data) => Field(name, f(data))
+            case RecordAssignment(record, typeVar) => RecordAssignment(record, f(typeVar).asInstanceOf[TypeVar])
             case data: Datatype => f(data).asInstanceOf[Nominal] /* unsafe cast */
           })
 
@@ -63,6 +64,7 @@ object DatatypeRepresentation {
       case Variant(name, cases) =>
         cases.iterator map {
           case Field(name, data) => data
+          case RecordAssignment(record, typeVar) => typeVar
           case data: Datatype => data
         }
 
@@ -131,6 +133,13 @@ object DatatypeRepresentation {
 
   case class Field(name: Name, get: Datatype) extends Nominal {
     def replaceBody(body: Datatype): Nominal = copy(get = body)
+  }
+
+  // pattern assignment
+  case class RecordAssignment(record: Record, typeVar: TypeVar) extends Nominal {
+    def name = record.name
+    def get = typeVar
+    def replaceBody(body: Datatype): Nominal = copy(typeVar = body.asInstanceOf[TypeVar])
   }
 
   case class DataConstructor(params: Many[Param], body: Datatype) {
