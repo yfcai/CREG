@@ -1,6 +1,6 @@
 T1. representation of datatypes (named sum, named product, fixed point)...OK
 T2. representation of n-hole contexts of datatypes...OK
-T3. from scala types to representation of datatypes (macro; runtime.universe.Type.normalize)
+T3. from scala types to representation of datatypes (macro; runtime.universe.Type.normalize)...OK
 T4. from representation of datatypes to scala types (macro)...OK
 T5. from n-hole contexts of datatypes to n-nary functors (macro)...OK
 T6. from scala expressions to datatypes (macro / parser-metaphor)...OK
