@@ -159,4 +159,12 @@ class UniverseConstructionSpec extends FlatSpec {
               Field("_1", TypeVar("List" /* as opposed to: treeName */)),
               Field("tail", TypeVar(treeName)))))))))
   }
+
+  ignore should "permit introducing recursive positions" in {
+    // not sure if this will be useful
+    @functor val nat = X => Maybe { Just(Maybe) }
+
+    info(" got: " + nat.toString)
+    fail("expect: DataConstructor(..., Fix(...))")
+  }
 }
