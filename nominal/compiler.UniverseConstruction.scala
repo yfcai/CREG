@@ -274,13 +274,8 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
               // e. g., replace "List" by "ListT[..., ...]"
               TypeVar(typeToCode(c)(unrolledTpe)),
 
-              // e. g., replace "List" in body by recursive calls
-              nominals map { nominal =>
-                nominal.replaceBody(nominal.get.everywhere {
-                  case TypeVar(name) if name == fixedPointDataTag =>
-                    TypeVar(fixedPointName)
-                })
-              }))
+              // preserve body
+              nominals))
 
           case otherwise =>
             otherwise

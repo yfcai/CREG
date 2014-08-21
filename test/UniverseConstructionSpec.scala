@@ -131,7 +131,10 @@ class UniverseConstructionSpec extends FlatSpec {
             Record("Cons", Many(
               Field("_1", TypeVar("A")),
               Field("tail", TypeVar(listName)))))))))
+  }
 
+  it should "permit deleting recursive positions" in {
+    // delete recursive position
     @functor val intF = L => List { Cons(Int, L) }
     assert(intF ==
       DataConstructor(
@@ -141,5 +144,19 @@ class UniverseConstructionSpec extends FlatSpec {
           Record("Cons", Many(
             Field("_1", TypeVar("Int")),
             Field("tail", TypeVar("L"))))))))
+  }
+
+  it should "not permit reassigning recursive positions" in {
+    @functor val tree = Ignored => List { Cons(_1 = List) }
+    val treeName = getFixedPointName(tree)
+    assert(tree ==
+      DataConstructor(
+        Many(Param covariant "Ignored"),
+        FixedPoint(treeName,
+          Variant(TypeVar(this.getClass.getName + ".this.ListT"), Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("_1", TypeVar("List" /* as opposed to: treeName */)),
+              Field("tail", TypeVar(treeName)))))))))
   }
 }
