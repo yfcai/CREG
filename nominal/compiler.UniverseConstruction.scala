@@ -174,7 +174,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   def startingType(c: Context)(body: Datatype, care: Set[Name]): Option[c.Type] = 
     body match {
       case Variant(header, _) =>
-        //println(s"\n$body\n")//DEBUG // should dodge free vars here...
         Some(fullyApplyToNothing(c)(header, care))
 
       case Record(_, _) | TypeVar(_) =>
@@ -417,12 +416,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
 
         case overrider =>
           var i = params.indexOf(overrider.name)
-
-          //DEBUG
-          if (overrider.name == "A")
-            println(s"\nparent = $parent\noverrider = $overrider\n")
-          //DEBUG: FOUND Record(A, Vector()) // disturbing
-
           // if overrider did not provide a name,
           // attempt to map the index back.
           // therefore we must forbid names of the form "_i"
