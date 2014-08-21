@@ -1,7 +1,7 @@
 import org.scalatest._
 import nominal.compiler._
 import nominal.lib._
-import nominal.datatype
+import nominal.annotation.datatype
 
 import scala.tools.reflect.ToolBoxError
 

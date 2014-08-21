@@ -1,5 +1,5 @@
 import org.scalatest._
-import nominal._
+import nominal.functors.datatype
 import nominal.lib._
 
 class DataSpec extends FlatSpec {

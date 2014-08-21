@@ -4,7 +4,7 @@ import nominal.compiler._
 import nominal.lib._
 import DatatypeRepresentation._
 
-import nominal.datatype
+import nominal.annotation.datatype
 
 class UniverseConstructionSpec extends FlatSpec {
   import UniverseConstruction.Tests._
