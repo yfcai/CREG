@@ -167,4 +167,11 @@ class UniverseConstructionSpec extends FlatSpec {
     info(" got: " + nat.toString)
     fail("expect: DataConstructor(..., Fix(...))")
   }
+
+
+  it should "reify datatypes with parameters as variant cases" in pending ; {
+    // @functor val noth = N => Maybe { Nothin_ = N }
+    // does not compile yet
+  }
+
 }

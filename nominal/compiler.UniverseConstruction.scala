@@ -336,10 +336,14 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
               case (IDoCare(record @ Record(_, _)), _) =>
                 record
 
+              case (IDoCare(TypeVar(param)), actual) if care(param) =>
+                println(s"care about: $param, $actual") // DEBUG
+                ??? // TODO: arg in variant position
+
               case (IDoCare(nonRecord), _) =>
                 abortWithError(c)(
                   c.universe.EmptyTree.pos,
-                  s"tentative variant $tpe expects record/case class, got $nonRecord")
+                  s"tentative variant $tpe expects record/type var, got $nonRecord")
 
               case (IDontCare(_), typeArg) =>
                 representGeneratedRecord(c)(
