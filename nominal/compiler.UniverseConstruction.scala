@@ -231,6 +231,8 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   case class IDontCare(get: TypeVar) extends DoICare { def shouldCare = false }
   case class IDoCare(get: Datatype) extends DoICare { def shouldCare = true }
 
+  def quoteUnquote(c: Context)(tpe: c.Type): c.Tree = { import c.universe._ ; tq"$tpe" }
+
   def carePackage(c: Context)(tpe0: c.Type, care: Set[Name], overrider: Option[Datatype]): DoICare = {
     // dealiasing is not recursive. do it here.
     val tpe = (overrider flatMap (x => startingType(c)(x, care)) getOrElse tpe0).dealias
@@ -245,108 +247,133 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
         IDontCare(TypeVar(symbol.fullName))
     }
     else {
-      val symbol = tpe.typeSymbol
+      // deal with fixed point
+      if (isFixedPointOfSomeFunctor(c)(tpe)) {
+        import c.universe._
 
-      // match overrider with children
-      val suboverriders: Many[Option[Datatype]] = matchSuboverriders(c)(tpe, care, overrider)
+        // name the fixed point
+        val fixedPointName = c.freshName("Fixed").toString
+        assert(
+          ! care(fixedPointName),
+          s"500 internal error: Context.freshName produces the clashing name $fixedPointName")
+        val newCare = care + fixedPointName
 
-      // recursive calls
-      val childCare = tpe.typeArgs.zip(suboverriders).map {
-        case (child, overrider) =>
-          carePackage(c)(child, care, overrider)
-      }
+        // get the functor
+        val List(functor) = tpe.typeArgs
+        val unrolledTpe = functor.etaExpand.resultType.substituteTypes(
+          functor.typeParams,
+          List(dodgeFreeTypeVariables(c)(tq"${TypeName(fixedPointName)}", newCare)))
 
-      // I should care about `tpe` if I care about at least one of its children
-      val shouldCare = overrider.nonEmpty || childCare.map(_.shouldCare).max
-      if (shouldCare) {
-        require(symbol.isClass,
-          """|violation of expectation: type on a cared path is not a class.
-             |Every type on a cared path should be a generated datatype.
-             |We assume that every abstract type is a variant and every
-             |concrete type is a record.
-             |""".stripMargin)
+        // adjust overrider
+        val newOverrider: Option[Datatype] = overrider match {
+          case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
+            Some(Variant(
+              // e. g., replace "List" by "ListT[..., ...]"
+              TypeVar(quoteUnquote(c)(unrolledTpe).toString),
 
-        // deal with fixed point
-        if (isFixedPointOfSomeFunctor(c)(tpe)) {
-          import c.universe._
-
-          // name the fixed point
-          val fixedPointName = c.freshName("Fixed").toString
-          assert(
-            ! care(fixedPointName),
-            s"500 internal error: Context.freshName produces the clashing name $fixedPointName")
-          val newCare = care + fixedPointName
-
-          // get the functor
-          val List(functor) = tpe.typeArgs
-          val unrolledTpe = functor.etaExpand.resultType.substituteTypes(
-            functor.typeParams,
-            List(dodgeFreeTypeVariables(c)(tq"${TypeName(fixedPointName)}", newCare)))
-
-          // since I care about tpe, I should also care about it when it's unrolled
-          val IDoCare(result) = carePackage(c)(unrolledTpe, newCare, overrider)
-
-          if (result hasFreeOccurrencesOf fixedPointName)
-            IDoCare(FixedPoint(fixedPointName, result))
-          else
-            IDoCare(result)
-        }
-        // having dealt with fixed point types,
-        // assume all variants are abstract & all records are concrete,
-        // given that `tpe` is not a leaf.
-        //
-        // empty records are leaves and their types are abstract.
-        else if (symbol.isAbstract) {
-
-          // if there's an overrider, it should not be anything that cannot expand to a variant
-          require(
-            overrider.isEmpty ||
-              overrider.get.isInstanceOf[Variant] ||
-              overrider.get.isInstanceOf[TypeVar],
-            s"got abstract class $tpe, expect:\n  ${overrider.get}")
-
-          // if I do care about this type & it's a variant,
-          // then children's IDontCare packages are useless.
-          // they have to be records.
-          val cases: Many[Nominal] = childCare.zip(tpe.typeArgs) map {
-            case (IDoCare(record @ Record(_, _)), _) =>
-              record
-
-            case (IDoCare(nonRecord), _) =>
-              abortWithError(c)(
-                c.universe.EmptyTree.pos,
-                s"tentative variant $tpe expects record/case class, got $nonRecord")
-
-            case (IDontCare(_), typeArg) =>
-              representGeneratedRecord(c)(
-                typeArg,
-                typeArg.typeArgs.zip(suboverriders).map {
-                  case (tpe, overrider) =>
-                    carePackage(c)(tpe, care, overrider)
+              // e. g., replace "List" in body by recursive calls
+              nominals map { nominal =>
+                nominal.replaceBody(nominal.get.everywhere {
+                  case TypeVar(name) if name == fixedPointDataTag =>
+                    TypeVar(fixedPointName)
                 })
-          }
-          IDoCare(Variant(TypeVar(symbol.fullName), cases))
-        }
-        else {
-          // if there is an overrider, it should not be anything that cannot expand to a record
-          require(
-            overrider.isEmpty ||
-              overrider.get.isInstanceOf[Record] ||
-              overrider.get.isInstanceOf[TypeVar],
-            s"got concrete class $tpe, expect:\n  ${overrider.get}")
+              }))
 
-          // this thing is a record. That's easier to deal with.
-          // children that are variants can simply be treated as
-          // type constants.
-          IDoCare(representGeneratedRecord(c)(tpe, childCare))
+          case otherwise =>
+            otherwise
+        }
+
+        // since I care about tpe, I should also care about it when it's unrolled
+        carePackage(c)(unrolledTpe, newCare, newOverrider) match {
+          case IDoCare(result) =>
+            if (result hasFreeOccurrencesOf fixedPointName)
+              IDoCare(FixedPoint(fixedPointName, result))
+            else
+              IDoCare(result)
+
+          case IDontCare(TypeVar(body)) =>
+            sys error "FIXME: this should not happen, right?"
         }
       }
       else {
-        // cast is safe: `shouldCare` is false only if all children are `IDontCare`
-        val children = childCare.map(_.asInstanceOf[TypeVar].name)
-        // if I don't care about `tpe`, then it will become a type constant
-        // with all children fully qualified
-        IDontCare(TypeVar(s"${symbol.fullName}[${children mkString ", "}]"))
+        val symbol = tpe.typeSymbol
+
+        // match overrider with children
+        val suboverriders: Many[Option[Datatype]] = matchSuboverriders(c)(tpe, care, overrider)
+
+        // recursive calls
+        val childCare = tpe.typeArgs.zip(suboverriders).map {
+          case (child, overrider) =>
+            carePackage(c)(child, care, overrider)
+        }
+
+        // I should care about `tpe` if I care about at least one of its children
+        val shouldCare = overrider.nonEmpty || childCare.map(_.shouldCare).max
+
+        if (shouldCare) {
+          require(symbol.isClass,
+            """|violation of expectation: type on a cared path is not a class.
+               |Every type on a cared path should be a generated datatype.
+               |We assume that every abstract type is a variant and every
+               |concrete type is a record.
+               |""".stripMargin)
+          // having dealt with fixed point types,
+          // assume all variants are abstract & all records are concrete,
+          // given that `tpe` is not a leaf.
+          //
+          // empty records are leaves and their types are abstract.
+          if (symbol.isAbstract) {
+
+            // if there's an overrider, it should not be anything that cannot expand to a variant
+            require(
+              overrider.isEmpty ||
+                overrider.get.isInstanceOf[Variant] ||
+                overrider.get.isInstanceOf[TypeVar],
+              s"got abstract class $tpe, expect:\n  ${overrider.get}")
+
+            // if I do care about this type & it's a variant,
+            // then children's IDontCare packages are useless.
+            // they have to be records.
+            val cases: Many[Nominal] = childCare.zip(tpe.typeArgs) map {
+              case (IDoCare(record @ Record(_, _)), _) =>
+                record
+
+              case (IDoCare(nonRecord), _) =>
+                abortWithError(c)(
+                  c.universe.EmptyTree.pos,
+                  s"tentative variant $tpe expects record/case class, got $nonRecord")
+
+              case (IDontCare(_), typeArg) =>
+                representGeneratedRecord(c)(
+                  typeArg,
+                  typeArg.typeArgs.zip(suboverriders).map {
+                    case (tpe, overrider) =>
+                      carePackage(c)(tpe, care, overrider)
+                  })
+            }
+            IDoCare(Variant(TypeVar(symbol.fullName), cases))
+          }
+          else {
+            // if there is an overrider, it should not be anything that cannot expand to a record
+            require(
+              overrider.isEmpty ||
+                overrider.get.isInstanceOf[Record] ||
+                overrider.get.isInstanceOf[TypeVar],
+              s"got concrete class $tpe, expect:\n  ${overrider.get}")
+
+            // this thing is a record. That's easier to deal with.
+            // children that are variants can simply be treated as
+            // type constants.
+            IDoCare(representGeneratedRecord(c)(tpe, childCare))
+          }
+        }
+        else {
+          // cast is safe: `shouldCare` is false only if all children are `IDontCare`
+          val children = childCare.map(_.asInstanceOf[TypeVar].name)
+          // if I don't care about `tpe`, then it will become a type constant
+          // with all children fully qualified
+          IDontCare(TypeVar(s"${symbol.fullName}[${children mkString ", "}]"))
+        }
       }
     }
 
