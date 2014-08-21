@@ -141,16 +141,5 @@ class UniverseConstructionSpec extends FlatSpec {
           Record("Cons", Many(
             Field("_1", TypeVar("Int")),
             Field("tail", TypeVar("L"))))))))
-
-    // reify[List[Int]]
-    //       ==
-    // FixedPoint(DataConstructor(Many("L"),
-    //   Variant("ListT", Many(
-    //     Record("Nil", Many.empty),
-    //     Record("Cons", Many(
-    //       Field("head", Scala("Int")),
-    //       Field("tail", Hole("L"))))))))
-
-    // stub
   }
 }
