@@ -97,12 +97,13 @@ object DatatypeRepresentation {
     }
   }
 
-  sealed trait Nominal { def name: Name ; def get: Datatype }
+  sealed trait Nominal { def name: Name ; def get: Datatype ; def replaceBody(body: Datatype): Nominal }
 
   case class TypeVar(name: Name) extends Datatype
 
   case class Record(name: Name, fields: Many[Field]) extends Nominal with Datatype {
     def get = this
+    def replaceBody(body: Datatype): Nominal = body.asInstanceOf[Nominal]
   }
 
   // variant is entry point from scala types, hence the header.
@@ -116,6 +117,7 @@ object DatatypeRepresentation {
   case class FixedPoint(name: Name, body: Datatype) extends Nominal with Datatype {
     def patternFunctor: DataConstructor = DataConstructor(Many(Param covariant name), body)
     def get = this
+    def replaceBody(body: Datatype): Nominal = copy(body = body)
   }
 
   // covariant function, produces anonymous types
@@ -127,7 +129,9 @@ object DatatypeRepresentation {
 
   // datatype representation helpers
 
-  case class Field(name: Name, get: Datatype) extends Nominal
+  case class Field(name: Name, get: Datatype) extends Nominal {
+    def replaceBody(body: Datatype): Nominal = copy(get = body)
+  }
 
   case class DataConstructor(params: Many[Param], body: Datatype) {
     def arity: Int = params.size
