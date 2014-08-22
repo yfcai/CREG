@@ -25,6 +25,9 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
   def nil[A]: List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Nil)
   def cons[A](head: A, tail: List[A]): List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Cons(head, tail))
 
+  val x12: List[Int] =
+    cons(1, cons(2, nil))
+
   val x14: List2.Map[Int] =
     cons(
       nil, cons(
@@ -81,14 +84,16 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
     val helloWorld = LF(hello) map (lhs => lhs copy lhs.get + " world")
     assert(helloWorld == LHS("hello world"))
 
-    val nil = NilT(Nil) map identity // if it compiles, then this succeeds
-    assert(nil == Nil)
-
-    // TODO: ConsT
-
-    // TODO: recursive cases: NilF, ConsF
-
-    //var usage = 0
-    //val result = NilF(x14) map { case _ => usage += 1 ; Nil }
+    // count how many times the higher order arg is called during the functors' fmaps
+    var (iT0, iT1, iF) = (0, 0, 0)
+    val nilT0 = NilT(x12.unroll) map (nil => { iT0 += 1 ; nil })
+    val nilT1 = NilT(Nil) map (nil => { iT1 += 1 ; nil })
+    val nilF = NilF(x12) map (nil => { iF += 1 ; nil })
+    assert(nilT0 == x12.unroll)
+    assert(nilT1 == Nil)
+    assert(nilF == x12)
+    assert(iT0 == 0, ": nilT0")
+    assert(iT1 == 1, ": nilT1")
+    assert(iF == 1, ": nilF")
   }
 }

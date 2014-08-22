@@ -213,7 +213,7 @@ trait TraversableGenerator extends SynonymGenerator {
         val recursiveDef = q"def $recurse($mA : $mAType): $resultType = $autoRolled"
         q"{$argSynonym ; $fixSynonym ; $unrolledSynonym ; $resultSynonym ; $recursiveDef ; $recurse($mA)}"
 
-      case Variant(header, cases) =>
+      case variant @ Variant(header, cases) =>
         if (cases.isEmpty)
           c parse s"""_root_.scala.sys error "instance of empty variant $header""""
         else
@@ -223,7 +223,7 @@ trait TraversableGenerator extends SynonymGenerator {
                 generateRecordBody(c)(mA, record, mangleA, mangleB, env, applicative)
 
               case RecordAssignment(recordDecl, typeVar) =>
-                generateSumPosition(c)(recordDecl, typeVar, mangleA, mangleB, env, applicative)
+                generateSummandPosition(c)(variant, recordDecl, typeVar, mangleA, mangleB, env, applicative)
 
               case otherwise =>
                 abortWithError(c)(
@@ -251,7 +251,8 @@ trait TraversableGenerator extends SynonymGenerator {
   }
 
   // parameter in a sum position
-  def generateSumPosition(c: Context)(
+  def generateSummandPosition(c: Context)(
+    _super: Variant,
     record: Record,
     typeVar: TypeVar,
     mangleA: Map[Name, Name],
@@ -264,17 +265,13 @@ trait TraversableGenerator extends SynonymGenerator {
     val myName = TermName(c freshName record.name)
     val wildcards = record.fields.map(_ => termNames.WILDCARD)
 
-    val argType    = meaning(c)(typeVar rename mangleA)
-    val resultType = meaning(c)(typeVar rename mangleB)
-
-    // special case needed here due to SI-1503
-    val arg = if (wildcards.isEmpty) q"$recordIdent" else q"$myName"
-
+    val arg = if (wildcards.isEmpty) q"$recordIdent" else q"$myName" // conditional needed here due to SI-1503
+    val argType = meaning(c)(typeVar rename mangleA)
     val argCast = q"$arg.asInstanceOf[$argType]"
 
     val body = generateDefTraverseBody(c)(argCast, typeVar, mangleA, mangleB, env, applicative)
-
-    val bodyCast = q"$body.asInstanceOf[$applicative.Map[this.Map[$resultType]]]"
+    val resultType = meaning(c)(_super rename mangleB)
+    val bodyCast = q"$body.asInstanceOf[${getApplicativeMapOnObjects(c)(applicative)}[$resultType]]"
 
     if (wildcards.isEmpty)
       // special case needed here due to SI-1503
@@ -431,11 +428,6 @@ object TraversableGenerator {
       def c123(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
         import c.universe._
 
-        //DEBUG BEGINS
-        val code = generateTraversable(c)(NilT, Map("X" -> TypeVar("Nil")))
-        println(code)
-        //DEBUG ENDS
-
         c.Expr(q"""
           // constant functor on everything
           val C1 = ${generateTraversable(c)(ConstInt, Map.empty)}
@@ -451,9 +443,11 @@ object TraversableGenerator {
           val LF = ${generateTraversable(c)(LF, Map("X" -> TypeVar("LHS[Any]")))}
 
           val NilT = ${generateTraversable(c)(NilT, Map("X" -> TypeVar("Nil")))}
+
+          val NilF = ${generateTraversable(c)(NilF, Map("X" -> TypeVar("Nil")))}
+
+          val ConsF = ${generateTraversable(c)(ConsF, Map("X" -> TypeVar("Cons[Any, Any]")))}
         """)
-          //val ConsF = ${generateTraversable(c)(ConsF, Map("X" -> TypeVar("Cons[Any, Any]")))}
-          //val NilF = ${generateTraversable(c)(NilF, Map("X" -> TypeVar("Nil")))} // TODO pending
       }
 
       // must be called with a context where c123 is already expanded
