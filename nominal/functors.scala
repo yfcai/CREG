@@ -9,3 +9,7 @@ import scala.annotation.StaticAnnotation
 class datatype extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro annotation.datatype.impl
 }
+
+class functor extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro annotation.functor.impl
+}
