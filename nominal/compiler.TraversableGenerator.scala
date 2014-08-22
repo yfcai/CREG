@@ -1,9 +1,7 @@
 package nominal
 package compiler
 
-/** Generate code for the pattern functor only
-  * To test the waters before generating for arbitrary functors
-  */
+/** Generate traversable instances for functors */
 
 import scala.reflect.macros.blackbox.Context
 
