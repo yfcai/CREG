@@ -341,27 +341,36 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
             // if I do care about this type & it's a variant,
             // then children's IDontCare packages are useless.
             // they have to be records.
-            val cases: Many[Nominal] = childCare.zip(tpe.typeArgs) map {
-              case (IDoCare(record @ Record(_, _)), _) =>
+            val cases: Many[Nominal] = (childCare, tpe.typeArgs, suboverriders).zipped.map({
+              case (IDoCare(record @ Record(_, _)), _, _) =>
                 record
 
-              case (IDoCare(TypeVar(param)), actual) if care(param) =>
-                println(s"care about: $param, $actual") // DEBUG
-                ??? // TODO: arg in variant position
+              case (IDoCare(typeVar @ TypeVar(param)), actual, _) if care(param) =>
+                require(care(param), "only the functor's parameters may occupy summand positions")
 
-              case (IDoCare(nonRecord), _) =>
+                val record =
+                  representGeneratedRecord(c)(
+                    actual.etaExpand.resultType,
+                    actual.typeParams.map(_ => IDoCare(TypeVar(anyType))))
+
+                RecordAssignment(record, typeVar)
+
+
+              case (IDoCare(nonRecord), _, _) =>
                 abortWithError(c)(
                   c.universe.EmptyTree.pos,
                   s"tentative variant $tpe expects record/type var, got $nonRecord")
 
-              case (IDontCare(_), typeArg) =>
+              case (IDontCare(_), typeArg, suboverrider) =>
+                val subsuboverriders = matchSuboverriders(c)(tpe, care, suboverrider)
+
                 representGeneratedRecord(c)(
                   typeArg,
-                  typeArg.typeArgs.zip(suboverriders).map {
+                  typeArg.typeArgs.zip(subsuboverriders).map {
                     case (tpe, overrider) =>
                       carePackage(c)(tpe, care, overrider)
                   })
-            }
+            })(collection.breakOut)
             IDoCare(Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases))
           }
           else {

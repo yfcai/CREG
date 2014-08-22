@@ -66,9 +66,9 @@ class UniverseConstructionSpec extends FlatSpec {
         Record("Just", Many(
           Field("get", TypeVar("A")))))))
     assert(maybeF.body == maybeA)
+  }
 
-    // test representing naked records
-    //
+  it should "reify naked record" in {
     // remark: naked records cannot be parsed,
     // because a record with no field is just an identifier &
     // indistinguishable from a type variable
@@ -76,7 +76,9 @@ class UniverseConstructionSpec extends FlatSpec {
     assert(justA ==
       Record("Just", Many(
         Field("get", TypeVar("A")))))
+  }
 
+  it should "take type parameters into consideration" in {
     @rep val maybe2 = rep [Maybe[Maybe[A]]] (Set("A"))
     @functor val maybe2F   = A => Maybe { Just(Maybe { Just(A) }) }
     @functor val maybe2Fv1 = A => Maybe[Maybe[A]] { Nothin_ }
@@ -169,9 +171,17 @@ class UniverseConstructionSpec extends FlatSpec {
   }
 
 
-  it should "reify datatypes with parameters as variant cases" in pending ; {
-    // @functor val noth = N => Maybe { Nothin_ = N }
-    // does not compile yet
+  it should "reify datatypes with parameters as variant cases" in {
+    @functor val noth = N => Maybe { Nothin_ = N }
+    assert(noth ==
+      DataConstructor(
+        Many(Param covariant "N"),
+        Variant(TypeVar(this.getClass.getName + ".this.MaybeT"), Many(
+          RecordAssignment(Record("Nothin_" , Many.empty), TypeVar("N")),
+          Record("Just", Many(Field("get", TypeVar("Nothing"))))))))
+
+    @functor val mayhap = N => Maybe { Just(Nothing) ; Nothin_ = N }
+    assert(mayhap == noth)
   }
 
 }
