@@ -65,7 +65,7 @@ trait CaseStudy {
 
   // applicative functors
   trait Applicative {
-    type Map[X]
+    type Map[+X]
     def pure[A](x: A): Map[A]
     def call[A, B](f: Map[A => B], x: Map[A]): Map[B]
   }
@@ -110,7 +110,7 @@ trait CaseStudy {
       def reduce(default: A, combine: (A, A) => A): A =
         compos[Const[A]#λ, A](identity)(
           new Applicative {
-            type Map[X] = A
+            type Map[+X] = A
             def pure[X](x: X): A = default
             def call[X, Y](f: A, x: A): A = combine(f, x)
           })
@@ -350,13 +350,13 @@ trait CaseStudy {
     type Cat2 // full subcategory 2
     type Bimap[+T1 <: Cat1, +T2 <: Cat2]
 
-    def traverse[F[_]: IsApplicative, A <: Cat1, B <: Cat2, C <: Cat1, D <: Cat2]
+    def traverse[F[+_]: IsApplicative, A <: Cat1, B <: Cat2, C <: Cat1, D <: Cat2]
       (f: A => F[C], g: B => F[D], x: Bimap[A, B]): F[Bimap[C, D]]
 
     def apply[A <: Cat1, B <: Cat2](x: Bimap[A, B]): View[A, B] = new View(x)
 
     class View[A <: Cat1, B <: Cat2](get: Bimap[A, B]) {
-      def bicompos[F[_]: IsApplicative, C <: Cat1, D <: Cat2]
+      def bicompos[F[+_]: IsApplicative, C <: Cat1, D <: Cat2]
         (f: A => F[C], g: B => F[D]): F[Bimap[C, D]] = traverse(f, g, get)
 
       def bimap[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Bimap[C, D] = bicompos[Identity, C, D](f, g)
@@ -375,39 +375,71 @@ trait CaseStudy {
 
     type Bimap[+V, +A <: Abs[_, _]] = Fix[H[V, A]#λ]
 
-    def traverse[F[_], A, B <: Abs[_, _], C, D <: Abs[_, _]]
+    def traverse[F[+_], A, B <: Abs[_, _], C, D <: Abs[_, _]]
         (f: A => F[C], g: B => F[D], x: Bimap[A, B])(implicit applicative: IsApplicative[F]): F[Bimap[C, D]] =
     {
       import applicative._
-      x.unroll match {
-        case Void =>
-          pure(Roll[H[C, D]#λ](Void))
+      /*
+       call(
+       // the cast on g_abs is because scalac lacks the knowledge that
+       //
+       // ∀ A <: Abs[Any, Any].  ∃ B C.  A =:= Abs[B, C].
+       //
+       // and thus  A <: TermT[⊥, ⊥, A, ⊥].
+       //
+       // Declaring `case class Abs` as `final` does not help.
+       //
+       pure[D => Bimap[C, D]](g_abs => Roll[H[C, D]#λ](g_abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
+       g(abs))
+       */
 
-        case Var(x) =>
-          call(
-            pure[C => Bimap[C, D]](x => Roll[H[C, D]#λ](Var(x))),
-            f(x))
+      // argData = fixedpoint rename mangleA
+      type MA = Fix[({
+        type λ[+T] = TermT[Void, Var[A], B, App[T, T]]
+      })#λ]
 
-        case abs @ Abs(_, _) =>
-          call(
-            // the cast on g_abs is because scalac lacks the knowledge that
-            //
-            // ∀ A <: Abs[Any, Any].  ∃ B C.  A =:= Abs[B, C].
-            //
-            // and thus  A <: TermT[⊥, ⊥, A, ⊥].
-            //
-            // Declaring `case class Abs` as `final` does not help.
-            //
-            pure[D => Bimap[C, D]](g_abs => Roll[H[C, D]#λ](g_abs.asInstanceOf[H[C, D]#λ[Bimap[C, D]]])),
-            g(abs))
+      // mBData = fixedpoint rename mangleB
+      type MB = Fix[({
+        type λ[+T] = TermT[Void, Var[C], D, App[T, T]]
+      })#λ]
 
-        case App(t1, t2) =>
-          call(
-            call(
-              pure[Bimap[C, D] => Bimap[C, D] => Bimap[C, D]](t1 => t2 => Roll[H[C, D]#λ](App(t1, t2))),
-              traverse(f, g, t1)),
-            traverse(f, g, t2))
-      }
+      type PatternFunctor[+T] = TermT[Void, Var[C], D, App[T, T]]
+
+      // mBData.body with `T` bound to `MB`
+      type Unrolled = TermT[Void, Var[C], D, App[MB, MB]]
+
+      // applicative.Map[mBType]
+      type Result = F[MB]
+
+      def recurse(mA: MA): Result =
+        applicative.call(
+          applicative.pure[Unrolled => MB](Roll.apply[PatternFunctor] _),
+          mA.unroll match {
+            case Void =>
+              pure[Void](Void)
+
+            case Var(x) =>
+              call(
+                pure[C => Unrolled](x => Var(x)),
+                f(x))
+
+            case App(t1, t2) =>
+              call(
+                call(
+                  pure[MB => MB => Unrolled](t1 => t2 => App(t1, t2)),
+                  recurse(t1)),
+                recurse(t2))
+
+            case abs @ Abs(_, _) =>
+              // expect: F[Unrolled] = F[TermT[Void, Var[C], D, App[MB, MB]]]
+              // has: F[D]
+              // fail to deduce: D <: Unrolled
+              val has: F[D] = g(abs)
+              has.asInstanceOf[F[Unrolled]]
+          }
+        )
+
+      recurse(x)
     }
   }
 
