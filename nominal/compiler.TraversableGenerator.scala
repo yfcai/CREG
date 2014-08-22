@@ -18,7 +18,10 @@ trait TraversableGenerator extends SynonymGenerator {
 
   // only generate 'new TraversableN { ... }'
   // leave the wrapping of generics to someone else
-  def generateTraversable(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): c.Tree =
+  def generateTraversable(c: Context)(functor: DataConstructor): c.Tree =
+    generateBoundedTraversable(c)(functor, extractSubcatBounds(functor.body))
+
+  def generateBoundedTraversable(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): c.Tree =
     newTraversable(c)(functor.arity, generateTraversableBody(c)(functor, subcats))
 
   def generateTraversableBody(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): Many[c.Tree] = {
@@ -29,6 +32,20 @@ trait TraversableGenerator extends SynonymGenerator {
     val imports = scalaLanguageFeatureImports(c)
     imports ++ subcategories :+ mapSynonym :+ defTraverse
   }
+
+  def extractSubcatBounds(data: Datatype): Map[Name, Datatype] =
+    data.everywhereQ[Map[Name, Datatype]]({
+      case Variant(_, nominals) =>
+        nominals.view.map({
+          case RecordAssignment(Record(name, fields), TypeVar(param)) =>
+            Map(param -> Record(name, fields map {
+              case Field(fieldName, _) => Field(fieldName, TypeVar(anyType))
+            }))
+
+          case _ =>
+            Map.empty
+        }).foldLeft(Map.empty[Name, Datatype])(_ ++ _)
+    }).foldLeft(Map.empty[Name, Datatype])(_ ++ _)
 
   /* fragile section begins */
   def mappingOnObjects: String = "Map"
@@ -430,23 +447,23 @@ object TraversableGenerator {
 
         c.Expr(q"""
           // constant functor on everything
-          val C1 = ${generateTraversable(c)(ConstInt, Map.empty)}
+          val C1 = ${generateTraversable(c)(ConstInt)}
 
           // identity functor on integers
-          val C2 = ${generateTraversable(c)(Identity, Map("X" -> TypeVar("Int")))}
+          val C2 = ${generateBoundedTraversable(c)(Identity, Map("X" -> TypeVar("Int")))}
 
           // product functor with 2nd component limited to Either[Int, Boolean]
-          val C3 = ${generateTraversable(c)(Product, Map("Y" -> TypeVar("Either[Int, Boolean]")))}
+          val C3 = ${generateBoundedTraversable(c)(Product, Map("Y" -> TypeVar("Either[Int, Boolean]")))}
 
-          val List2 = ${generateTraversable(c)(List2, Map.empty)}
+          val List2 = ${generateTraversable(c)(List2)}
 
-          val LF = ${generateTraversable(c)(LF, Map("X" -> TypeVar("LHS[Any]")))}
+          val LF = ${generateTraversable(c)(LF)}
 
-          val NilT = ${generateTraversable(c)(NilT, Map("X" -> TypeVar("Nil")))}
+          val NilT = ${generateTraversable(c)(NilT)}
 
-          val NilF = ${generateTraversable(c)(NilF, Map("X" -> TypeVar("Nil")))}
+          val NilF = ${generateTraversable(c)(NilF)}
 
-          val ConsF = ${generateTraversable(c)(ConsF, Map("X" -> TypeVar("Cons[Any, Any]")))}
+          val ConsF = ${generateTraversable(c)(ConsF)}
         """)
       }
 

@@ -40,10 +40,15 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
   type TC3 = C3.Map[String, Either[Int, Boolean]]
 
   "TraversableGenerator" should "generate subcategory bounds" in {
-    implicitly[C1.Cat  =:= Any]
-    implicitly[C2.Cat  =:= Int]
-    implicitly[C3.Cat1 =:= Any]
-    implicitly[C3.Cat2 =:= Either[Int, Boolean]]
+    implicitly[   C1.Cat  =:= Any                 ]
+    implicitly[   C2.Cat  =:= Int                 ]
+    implicitly[   C3.Cat1 =:= Any                 ]
+    implicitly[   C3.Cat2 =:= Either[Int, Boolean]]
+    implicitly[List2.Cat  =:= Any                 ]
+    implicitly[   LF.Cat  =:= LHS[Any]            ]
+    implicitly[ NilT.Cat  =:= Nil                 ]
+    implicitly[ NilF.Cat  =:= Nil                 ]
+    implicitly[ConsF.Cat  =:= Cons[Any, Any]      ]
   }
 
   ignore should "generate bounded mapping on objects" in {
