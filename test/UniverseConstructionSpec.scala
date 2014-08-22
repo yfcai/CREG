@@ -148,7 +148,11 @@ class UniverseConstructionSpec extends FlatSpec {
             Field("tail", TypeVar("L"))))))))
   }
 
-  it should "not permit reassigning recursive positions" in {
+  // reassigning recursive positions is useful in e. g.
+  //
+  //   @functor val list = List { Cons(C, List) }
+  //
+  it should "permit reassigning recursive positions" in {
     @functor val tree = Ignored => List { Cons(_1 = List) }
     val treeName = getFixedPointName(tree)
     assert(tree ==
@@ -158,7 +162,7 @@ class UniverseConstructionSpec extends FlatSpec {
           Variant(TypeVar(this.getClass.getName + ".this.ListT"), Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
-              Field("_1", TypeVar("List" /* as opposed to: treeName */)),
+              Field("_1", TypeVar(treeName)),
               Field("tail", TypeVar(treeName)))))))))
   }
 

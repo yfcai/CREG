@@ -176,7 +176,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   /** starting type hidden in an overrider; in other words, the entry point */
   def startingType(c: Context)(body: Datatype, care: Set[Name]): Option[c.Type] = 
     body match {
-      case Variant(header, _) =>
+      case Variant(header, fields) =>
         Some(fullyApplyToNothing(c)(header, care))
 
       case Record(_, _) | TypeVar(_) =>
@@ -277,14 +277,24 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
           List(dodgeFreeTypeVariables(c)(tq"${TypeName(fixedPointName)}", newCare)))
 
         // adjust overrider
+        // it has to be a variant whose typeVar reflects the overriders
         val newOverrider: Option[Datatype] = overrider match {
           case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
+
             Some(Variant(
               // e. g., replace "List" by "ListT[..., ...]"
               TypeVar(typeToCode(c)(unrolledTpe)),
 
-              // preserve body
-              nominals))
+              // e. g., rename "List" to `fixedPointName`
+              nominals.map { nominal =>
+                nominal.replaceBody(
+                  nominal.get everywhere {
+                    case TypeVar(name) if name == fixedPointDataTag =>
+                      TypeVar(fixedPointName)
+                  }
+                )
+              }
+            ))
 
           case otherwise =>
             otherwise
@@ -342,12 +352,9 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
             // then children's IDontCare packages are useless.
             // they have to be records.
             val cases: Many[Nominal] = (childCare, tpe.typeArgs, suboverriders).zipped.map({
-              case (IDoCare(record @ Record(_, _)), _, _) =>
-                record
-
-              case (IDoCare(typeVar @ TypeVar(param)), actual, _) if care(param) =>
-                require(care(param), "only the functor's parameters may occupy summand positions")
-
+              // summand record is overridden by a functor parameter in type argument part
+              case (IDoCare(typeVar @ TypeVar(param)), actual, suboverrider)
+                  if care(param) =>
                 val record =
                   representGeneratedRecord(c)(
                     actual.etaExpand.resultType,
@@ -355,6 +362,14 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
 
                 RecordAssignment(record, typeVar)
 
+              // summand record is overridden by a functor parameter in overrider part
+              case (IDoCare(record @ Record(_, _)), _, Some(typeVar @ TypeVar(param)))
+                  if care(param) =>
+                RecordAssignment(record, typeVar)
+
+              // normal record
+              case (IDoCare(record @ Record(_, _)), _, suboverrider) =>
+                record
 
               case (IDoCare(nonRecord), _, _) =>
                 abortWithError(c)(
@@ -512,7 +527,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
     val dummy = TypeName(c freshName "Dummy")
     val method = TermName(c freshName "method")
     val typeDefs = mkTypeDefs(c)(care.toSeq map (Param invariant _))
-    val wrapper = q"class $dummy { def $method[..$typeDefs]: ${tpe} = ??? } ; new $dummy"
+    val wrapper = q"{ class $dummy { def $method[..$typeDefs]: ${tpe} = ??? } ; new $dummy }"
     c.typecheck(wrapper).tpe.member(method).typeSignature.finalResultType
   }
 }
