@@ -414,11 +414,8 @@ class DataSpec extends FlatSpec {
       def fold[T](f: ListF[A, T] => T): T = f(List patternFunctor xs.unroll map (_ fold f))
     }
 
-    val nil: List[Nothing] = Roll[({ type λ[+T] = ListF[Nothing, T] })#λ](Nil)
-    def cons[A](x: A, xs: List[A]): List[A] = Roll[({ type λ[+T] = ListF[A, T] })#λ](Cons(x, xs))
-
     val firstNinePrimes: List[Int] =
-      cons(2, cons(3, cons(5, cons(7, cons(11, cons(13, cons(17, cons(19, cons(23, nil)))))))))
+      Cons(2, Cons(3, Cons(5, Cons(7, Cons(11, Cons(13, Cons(17, Cons(19, Cons(23, Nil)))))))))
 
     def sum(xs: List[Int]) = xs.fold[Int] {
       case Nil => 0

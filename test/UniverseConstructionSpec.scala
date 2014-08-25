@@ -11,9 +11,6 @@ class UniverseConstructionSpec extends FlatSpec {
 
   @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
 
-  def nil[A]: List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Nil)
-  def cons[A](head: A, tail: List[A]): List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Cons(head, tail))
-
   "UniverseConstruction" should "be able to interpret list of integers" in {
     @interpretIntList trait IntList {
       FixedPoint(DataConstructor(Many("L"),
@@ -24,7 +21,7 @@ class UniverseConstructionSpec extends FlatSpec {
             Field("tail", Hole("L"))))))))
     }
 
-    val xs: IntList = cons(1, cons(2, cons(3, cons(4, nil))))
+    val xs: IntList = Cons(1, Cons(2, Cons(3, Cons(4, Nil))))
 
     info(s"xs = $xs")
   }
@@ -45,7 +42,7 @@ class UniverseConstructionSpec extends FlatSpec {
 
     val my = mkMy[Int]
 
-    val xs: my.List = cons(1, cons(2, cons(3, cons(4, nil))))
+    val xs: my.List = Cons(1, Cons(2, Cons(3, Cons(4, Nil))))
 
     info(s"xs = $xs")
   }

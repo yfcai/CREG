@@ -21,21 +21,34 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
   // if this compiles at all, then generated code implements Traversable interface correctly
   @c123 object Dummy
 
-  // smart constructors to roll lists (should be automated in implicit macro later)
-  def nil[A]: List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Nil)
-  def cons[A](head: A, tail: List[A]): List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Cons(head, tail))
-
   val x12: List[Int] =
-    cons(1, cons(2, nil))
+    Cons(1, Cons(2, Nil))
+
+  // this breaks implicit resolution in horrific ways
+  //
+  // implicit def whut[A, B <% A, T <% List[A]](c: Cons[B, T]): List[A] =
+  //   Cons(c.head: A, c.tail: List[A])
+  //
+  // it is intended to support the following syntax, in vain:
+  //
+  // val x14: List[List[Int]] = Cons(Nil, Cons(1, Nil), ..., Nil)
+
+  // resolving to semi-manual list construction
+  object List {
+    def apply[T](elems: T*): List[T] =
+      if (elems.isEmpty)
+        Nil
+      else
+        Cons(elems.head, apply(elems.tail: _*))
+  }
 
   val x14: List2.Map[Int] =
-    cons(
-      nil, cons(
-        cons(1, nil), cons(
-          cons(1, cons(2, nil)), cons(
-            cons(1, cons(2, cons(3, nil))), cons(
-              cons(1, cons(2, cons(3, cons(4, nil)))),
-              nil)))))
+    List(
+      List(),
+      List(1),
+      List(1, 2),
+      List(1, 2, 3),
+      List(1, 2, 3, 4))
 
   type TC3 = C3.Map[String, Either[Int, Boolean]]
 
@@ -75,13 +88,13 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
 
     val x25 = List2(x14) map (_ + 1)
     assert(x25 ==
-      cons(
-        nil, cons(
-          cons(2, nil), cons(
-            cons(2, cons(3, nil)), cons(
-              cons(2, cons(3, cons(4, nil))), cons(
-                cons(2, cons(3, cons(4, cons(5, nil)))),
-                nil))))))
+      List(
+        List(),
+        List(2),
+        List(2, 3),
+        List(2, 3, 4),
+        List(2, 3, 4, 5)))
+
   }
 
   it should "generate traversals for recursion at variant case position" in {

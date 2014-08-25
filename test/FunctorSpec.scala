@@ -12,22 +12,16 @@ class FunctorSpec extends FlatSpec {
     Cons(head = A, tail = List)
   }
 
-  def nil[A]: List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Nil)
-  def cons[A](head: A, tail: List[A]): List[A] = Roll[({ type λ[+L] = ListF[A, L] })#λ](Cons(head, tail))
   object List {
     def apply[T](elems: T*): List[T] =
       if (elems.isEmpty)
-        nil
+        Nil
       else
-        cons(elems.head, apply(elems.tail: _*))
+        Cons(elems.head, apply(elems.tail: _*))
   }
 
   // this should be generated
   implicit class ListIsFoldable[A](xs: List[A]) extends Foldable[({ type λ[+L] = ListF[A, L] })#λ](xs)(listF)
-
-
-  // Does not work yet. Type of block expr is Unit, not Traversable.Endofunctor[List].
-  // val list: Traversable.Endofunctor[List] = { @functor val _ = A => List[A] }
 
   val list = {
     @functor val list = A => List[A]

@@ -23,16 +23,10 @@ object Main extends App {
   // implicits
   implicit def _var(x: String): Term = Roll[TermF](Var(x))
 
-  implicit def autoroll[Ab0 <% Term, Ap0 <% Term, Ap1 <% Term](
-    t: TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
-  ): Term = {
-    @functor val rollF = (Ab0, Ap0, Ap1) => TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
-    Roll[TermF](rollF(t) map (x => x: Term, x => x: Term, x => x: Term))
-  }
-
   // 2nd argument `termF` of `Foldable` provided implicitly
   implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)
 
+  val t: Term = Void
 
   // USAGE: PRETTY PRINTING
 
