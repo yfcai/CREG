@@ -7,7 +7,7 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
 trait InterfaceHelperGenerator extends TraversableGenerator with Preprocessor {
-  /** Given
+  /** Given:
     *
     *   @datatype trait Term {
     *     Void
@@ -16,75 +16,100 @@ trait InterfaceHelperGenerator extends TraversableGenerator with Preprocessor {
     *     App(operator = Term, operand = Term)
     *   }
     *
-    * generate
+    * Generate:
     *
-    *   implicit def autoroll$macro$1997[Ab0 <% Term, Ap0 <% Term, Ap1 <% Term](
-    *     t: TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
-    *   ): Term = {
-    *     @functor val rollF = (Ab0, Ap0, Ap1) => TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
-    *     Roll[TermF](rollF(t) map (x => x: Term, x => x: Term, x => x: Term))
-    *   }
+    *   implicit def autorollVoid(t: Void): Term = Roll[TermF](t)
+    *   implicit def autorollVar(t: Var[String]): Term = Roll[TermF](Var(t.name))
+    *   implicit def autorollAbs[T <% Term](t: Abs[String, T]): Term = Roll[TermF](Abs(t.param, t.body))
+    *   implicit def autorollApp[S <% Term, T <% Term](t: App[S, T]): Term = Roll[TermF](App(t.operator, t.operand))
     */
-  def generateAutoroll(c: Context)(food: SynonymGeneratorFood): Option[c.Tree] = {
+  def generateAutoroll(c: Context)(food: SynonymGeneratorFood): Many[c.Tree] = {
     import c.universe._
     food.patternFunctor match {
       // if there is no pattern functor,
       // then the datatype is not recursive and we don't have to autoroll.
       case None =>
-        None
+        Many.empty
 
       case Some((patternFunctorName, patternFunctor)) =>
-        Some(doGenerateAutoroll(c)(patternFunctorName, patternFunctor))
+        autorollAllRecords(c)(patternFunctorName, patternFunctor)
     }
   }
 
-  def doGenerateAutoroll(c: Context)(patternFunctorName: Name, genericData: DataConstructor): c.Tree = {
+  /** Generate special implicit conversions for case objects
+    * (resolution can't find them if the datatype is generic)
+    *
+    *   implicit def rollVoid$macro$1997(t: Void): Term = Roll[TermF](t)
+    */
+  def autorollAllRecords(c: Context)(patternFunctorName: Name, genericData: DataConstructor): Many[c.Tree] = {
     import c.universe._
-    val DataConstructor(genericParams, FixedPoint(name, body)) = genericData
+    genericData match {
+      case DataConstructor(genericParams,
+             FixedPoint(name, Variant(header, nominals))) =>
+        val records = nominals.asInstanceOf[Many[Record]]
+        records map {
+          case record @ Record(recordName, fields) =>
+            val genericTypeNames = genericParams map (x => TypeName(x.name))
 
-    val genericTypeNames = genericParams map (x => TypeName(x.name))
+            val fixedType =
+              if (genericParams.isEmpty)
+                tq"${TypeName(name)}"
+              else
+                tq"${TypeName(name)}[..$genericTypeNames]"
 
-    val fixedType =
-      if (genericParams.isEmpty)
-        tq"${TypeName(name)}"
-      else
-        tq"${TypeName(name)}[..$genericTypeNames]"
+            val arg = TermName(c freshName "t")
 
-    val arg = TermName(c freshName "t")
+            // create a DataConstructor taking types to each of the recursive positions
+            // call it the multi pattern functor
+            val multiPatternFunctor = diversifyPatternFunctor(c)(name, record)
+            val recursivePositions = multiPatternFunctor.params
 
-    // create a DataConstructor taking types to each of the recursive positions
-    // call it the multi pattern functor
-    val multiPatternFunctor = diversifyPatternFunctor(c)(name, body)
+            // view bounds do not exist...
+            val typeParams = mkTypeDefs(c)((genericParams ++ recursivePositions) map (_.toInvariant))
 
-    // view bounds do not exist...
-    val typeParams = mkTypeDefs(c)((genericParams ++ multiPatternFunctor.params) map (_.toInvariant))
+            // TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
+            val argType = meaning(c)(multiPatternFunctor.body)
 
-    // TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
-    val argType = meaning(c)(multiPatternFunctor.body)
+            // x => x: Term, x => x: Term, ...
+            val implicitCalls = recursivePositions map (_ => q"(x => x: $fixedType)")
 
-    // x => x: Term, x => x: Term, ...
-    val implicitCalls = multiPatternFunctor.params map (_ => q"(x => x: $fixedType)")
+            val autoroll = TermName(c freshName "autoroll" + recordName)
 
-    val autoroll = TermName(c freshName "autoroll")
+            val evidences = recursivePositions map { param =>
+              q"val ${TermName(param.name)} : (${TypeName(param.name)} => $fixedType)"
+            }
 
-    val evidences = multiPatternFunctor.params map { param =>
-      q"val ${TermName(param.name)} : (${TypeName(param.name)} => $fixedType)"
+            // ({ type λ[+X] = TermF[X] })#λ
+            val patternFunctor = mkInnerPatternFunctor(c)(patternFunctorName, genericParams)
+
+            val autorollBody =
+              if (fields.isEmpty)
+                q"${getRoll(c)}[$patternFunctor]($arg)"
+              else {
+                val recordTerm = TermName(recordName)
+                val newFields = fields.map {
+                  case Field(fieldName, fieldType) =>
+                    q"$arg.${TermName(fieldName)}"
+                }
+                q"${getRoll(c)}[$patternFunctor]($recordTerm(..$newFields))"
+              }
+
+            q"implicit def $autoroll[..$typeParams]($arg: $argType)(implicit ..$evidences): $fixedType = $autorollBody"
+        }
+
+      case _ =>
+        Many.empty
     }
+  }
 
-    // ({ type λ[+X] = TermF[X] })#λ
-    val patternFunctor = {
-      val f = TypeName(patternFunctorName)
-      val inner = TypeName(c freshName "inner")
-      val x = TypeName(c freshName "X")
-      val typeArgs = genericTypeNames :+ x
-      tq"({ type $inner[+$x] = $f[..$typeArgs] })#$inner"
-    }
-
-    // the traversable functor about each and every recursive position
-    val rollF = generateTraversable(c)(multiPatternFunctor)
-    val autorollBody = q"${getRoll(c)}[$patternFunctor]($rollF($arg) map (..$implicitCalls))"
-
-    q"implicit def $autoroll[..$typeParams]($arg: $argType)(implicit ..$evidences): $fixedType = $autorollBody"
+  // ({ type λ[+X] = TermF[X] })#λ
+  def mkInnerPatternFunctor(c: Context)(patternFunctorName: Name, genericParams: Many[Param]): c.Tree = {
+    import c.universe._
+    val f = TypeName(patternFunctorName)
+    val inner = TypeName(c freshName "inner")
+    val x = TypeName(c freshName "X")
+    val typeArgs = genericParams.map(x => TypeName(x.name)) :+ x
+    tq"({ type $inner[+$x] = $f[..$typeArgs] })#$inner"
   }
 
   /** create a DataConstructor mapping parameters to each occurrence of
