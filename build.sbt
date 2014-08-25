@@ -22,7 +22,7 @@ lazy val nominal = project in file("nominal") settings (
 lazy val test = project in file(".") dependsOn nominal settings (
   fork := true, // otherwise cannot deserialize
   scalaVersion := sversion,
-  scalaSource in Compile := new File(baseDirectory.value, "empty"),
+  scalaSource in Compile := new File(baseDirectory.value, "main"),
   scalaSource in Test := new File(baseDirectory.value, "test"),
   autoCompilerPlugins := true,
   scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
@@ -33,19 +33,3 @@ lazy val test = project in file(".") dependsOn nominal settings (
     compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
   )
 )
-
-
-// main
-
-lazy val main = project in file("main") dependsOn nominal settings (
-  scalaVersion := sversion,
-  scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
-  libraryDependencies ++= List(
-    compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
-  )
-)
-
-
-// root
-
-lazy val root = project.aggregate(nominal, test, main)
