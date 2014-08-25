@@ -65,3 +65,50 @@ trait Traversable2 {
     def map[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Map[C, D] = this.traverse[Applicative.Identity, C, D](f, g)
   }
 }
+
+trait Traversable3 {
+  type Cat1
+  type Cat2
+  type Cat3
+  type Map[+A <: Cat1, +B <: Cat2, +C <: Cat3]
+
+  def traverse[F[+_]: Applicative.Endofunctor,
+    A <: Cat1, B <: Cat2, W <: Cat3, C <: Cat1, D <: Cat2, Y <: Cat3]
+              (f: A => F[C], g: B => F[D], h: W => F[Y],
+                mAB: Map[A, B, W]): F[Map[C, D, Y]]
+
+  def apply[A <: Cat1, B <: Cat2, W <: Cat3](mAB: Map[A, B, W]): View[A, B, W] = new View(mAB)
+
+  class View[A <: Cat1, B <: Cat2, W <: Cat3](mAB: Map[A, B, W]) {
+    def traverse[F[+_]: Applicative.Endofunctor, C <: Cat1, D <: Cat2, Y <: Cat3]
+                (f: A => F[C], g: B => F[D], h: W => F[Y]): F[Map[C, D, Y]] =
+      Traversable3.this.traverse(f, g, h, mAB)
+
+    def map[C <: Cat1, D <: Cat2, Y <: Cat3](f: A => C, g: B => D, h: W => Y): Map[C, D, Y] =
+      this.traverse[Applicative.Identity, C, D, Y](f, g, h)
+  }
+}
+
+trait Traversable4 {
+  type Cat1
+  type Cat2
+  type Cat3
+  type Cat4
+  type Map[+A <: Cat1, +B <: Cat2, +C <: Cat3, +D <: Cat4]
+
+  def traverse[F[+_]: Applicative.Endofunctor,
+    A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4, C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4]
+              (f: A => F[C], g: B => F[D], h: W => F[Y], k: X => F[Z],
+                mAB: Map[A, B, W, X]): F[Map[C, D, Y, Z]]
+
+  def apply[A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4](mAB: Map[A, B, W, X]): View[A, B, W, X] = new View(mAB)
+
+  class View[A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4](mAB: Map[A, B, W, X]) {
+    def traverse[F[+_]: Applicative.Endofunctor, C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4]
+                (f: A => F[C], g: B => F[D], h: W => F[Y], k: X => F[Z]): F[Map[C, D, Y, Z]] =
+      Traversable4.this.traverse(f, g, h, k, mAB)
+
+    def map[C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4](f: A => C, g: B => D, h: W => Y, k: X => Z): Map[C, D, Y, Z] =
+      this.traverse[Applicative.Identity, C, D, Y, Z](f, g, h, k)
+  }
+}
