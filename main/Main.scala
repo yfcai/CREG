@@ -14,16 +14,21 @@ object Main extends App {
     App(operator = Term, operand = Term)
   }
 
-  // smart constructors, to be made obsolete by auto-rolling
-  def void: Term = Roll[TermF](Void)
-  implicit def _var(x: String): Term = Roll[TermF](Var(x))
-  def abs(x: String, body: Term): Term = Roll[TermF](Abs(x, body))
-  def app(f: Term, y: Term): Term = Roll[TermF](App(f, y))
-
   // @functor only works in block scope >_<
   implicit val termF = {
     @functor implicit val termF = X => TermF[X]
     termF
+  }
+
+  // smart constructors, to be made obsolete by auto-rolling
+  implicit def _var(x: String): Term = Roll[TermF](Var(x))
+
+  // implicits
+  implicit def autoroll[Ab0 <% Term, Ap0 <% Term, Ap1 <% Term](
+    t: TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
+  ): Term = {
+    @functor val rollF = (Ab0, Ap0, Ap1) => TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
+    Roll[TermF](rollF(t) map (x => x: Term, x => x: Term, x => x: Term))
   }
 
   // 2nd argument `termF` of `Foldable` provided implicitly
@@ -119,19 +124,19 @@ object Main extends App {
   // Execution begins
 
   // \x -> x
-  val id = abs("x", "x")
+  val id: Term = Abs("x", "x")
 
   // (\x -> x) y
-  val idy = app(id, "y")
+  val idy: Term = App(id, "y")
 
   // \x -> f (x y)
-  val f_xy = abs("x", app("f", app("x", "y")))
+  val f_xy: Term = Abs("x", App("f", App("x", "y")))
 
   // \y -> (f x) y
-  val fx_y = abs("y", app(app("f", "x"), "y"))
+  val fx_y: Term = Abs("y", App(App("f", "x"), "y"))
 
   // \f -> f (\z -> ())
-  val fzv = abs("f", app("f", abs("z", void)))
+  val fzv: Term = Abs("f", App("f", Abs("z", Void)))
 
   def put (name: String, obj : Any ) = println(s"$name = $obj")
   def show(name: String, term: Term) = put(name, pretty(term))
@@ -146,8 +151,8 @@ object Main extends App {
       put(s"freevars($name)", freevars(term))
       show(s"prependUnderscore($name)", prependUnderscore(term))
       List(
-        ("y", app("x", "x")),
-        ("y", app("x", "y"))
+        ("y", App("x", "x")),
+        ("y", App("x", "y"))
       ).foreach {
         case (y, ysub) =>
           val s1 = subst1(y, ysub, term)
