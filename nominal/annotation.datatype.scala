@@ -8,7 +8,14 @@ import scala.annotation.StaticAnnotation
 import compiler._
 import DatatypeRepresentation._
 
-object datatype extends Parser with Preprocessor with DeclarationGenerator with SynonymGenerator with TraversableGenerator {
+object datatype
+extends Parser
+   with Preprocessor
+   with DeclarationGenerator
+   with SynonymGenerator
+   with TraversableGenerator
+   with InterfaceHelperGenerator
+{
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
@@ -30,14 +37,16 @@ object datatype extends Parser with Preprocessor with DeclarationGenerator with 
       // declaration generator generates template classes
       // synonym generator generates synonyms
 
+      // auto-rolling for recursive datatypes
+      val autoroll = generateAutoroll(c)(synonymFood)
+
       // import language features needed for generated code
       val imports = scalaLanguageFeatureImports(c).iterator
 
       // companion object
       val updatedCompanion: c.Tree = injectIntoObject(c)(companion, Seq.empty) // nothing to inject for now
 
-      // TODO: append recursive polynomial functor instances etc to result
-      val result = imports ++ declarations ++ synonyms ++ Iterator(updatedCompanion)
+      val result = imports ++ declarations ++ synonyms ++ autoroll ++ Some(updatedCompanion)
 
       c.Expr(q"..${result.toSeq}")
 

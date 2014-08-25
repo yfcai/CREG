@@ -116,14 +116,14 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   def mkBoundedTypeDef(c: Context)(param: Param, bounds: Map[Name, Datatype]): c.universe.TypeDef = {
     import c.universe._
     val variance = param.variance.scalaSymbol
-    val traitIn = TypeName(c freshName "Trait") // TODO: use bounds
+    val traitIn = TypeName(c freshName "Trait")
     if (bounds contains param.name) {
       val bound = meaning(c)(bounds(param.name))
-      val q"trait $traitOut[$typeDef]" = c.parse(s"trait $traitIn[ $variance ${param.name} <: $bound ]")
+      val q"class $traitOut[$typeDef] { ..$bodyOut }" = c.parse(s"class $traitIn[ $variance ${param.name} <: $bound ]")
       typeDef
     }
     else {
-      val q"trait $traitOut[$typeDef]" = c.parse(s"trait $traitIn[ $variance ${param.name} ]")
+      val q"class $traitOut[$typeDef] { ..$bodyOut }" = c.parse(s"class $traitIn[ $variance ${param.name} ]")
       typeDef
     }
   }
@@ -138,10 +138,10 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   // location of the Fix[_[_]] trait
   def getFix(c: Context): c.Tree = {
     import c.universe._
-    val q"??? : $fix [ ID ]" = q"??? : _root_.nominal.lib.Fix [ ID ]"
-    fix
+    tq"_root_.nominal.lib.Fix"
   }
 
+  def getRoll(c: Context): c.Tree = c parse "_root_.nominal.lib.Roll"
 
   // ====================== //
   // FROM SCALA TO DATATYPE //

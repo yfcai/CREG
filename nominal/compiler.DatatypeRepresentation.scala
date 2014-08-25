@@ -146,7 +146,9 @@ object DatatypeRepresentation {
     def arity: Int = params.size
   }
 
-  case class Param(name: Name, variance: Param.Variance)
+  case class Param(name: Name, variance: Param.Variance) {
+    def toInvariant: Param = copy(variance = Param.Variance.Invariant)
+  }
 
   object Param {
     sealed trait Variance { def scalaSymbol: String }

@@ -55,8 +55,6 @@ trait TraversableGenerator extends SynonymGenerator {
 
   def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
 
-  def getRoll(c: Context): c.Tree = c parse "_root_.nominal.lib.Roll"
-
   def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
     import c.universe._
     val q"??? : $tpe" = q"??? : _root_.nominal.lib.Applicative.Endofunctor[$f]"
