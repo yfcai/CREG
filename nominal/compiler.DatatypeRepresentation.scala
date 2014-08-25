@@ -97,6 +97,17 @@ object DatatypeRepresentation {
         val trueForChildren = other.gmapQ({ case t => t.hasFreeOccurrencesOf(name) })
         trueForChildren.nonEmpty && trueForChildren.max
     }
+
+    def freevars: Set[Name] = this match {
+      case TypeVar(x) =>
+        Set(x)
+
+      case FixedPoint(x, body) =>
+        body.freevars - x
+
+      case other =>
+        other.gmapQ({ case t => t.freevars }).foldLeft(Set.empty[Name])(_ ++ _)
+    }
   }
 
   sealed trait Nominal { def name: Name ; def get: Datatype ; def replaceBody(body: Datatype): Nominal }
