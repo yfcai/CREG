@@ -20,10 +20,9 @@ object Main extends App {
     termF
   }
 
-  // smart constructors, to be made obsolete by auto-rolling
+  // implicits
   implicit def _var(x: String): Term = Roll[TermF](Var(x))
 
-  // implicits
   implicit def autoroll[Ab0 <% Term, Ap0 <% Term, Ap1 <% Term](
     t: TermT[Void, Var[String], Abs[String, Ab0], App[Ap0, Ap1]]
   ): Term = {
