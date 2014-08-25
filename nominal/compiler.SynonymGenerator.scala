@@ -10,6 +10,29 @@ trait SynonymGenerator extends UniverseConstruction {
     generateBoundedSynonym(c)(name, genericDatatype, Map.empty)
 
   def generateBoundedSynonym(c: Context)(name: Name, genericDatatype: DataConstructor, bounds: Map[Name, Datatype]): c.Tree = {
+    val (newDatatype, newBounds) = disambiguate(c)(genericDatatype, bounds)
+    boundedSynonymWithoutDisambiguation(c)(name, newDatatype, newBounds)
+  }
+
+  /** remove identical names from bounds (currently by failing otherwise) */
+  private[this]
+  def disambiguate(c: Context)(
+    data: DataConstructor, bounds: Map[Name, Datatype]
+  ): (DataConstructor, Map[Name, Datatype]) = {
+    val identicals = bounds filter {
+      case (x1, TypeVar(x2)) => x1 == x2
+      case (x1, Record(x2, _)) => x1 == x2
+      case _ => false
+    }
+    if (! identicals.isEmpty) sys error s"duplicate names in bounds: $identicals"
+    (data, bounds) //stub
+  }
+
+  /** precondition: `bounds` contains no identity mapping */
+  private[this]
+  def boundedSynonymWithoutDisambiguation(c: Context)(
+    name: Name, genericDatatype: DataConstructor, bounds: Map[Name, Datatype]
+  ): c.Tree = {
     import c.universe._
     val DataConstructor(params, datatypeBody) = genericDatatype
     val typeName = TypeName(name)
