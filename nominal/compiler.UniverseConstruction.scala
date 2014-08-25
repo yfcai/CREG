@@ -278,7 +278,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
 
         // adjust overrider
         // it has to be a variant whose typeVar reflects the overriders
-        val newOverrider: Option[Datatype] = overrider match {
+        def adjustOverrider(overrider: Option[Datatype]): Option[Datatype] = overrider match {
           case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
 
             Some(Variant(
@@ -296,9 +296,15 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
               }
             ))
 
+          // convert `Term` to `Term {}`, coz the first case is tough to handle downstream
+          case Some(header @ TypeVar(_)) =>
+            adjustOverrider(Some(Variant(header, Many.empty)))
+
           case otherwise =>
             otherwise
         }
+
+        val newOverrider = adjustOverrider(overrider)
 
         // since I care about tpe, I should also care about it when it's unrolled
         carePackage(c)(unrolledTpe, newCare, newOverrider) match {
@@ -455,7 +461,14 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
         matchChildrenOverriders(c)(tpe, record, fields)
 
       case Some(FixedPoint(name, body)) =>
-        // TODO: think about it.
+        // this case is possible if we do not convert
+        //
+        //   @functor val badF = XX => Term
+        //
+        // to the easier-to-handle case
+        //
+        //   @functor val badF = XX => Term {}
+        //
         ???
 
       case Some(Reader(domain, range)) =>
