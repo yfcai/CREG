@@ -7,7 +7,7 @@ import scala.language.experimental.macros
 import scala.annotation.StaticAnnotation
 
 class datatype extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro annotation.datatype.impl
+  def macroTransform(annottees: Any*): Any = macro annotation.datatype.vanillaImpl
 }
 
 class functor extends StaticAnnotation {

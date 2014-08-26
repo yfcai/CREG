@@ -16,7 +16,20 @@ extends Parser
    with TraversableGenerator
    with InterfaceHelperGenerator
 {
-  def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+  object Flag extends Enumeration {
+    type Flag = Value
+    val ImplicitConstructor = Value
+  }
+
+  // enable implicit constructors by default
+  // TODO: disable them after fixed point typing macro is done
+  def vanillaImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
+    expandData(c)(annottees, Set(Flag.ImplicitConstructor))
+
+  def noImplicitsImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
+    expandData(c)(annottees, Set())
+
+  def expandData(c: Context)(annottees: Seq[c.Expr[Any]], options: Set[Flag.Flag]): c.Expr[Any] = {
     import c.universe._
 
     val (input, companion) = extractInput(c)(annottees)
@@ -37,16 +50,16 @@ extends Parser
       // declaration generator generates template classes
       // synonym generator generates synonyms
 
-      // auto-rolling for recursive datatypes
-      val autoroll = generateAutoroll(c)(synonymFood)
-
       // import language features needed for generated code
       val imports = scalaLanguageFeatureImports(c).iterator
 
       // companion object
       val updatedCompanion: c.Tree = injectIntoObject(c)(companion, Seq.empty) // nothing to inject for now
 
-      val result = imports ++ declarations ++ synonyms ++ autoroll ++ Some(updatedCompanion)
+      var result = imports ++ declarations ++ synonyms ++ Some(updatedCompanion)
+
+      if (options(this.Flag.ImplicitConstructor))
+        result = result ++ generateAutoroll(c)(synonymFood)
 
       c.Expr(q"..${result.toSeq}")
 
@@ -112,5 +125,9 @@ extends Parser
 }
 
 class datatype extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro datatype.impl
+  def macroTransform(annottees: Any*): Any = macro datatype.vanillaImpl
+}
+
+class dataWithoutImplicits extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro datatype.noImplicitsImpl
 }
