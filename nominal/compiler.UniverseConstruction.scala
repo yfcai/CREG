@@ -245,10 +245,62 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
     tq"$tpe".toString
   }
 
-  def carePackage(c: Context)(tpe0: c.Type, care: Set[Name], overrider: Option[Datatype]): DoICare = {
+  /** convert scala type to datatype representation, without expanding
+    * more than one level. Duplicate some code of `carePackage`.
+    * Consider refactor.
+    */
+  def representOnce(c: Context)(tpe0: c.Type): Datatype = {
+    val tpe = tpe0.dealias
+    val symbol = tpe.typeSymbol
+    if (isFixedPointOfSomeFunctor(c)(tpe)) {
+      // CASE fixed point
+      // relies on `carePackage` to consider the type parameter of
+      // the functor to be worth caring
+      carePackage(c)(tpe, Set.empty, None).get
+    }
+    else if (symbol.isAbstract && tpe.typeArgs.nonEmpty) {
+      // CASE variant
+      val cases: Many[Record] = tpe.typeArgs.map(child => {
+        representOnce(c)(child) match {
+          case record @ Record(_, _) =>
+            record
+
+          case other =>
+            abortWithError(c)(
+              c.enclosingPosition,
+              s"representOnce: expect record, got $other")
+        }
+      })(collection.breakOut)
+
+      Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases)
+    }
+    else { // ! symbol.isAbstract
+      // CASE record
+      // expand children without caring about them
+      val childCare = tpe.typeArgs.map(child => carePackage(c)(child, Set.empty, None))
+      representGeneratedRecord(c)(tpe, childCare)
+    }
+  }
+
+  /** convert scala type to datatype representation while dealing with
+    * many concerns.
+    *
+    * @param tpe0 scala type to represent
+    * @param care set of names we care about, namely parameters of functors and names of fixed points
+    * @param overrider the part overriding the default with parts inside braces: List { Cons(Int, R) }
+    *
+    * @return representation of tpe0 with flag whether I care about it or not
+    */
+  def carePackage(c: Context)(
+    tpe0: c.Type,
+    care: Set[Name],
+    overrider: Option[Datatype]
+  ): DoICare = {
     // dealiasing is not recursive. do it here.
     val tpe = (overrider flatMap (x => startingType(c)(x, care)) getOrElse tpe0).dealias
 
+    // the case for type parameters of functors and sums without summand
+    // and 0-argument records
     if (tpe.typeArgs.isEmpty) {
       val symbol = tpe.typeSymbol
       val name = symbol.name.toString
@@ -394,7 +446,8 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
             })(collection.breakOut)
             IDoCare(Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases))
           }
-          else {
+          else { // ! symbol.isAbstract
+            // this is the record case
             // if there is an overrider, it should not be anything that cannot expand to a record
             require(
               overrider.isEmpty ||
