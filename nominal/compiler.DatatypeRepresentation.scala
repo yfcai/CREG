@@ -25,6 +25,17 @@ object DatatypeRepresentation {
     def everywhereQ[T](f: PartialFunction[Datatype, T]): Iterator[T] =
       (f lift this).fold[Iterator[T]](Iterator.empty)(x => Iterator(x)) ++ children.flatMap(_ everywhereQ f)
 
+    def subst(x: Name, xdef: Datatype): Datatype = this match {
+      case TypeVar(y) if x == y =>
+        xdef
+
+      case FixedPoint(y, body) if x == y =>
+        this
+
+      case other =>
+        other gmapT (t => t.subst(x, xdef))
+    }
+
 
     def gmapT(f: Datatype => Datatype): Datatype = this match {
       case TypeVar(_) =>
@@ -131,6 +142,8 @@ object DatatypeRepresentation {
     def patternFunctor: DataConstructor = DataConstructor(Many(Param covariant name), body)
     def get = this
     def replaceBody(body: Datatype): Nominal = copy(body = body)
+
+    def unrollOnce: Datatype = body subst (name, this)
   }
 
   // covariant function, produces anonymous types
