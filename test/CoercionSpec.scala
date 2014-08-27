@@ -5,7 +5,7 @@ import nominal.annotation.dataWithoutImplicits
 
 import scala.language.experimental.macros
 
-class CoersionSpec extends FlatSpec with Coersion {
+class CoercionSpec extends FlatSpec with Coercion {
   @dataWithoutImplicits trait List[A] {
     Nil
     Cons(head = A, tail = List)
@@ -17,7 +17,10 @@ class CoersionSpec extends FlatSpec with Coersion {
   // representation of type
   def rep[T](implicit tag: reflect.runtime.universe.TypeTag[T]): String = tag.tpe.toString
 
-  "Coersion" should "know the source and destination types" in {
+  // instantiate dummy object to test typer
+  def absurd[T]: T = null.asInstanceOf[T]
+
+  "Coercion" should "know the source and destination types" in {
     val info = collection.mutable.Map.empty[String, String]
     val x0: List[Int] = coerceContextInfo(Nil, info)
     assert(info == Map("expected" -> rep[List[Int]], "actual" -> rep[Nil.type]))
@@ -43,5 +46,37 @@ class CoersionSpec extends FlatSpec with Coersion {
     assert(cons == Cons(5, nilOfInt))
   }
 
-  it should "tell whether types are compatible at runtime" in pending
+  // curried ListF
+  private[this] type ListC[+X] = { type λ[+Y] = ListF[X, Y] }
+
+  private[this] type ListF2[+X] = ListF[X, X]
+
+  // μX. ListF[X, X]
+  private[this] type MuX = Fix[ListF2]
+
+  // μY. ListF[μX. ListF[X, X], Y]
+  private[this] type MuY = Fix[ListC[MuX]#λ]
+
+  it should "tell whether types are compatible at runtime" in {
+    // MuX and MuY are compatible at runtime.
+    // but this does not compile:
+    //   val x0: MuX = absurd[MuY]
+
+    // these do:
+    val x1: MuX = coerce(absurd[MuY])
+    val x2: MuY = coerce(absurd[MuX])
+
+    // unfortunately, can't verify failure because
+    // the `coerce` macro can't be used inside
+    // nominal.util.EvalScala.evalScala.
+    //
+    // these fail with bad error messages.
+    // error messages are bad because scalac discards
+    // the first error message, discards the expected
+    // return type it infers, and calls `coerce` again
+    // with expected type = Nothing.
+    //
+    //   val x3: List[Int] = coerce(absurd[MuY])
+    //   val x4: MuY = coerce(absurd[ILT])
+  }
 }
