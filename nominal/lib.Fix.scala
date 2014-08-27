@@ -15,7 +15,7 @@ object Fix {
   //
   // covariance of type parameter is not option.
   class TypeWitness[+T]
-  object TypeWitness {
-    implicit def spawn[T]: TypeWitness[T] = new TypeWitness
+  object TypeWitness extends TypeWitness[Nothing] {
+    implicit def get[T]: TypeWitness[T] = this
   }
 }
