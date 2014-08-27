@@ -119,6 +119,24 @@ object DatatypeRepresentation {
       case other =>
         other.gmapQ({ case t => t.freevars }).foldLeft(Set.empty[Name])(_ ++ _)
     }
+
+    // unify names bound by fixed points
+    def canonize: Datatype = {
+      var i = -1
+      def next() = { i += 1 ; s"canon$i" }
+
+      def loop(data: Datatype): Datatype = data match {
+        case FixedPoint(x, body) =>
+          val newBody = loop(body)
+          val y = next()
+          FixedPoint(y, newBody subst (x, TypeVar(y)))
+
+        case other =>
+          other gmapT (child => child.canonize)
+      }
+
+      loop(this)
+    }
   }
 
   sealed trait Nominal { def name: Name ; def get: Datatype ; def replaceBody(body: Datatype): Nominal }
