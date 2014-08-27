@@ -60,13 +60,41 @@ object Coersion extends UniverseConstruction {
     (witness: c.Tree)
     (implicit actualTag: c.WeakTypeTag[Actual], expectedTag: c.WeakTypeTag[Expected]):
       c.Tree =
-  {
+    performCoersion(c)(arg, actualTag.tpe, expectedTag.tpe)
+
+  def performCoersion(c: Context)(arg: c.Tree, actualType: c.Type, expectedType: c.Type): c.Tree = {
     import c.universe._
-    val (actualType, expectedType) = (actualTag.tpe, expectedTag.tpe)
+    val actual = representOnce(c)(actualType)
+    val expected = representOnce(c)(expectedType)
+    (actual, expected) match {
+      // actual & expected has compatible runtime type. do a cast.
+      case _ if compatibleRuntimeTypes(c)(actual, expected) =>
+        q"$arg.asInstanceOf[$expectedType]"
 
-    //DEBUG
-    println(s"\ncoercing $arg from $actualType to $expectedType\n")
+      case (FixedPoint(_, _), FixedPoint(_, _)) =>
+        sys error s"TODO: coersion between fixed points\nfrom: $actual\n..to: $expected"
 
-    q"null.asInstanceOf[$expectedType]" // stub
+      // from non-fixed to fixed: auto-roll at top level
+      case (actual, expected @ FixedPoint(_, _))
+          if isScalaSubtype(c)(scalaType(c)(actual), scalaType(c)(expected.unrollOnce)) =>
+        val tq"$fix[$functor]" = meaning(c)(expected)
+        q"${getRoll(c)}[$functor]($arg)"
+
+      // from fixed to non-fixed: auto-unroll at top level
+      case (actual @ FixedPoint(_, _), expected)
+          if isScalaSubtype(c)(scalaType(c)(actual.unrollOnce), scalaType(c)(expected)) =>
+        q"$arg.unroll"
+    }
   }
+
+  def isScalaSubtype(c: Context)(subtype: c.Type, supertype: c.Type): Boolean = {
+    import c.universe._
+    c.inferImplicitValue(treeToType(c)(tq"$subtype <:< $supertype")) match {
+      case q"" => false
+      case _ => true
+    }
+  }
+
+  def compatibleRuntimeTypes(c: Context)(actual: Datatype, expected: Datatype): Boolean =
+    false //stub
 }
