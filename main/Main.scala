@@ -5,7 +5,7 @@ import nominal.functors._
 // maybe should include .lib in .functors?
 import nominal.lib._
 
-object Main extends App {
+object Main extends App with Coercion {
 
   @datatype trait Term {
     Void
@@ -26,7 +26,7 @@ object Main extends App {
   // 2nd argument `termF` of `Foldable` provided implicitly
   implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)
 
-  val t: Term = Void
+  val t: Term = coerce(Void)
 
   // USAGE: PRETTY PRINTING
 
@@ -117,7 +117,9 @@ object Main extends App {
   // Execution begins
 
   // \x -> x
-  val id: Term = Abs("x", "x")
+  // coercion still can't deal with nesting. (27.08.2014)
+  // figure this out before deploying it further.
+  val id: Term = coerce(Abs("x", coerce(Var("x")): Term))
 
   // (\x -> x) y
   val idy: Term = App(id, "y")
