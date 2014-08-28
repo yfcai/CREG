@@ -2,7 +2,7 @@
   *
   * - auto-roll at top level
   * - auto-roll at arbitrary level
-  * - auto-cast (pending: need subtyping for datatypes with structural fixed points)
+  * - auto-cast
   * - interleaving auto-roll and auto-cast at arbitrary depth (probably really hard)
   */
 
@@ -34,7 +34,7 @@ trait Coercion {
     (implicit witness: Fix.TypeWitness[T]): T = macro Coercion.infoImpl[S, T]
 }
 
-object Coercion extends UniverseConstruction {
+object Coercion extends UniverseConstruction with TraversableGenerator {
   import Fix.TypeWitness
 
   def infoImpl[Actual, Expected]
@@ -92,13 +92,6 @@ object Coercion extends UniverseConstruction {
       // question: can `adjust` subsume this?
       case _ if compatibleRuntimeTypes(c)(actualType, expectedType) =>
         q"$arg.asInstanceOf[$expectedType]"
-
-      // from non-fixed to fixed: auto-roll at top level
-      // record case replaced by auto-rolling at all levels (record-only for now)
-      case (actual @ Variant(_, _), expected @ FixedPoint(_, _))
-          if isScalaSubtype(c)(scalaType(c)(actual), scalaType(c)(expected.unrollOnce)) =>
-        val tq"$fix[$functor]" = meaning(c)(expected)
-        q"${getRoll(c)}[$functor]($arg)"
 
       // from fixed to non-fixed: auto-unroll at top level
       case (actual @ FixedPoint(_, _), expected)
@@ -201,40 +194,48 @@ object Coercion extends UniverseConstruction {
     }
   }
 
-  sealed trait Adjustment[+T]
-  case object TypeError extends Adjustment[Nothing]
-  case object NoChange extends Adjustment[Nothing]
-  case class Adjusted[T](code: T) extends Adjustment[T]
+  sealed trait Adjustment[+T] { def map[U](f: T => U): Adjustment[U] }
+  case object TypeError extends Adjustment[Nothing] { def map[U](f: Nothing => U): Adjustment[U] = this }
+  case object NoChange extends Adjustment[Nothing] { def map[U](f: Nothing => U): Adjustment[U] = this }
+  case class Adjusted[T](code: T) extends Adjustment[T] { def map[U](f: T => U): Adjustment[U] = Adjusted(f(code)) }
 
-  def adjust(c: Context)(arg: c.Tree, actual: c.Type, expected: c.Type): Adjustment[c.Tree] = {
-    import c.universe._
-    val trivialAdjustment = adjustTrivially(c)(arg, actual, expected)
-    if (trivialAdjustment.nonEmpty)
-      trivialAdjustment.get
-    else {
+  /** Transitive closure of the following graph:
+    *
+    *   ACTUAL        EXPECTED
+    *
+    *   record   =>   record
+    *     ^             |
+    *     |             v
+    *   variant       variant
+    *     ^             |
+    *     |             v
+    *   fixed         fixed
+    *
+    */
+  def adjust(c: Context)(arg: c.Tree, actual: c.Type, expected: c.Type): Adjustment[c.Tree] =
+    adjustTrivially(c)(arg, actual, expected).getOrElse {
       val (actualRep, expectedRep) = (representOnce(c)(actual), representOnce(c)(expected))
-      (actualRep, expectedRep) match {
-        // record to fixed point
-        case (actualRecord @ Record(_, _), fixed @ FixedPoint(fixedName, Variant(header, records))) =>
-          records.find(_.name == actualRecord.name) match {
-            case Some(expectedRecord0 @ Record(_, _)) =>
-              val expectedRecord = (expectedRecord0 subst (fixedName, fixed)).asInstanceOf[Record]
-              val tq"$fix[$functor]" = meaning(c)(expectedRep)
-              adjustRecordBody(c)(arg, actualRecord, expectedRecord) match {
-                case Some(body) => Adjusted(q"${getRoll(c)}[$functor]($body)")
-                case None => TypeError
-              }
+        (actualRep, expectedRep) match {
+        case (record: Record, expectedRecord: Record) =>
+          recordToRecord(c)(arg, record, expectedRecord)
 
-            // no record of identical name found
-            case _ => TypeError
-          }
+        case (record: Record, variant: Variant) =>
+          recordToVariant(c)(arg, record, variant)
+
+        case (record: Record, fixed: FixedPoint) =>
+          recordToFixedPoint(c)(arg, record, fixed)
+
+        case (variant: Variant, expectedVariant: Variant) =>
+          variantToVariant(c)(arg, variant, expectedVariant)
+
+        case (variant: Variant, fixed: FixedPoint) =>
+          variantToFixedPoint(c)(arg, variant, fixed)
 
         // variant to fixed point, fixed point to variant, etc
         case _ =>
           TypeError
       }
     }
-  }
 
   // either no change, or call an implicit
   def adjustTrivially(c: Context)(arg: c.Tree, actual: c.Type, expected: c.Type): Option[Adjustment[c.Tree]] = {
@@ -243,24 +244,69 @@ object Coercion extends UniverseConstruction {
       Some(NoChange)
     else {
       c.inferImplicitView(arg, actual, expected) match {
-        case q"" =>
-          None
-
-        case view =>
-          Some(Adjusted(q"$view($arg)"))
+        case q"" => None
+        case view => Some(Adjusted(q"$view($arg)"))
       }
     }
   }
 
-  def adjustRecordBody(c: Context)(arg: c.Tree, actual: Record, expected: Record): Option[c.Tree] = {
+  /** variant => fixed = variant => variant -> fixed */
+  def variantToFixedPoint(c: Context)(arg: c.Tree, variant: Variant, fixed: FixedPoint): Adjustment[c.Tree] =
+    variantToVariant(c)(arg, variant, fixed.unrollToVariant) map rollWith(c)(fixed)
+
+  /** variant => variant = variant -> record => variant */
+  def variantToVariant(c: Context)(arg: c.Tree, actual: Variant, expected: Variant): Adjustment[c.Tree] =
+    if (actual.header == expected.header) {
+      import c.universe._
+
+      val adjustedRecords: List[CaseDef] =
+        actual.cases.asInstanceOf[Many[Record]].map({
+          record => recordCaseDef(c)(record) {
+            case (recordName, fieldNames) =>
+              val newArg = q"$recordName"
+              recordToVariant(c)(newArg, record, expected) match {
+                case TypeError => return TypeError
+                case Adjusted(code) => code
+                case NoChange => newArg
+              }
+          }
+        })(collection.breakOut)
+
+      Adjusted(Match(arg, adjustedRecords))
+    }
+    else
+      TypeError
+
+  /** record => variant = record => record -> variant */
+  def recordToVariant(c: Context)(arg: c.Tree, record: Record, variant: Variant): Adjustment[c.Tree] =
+    variant.cases.find(_.name == record.name) match {
+      case Some(expectedRecord @ Record(_, _)) =>
+        // `recordToRecord` will test that actual and expected record fields match
+        recordToRecord(c)(arg, record, expectedRecord)
+
+      case _ => TypeError
+    }
+
+  /** record => fixed = record => variant -> fixed */
+  def recordToFixedPoint(c: Context)(arg: c.Tree, record: Record, fixed: FixedPoint): Adjustment[c.Tree] =
+    recordToVariant(c)(arg, record, fixed.unrollToVariant) map rollWith(c)(fixed)
+
+  def rollWith(c: Context)(fixed: FixedPoint): c.Tree => c.Tree = {
+    import c.universe._
+    val tq"$fix[$functor]" = meaning(c)(fixed)
+    body => q"${getRoll(c)}[$functor]($body)"
+  }
+
+  /** record => record: primitive gulf-crossing recursion-invoking arrow */
+  def recordToRecord(c: Context)(arg: c.Tree, actual: Record, expected: Record): Adjustment[c.Tree] = {
     import c.universe._
     if (
       actual.name != expected.name ||
       actual.fields.map(_.name) != expected.fields.map(_.name)
     )
-      None
+      TypeError
     else if (actual.fields.isEmpty)
-      Some(arg)
+      Adjusted(arg)
     else {
       val subAdjustments = actual.fields.zip(expected.fields).foldRight[Option[List[c.Tree]]](Some(Nil)) {
         case (_, None) =>
@@ -282,13 +328,13 @@ object Coercion extends UniverseConstruction {
       }
       subAdjustments match {
         case None =>
-          None
+          TypeError
 
         case Some(adjustments) if adjustments.isEmpty =>
-          Some(arg)
+          Adjusted(arg)
 
         case Some(adjustments) if adjustments.nonEmpty =>
-          Some(q"$arg.copy(..$adjustments)")
+          Adjusted(q"$arg.copy(..$adjustments)")
       }
     }
   }

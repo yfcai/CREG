@@ -162,6 +162,7 @@ object DatatypeRepresentation {
     def replaceBody(body: Datatype): Nominal = copy(body = body)
 
     def unrollOnce: Datatype = body subst (name, this)
+    def unrollToVariant: Variant = unrollOnce.asInstanceOf[Variant]
   }
 
   // covariant function, produces anonymous types
