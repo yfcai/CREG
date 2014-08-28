@@ -21,7 +21,7 @@ object Main extends App with Coercion {
   }
 
   // implicits
-  implicit def _var(x: String): Term = Roll[TermF](Var(x))
+  implicit def _var(x: String): Term = coerce(Var(x))
 
   // 2nd argument `termF` of `Foldable` provided implicitly
   implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)
@@ -91,10 +91,9 @@ object Main extends App with Coercion {
     y
   }
 
-  def avoidCapture(avoid: Set[String], alias: Map[String, String], t: Term): Term =
-    avoidF(
-      // TODO: auto-roll
-      t.asInstanceOf[avoidF.Map[String, Abs[String, Term]]]
+  def avoidCapture(avoid: Set[String], alias: Map[String, String], t: Term): Term = coerce(
+    avoidF[String, Abs[String, Term]](
+      coerce(t)
     ).map(
       alias withDefault identity,
       (abs: Abs[String, Term]) => {
@@ -102,7 +101,8 @@ object Main extends App with Coercion {
         val y = fresh(x, avoid)
         Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
       }
-    ).asInstanceOf[Term] // TODO: auto-roll
+    )
+  )
 
   def subst1(x: String, xsub: Term, t: Term): Term =
     avoidCapture(freevars(xsub) + x, Map.empty, t).fold[Term] {
@@ -110,7 +110,7 @@ object Main extends App with Coercion {
         xsub
 
       case other =>
-        Roll[TermF](other) // TODO: auto-roll
+        coerce(other)
     }
 
 
