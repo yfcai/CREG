@@ -78,4 +78,20 @@ class CoercionSpec extends FlatSpec with Coercion {
     //   val x3: List[Int] = coerce(absurd[MuY])
     //   val x4: MuY = coerce(absurd[ILT])
   }
+
+  it should "roll variants into fixed points" in {
+    val ints: ILT = coerce(Cons(3, Nil))
+
+    // compilation success means auto-roll at top level
+    val intList: List[Int] = coerce(ints)
+
+    // compilation success means auto-roll at nested level
+    val list2: List[List[Int]] = coerce(Cons(ints, Cons(ints, Cons(ints, Nil))))
+    val list3: List[List[List[Int]]] = coerce(Cons(Cons(ints, Nil), Nil))
+
+    val list4: ListF[List[Int], List[List[Int]]] = coerce(Cons(Cons(3, Nil), Nil))
+
+    val list5: ListF[Cons[Int, Nil], Nil] = Cons(Cons(3, Nil), Nil)
+    val list6: ListF[List[Int], List[List[Int]]] = coerce(list5)
+  }
 }
