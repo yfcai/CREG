@@ -272,58 +272,56 @@ trait TraversableGenerator extends SynonymGenerator {
     mangleB: Map[Name, Name],
     env: Map[Name, c.Tree => c.Tree],
     applicative: c.TermName
-  ): c.universe.CaseDef = {
-    import c.universe._
-    val recordIdent = Ident(TermName(record.name))
-    val myName = TermName(c freshName record.name)
-    val wildcards = record.fields.map(_ => termNames.WILDCARD)
-
-    val arg = if (wildcards.isEmpty) q"$recordIdent" else q"$myName" // conditional needed here due to SI-1503
-    val argType = meaning(c)(typeVar rename mangleA)
-    val argCast = q"$arg.asInstanceOf[$argType]"
-
-    val body = generateDefTraverseBody(c)(argCast, typeVar, mangleA, mangleB, env, applicative)
-    val resultType = meaning(c)(_super rename mangleB)
-    val bodyCast = q"$body.asInstanceOf[${getApplicativeMapOnObjects(c)(applicative)}[$resultType]]"
-
-    if (wildcards.isEmpty)
-      // special case needed here due to SI-1503
-      cq"$recordIdent => $bodyCast"
-    else
-      cq"$myName @ $recordIdent(..$wildcards) => $bodyCast"
-  }
+  ): c.universe.CaseDef =
+    recordCaseDef(c)(record) {
+      case (arg, fieldNames) =>
+        import c.universe._
+        val argType = meaning(c)(typeVar rename mangleA)
+        val argCast = q"$arg.asInstanceOf[$argType]"
+        val body = generateDefTraverseBody(c)(argCast, typeVar, mangleA, mangleB, env, applicative)
+        val resultType = meaning(c)(_super rename mangleB)
+        q"$body.asInstanceOf[${getApplicativeMapOnObjects(c)(applicative)}[$resultType]]"
+    }
 
   def generateRecordBody(c: Context)(
     mA: c.Tree,
-    datatype: Record,
+    record: Record,
     mangleA: Map[Name, Name],
     mangleB: Map[Name, Name],
     env: Map[Name, c.Tree => c.Tree],
     applicative: c.TermName
   ): c.universe.CaseDef = {
     import c.universe._
-    def resultType = meaning(c)(datatype rename mangleB)
-    def mkPure(x: Tree): Tree = q"$applicative.pure[$resultType]($x)"
-    datatype match {
-      case Record(name, fields) =>
-        if (fields.size == 0) {
-          val ident = Ident(TermName(name))
-          cq"$ident => ${mkPure(ident)}"
-        }
-        else {
-          val caseName = TermName(name)
-          val fieldNames = fields.map(field => TermName(c freshName field.name))
-          val fieldBindings = fieldNames.map(name => Bind(name, q"${termNames.WILDCARD}"))
-          val body = mkCallTree(c)(
-            applicative,
-            mkPureConstructor(c)((datatype rename mangleB).asInstanceOf[Record], applicative) +:
-              fieldNames.zip(fields).map({
-                case (name, Field(_, body)) =>
-                  generateDefTraverseBody(c)(q"$name", body, mangleA, mangleB, env, applicative)
-              }))
-          cq"$caseName(..$fieldBindings) => $body"
-        }
+    recordCaseDef(c)(record) {
+      case (recordName, fieldNames) if fieldNames.size > 0 =>
+        mkCallTree(c)(
+          applicative,
+          mkPureConstructor(c)((record rename mangleB).asInstanceOf[Record], applicative) +:
+            fieldNames.zip(record.fields).map({
+              case (name, Field(_, body)) =>
+                generateDefTraverseBody(c)(q"$name", body, mangleA, mangleB, env, applicative)
+            }))
+
+      case (recordName, fieldNames) if fieldNames.size == 0 =>
+        val resultType = meaning(c)(record rename mangleB)
+        q"$applicative.pure[$resultType]($recordName)"
     }
+  }
+
+  /** from record, create `case recordName @ Record(fieldNames @ _*) => body`
+    * where body = mkBody(recordName, fieldNames)
+    */
+  def recordCaseDef(c: Context)(record: Record)(mkBody: (c.TermName, Many[c.TermName]) => c.Tree): c.universe.CaseDef = {
+    import c.universe._
+    val recordIdentName = TermName(record.name)
+    val recordIdent = Ident(recordIdentName)
+    val recordName = TermName(c freshName record.name)
+    val fieldNames = record.fields.map(field => TermName(c freshName field.name))
+    val fieldBindings = fieldNames.map(name => Bind(name, Ident(termNames.WILDCARD)))
+    if (fieldNames.isEmpty)
+      cq"$recordIdent => ${mkBody(recordIdentName, fieldNames)}"
+    else
+      cq"$recordName @ $recordIdent(..$fieldBindings) => ${mkBody(recordName, fieldNames)}"
   }
 
   def mkCallTree(c: Context)(applicative: c.TermName, leaves: Many[c.Tree]): c.Tree = {
