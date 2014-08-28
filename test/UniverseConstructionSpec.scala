@@ -6,7 +6,7 @@ import DatatypeRepresentation._
 
 import nominal.annotation.datatype
 
-class UniverseConstructionSpec extends FlatSpec {
+class UniverseConstructionSpec extends FlatSpec with Coercion {
   import UniverseConstruction.Tests._
 
   @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
@@ -21,7 +21,7 @@ class UniverseConstructionSpec extends FlatSpec {
             Field("tail", Hole("L"))))))))
     }
 
-    val xs: IntList = Cons(1, Cons(2, Cons(3, Cons(4, Nil))))
+    val xs: IntList = coerce(Cons(1, Cons(2, Cons(3, Cons(4, Nil)))))
 
     info(s"xs = $xs")
   }
@@ -42,7 +42,7 @@ class UniverseConstructionSpec extends FlatSpec {
 
     val my = mkMy[Int]
 
-    val xs: my.List = Cons(1, Cons(2, Cons(3, Cons(4, Nil))))
+    val xs: my.List = coerce(Cons(1, Cons(2, Cons(3, Cons(4, Nil)))))
 
     info(s"xs = $xs")
   }

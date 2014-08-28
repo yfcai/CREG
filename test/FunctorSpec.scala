@@ -6,7 +6,7 @@ import nominal.functors._
 // ISSUE: universe.Type.dealias does not work in class scope
 // should post StackOverflow question.
 
-class FunctorSpec extends FlatSpec {
+class FunctorSpec extends FlatSpec with Coercion {
   @datatype trait List[+A] {
     Nil
     Cons(head = A, tail = List)
@@ -15,9 +15,9 @@ class FunctorSpec extends FlatSpec {
   object List {
     def apply[T](elems: T*): List[T] =
       if (elems.isEmpty)
-        Nil
+        coerce(Nil)
       else
-        Cons(elems.head, apply(elems.tail: _*))
+        coerce(Cons(elems.head, apply(elems.tail: _*)))
   }
 
   // this should be generated

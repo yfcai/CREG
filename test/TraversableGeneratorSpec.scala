@@ -5,7 +5,7 @@ import nominal.annotation.datatype
 
 import scala.tools.reflect.ToolBoxError
 
-class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
+class TraversableGeneratorSpec extends FlatSpec with Coercion with nominal.util.EvalScala {
   import TraversableGenerator.Tests._
 
   @datatype trait List[+A] {
@@ -22,33 +22,16 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
   @c123 object Dummy
 
   val x12: List[Int] =
-    Cons(1, Cons(2, Nil))
+    coerce(Cons(1, Cons(2, Nil)))
 
-  // this breaks implicit resolution in horrific ways
-  //
-  // implicit def whut[A, B <% A, T <% List[A]](c: Cons[B, T]): List[A] =
-  //   Cons(c.head: A, c.tail: List[A])
-  //
-  // it is intended to support the following syntax, in vain:
-  //
-  // val x14: List[List[Int]] = Cons(Nil, Cons(1, Nil), ..., Nil)
-
-  // resolving to semi-manual list construction
-  object List {
-    def apply[T](elems: T*): List[T] =
-      if (elems.isEmpty)
-        Nil
-      else
-        Cons(elems.head, apply(elems.tail: _*))
-  }
-
-  val x14: List2.Map[Int] =
-    List(
-      List(),
-      List(1),
-      List(1, 2),
-      List(1, 2, 3),
-      List(1, 2, 3, 4))
+  val x14: List2.Map[Int] = coerce(
+    Cons(
+      Nil, Cons(
+        Cons(1, Nil), Cons(
+          Cons(1, Cons(2, Nil)), Cons(
+            Cons(1, Cons(2, Cons(3, Nil))), Cons(
+              Cons(1, Cons(2, Cons(3, Cons(4, Nil)))), Nil)))))
+  )
 
   type TC3 = C3.Map[String, Either[Int, Boolean]]
 
@@ -87,14 +70,15 @@ class TraversableGeneratorSpec extends FlatSpec with nominal.util.EvalScala {
     assert(x14_sum == 1 + (1 + 2) + (1 + 2 + 3) + (1 + 2 + 3 + 4))
 
     val x25 = List2(x14) map (_ + 1)
-    assert(x25 ==
-      List(
-        List(),
-        List(2),
-        List(2, 3),
-        List(2, 3, 4),
-        List(2, 3, 4, 5)))
-
+    val x25_expected: List[List[Int]] = coerce(
+      Cons(
+        Nil, Cons(
+          Cons(2, Nil), Cons(
+            Cons(2, Cons(3, Nil)), Cons(
+              Cons(2, Cons(3, Cons(4, Nil))), Cons(
+                Cons(2, Cons(3, Cons(4, Cons(5, Nil)))), Nil)))))
+    )
+    assert(x25 == x25_expected)
   }
 
   it should "generate traversals for recursion at variant case position" in {

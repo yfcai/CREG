@@ -1,12 +1,11 @@
 import org.scalatest._
 import nominal.functors._
 import nominal.lib._
-import nominal.annotation.dataWithoutImplicits
 
 import scala.language.experimental.macros
 
 class CoercionSpec extends FlatSpec with Coercion {
-  @dataWithoutImplicits trait List[A] {
+  @datatype trait List[A] {
     Nil
     Cons(head = A, tail = List)
   }

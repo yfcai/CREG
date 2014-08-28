@@ -24,9 +24,6 @@ extends Parser
   // enable implicit constructors by default
   // TODO: disable them after fixed point typing macro is done
   def vanillaImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
-    expandData(c)(annottees, Set(Flag.ImplicitConstructor))
-
-  def noImplicitsImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
     expandData(c)(annottees, Set())
 
   def expandData(c: Context)(annottees: Seq[c.Expr[Any]], options: Set[Flag.Flag]): c.Expr[Any] = {
@@ -126,8 +123,4 @@ extends Parser
 
 class datatype extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro datatype.vanillaImpl
-}
-
-class dataWithoutImplicits extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro datatype.noImplicitsImpl
 }

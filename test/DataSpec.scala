@@ -2,7 +2,7 @@ import org.scalatest._
 import nominal.functors.datatype
 import nominal.lib._
 
-class DataSpec extends FlatSpec {
+class DataSpec extends FlatSpec with Coercion {
   import language.implicitConversions
   import language.higherKinds
 
@@ -415,7 +415,9 @@ class DataSpec extends FlatSpec {
     }
 
     val firstNinePrimes: List[Int] =
-      Cons(2, Cons(3, Cons(5, Cons(7, Cons(11, Cons(13, Cons(17, Cons(19, Cons(23, Nil)))))))))
+      coerce(
+        Cons(2, Cons(3, Cons(5, Cons(7, Cons(11, Cons(13, Cons(17, Cons(19, Cons(23, Nil)))))))))
+      )
 
     def sum(xs: List[Int]) = xs.fold[Int] {
       case Nil => 0

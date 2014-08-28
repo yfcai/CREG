@@ -5,11 +5,9 @@ import nominal.functors._
 // maybe should include .lib in .functors?
 import nominal.lib._
 
-import nominal.annotation.dataWithoutImplicits
-
 object Main extends App with Coercion {
 
-  @dataWithoutImplicits trait Term {
+  @datatype trait Term {
     Void
     Var(name = String)
     Abs(param = String, body = Term)
