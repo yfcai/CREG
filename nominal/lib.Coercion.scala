@@ -208,8 +208,9 @@ object Coercion extends UniverseConstruction {
 
   def adjust(c: Context)(arg: c.Tree, actual: c.Type, expected: c.Type): Adjustment[c.Tree] = {
     import c.universe._
-    if (isScalaSubtype(c)(actual, expected))
-      NoChange
+    val trivialAdjustment = adjustTrivially(c)(arg, actual, expected)
+    if (trivialAdjustment.nonEmpty)
+      trivialAdjustment.get
     else {
       val (actualRep, expectedRep) = (representOnce(c)(actual), representOnce(c)(expected))
       (actualRep, expectedRep) match {
@@ -231,6 +232,22 @@ object Coercion extends UniverseConstruction {
         // variant to fixed point, fixed point to variant, etc
         case _ =>
           TypeError
+      }
+    }
+  }
+
+  // either no change, or call an implicit
+  def adjustTrivially(c: Context)(arg: c.Tree, actual: c.Type, expected: c.Type): Option[Adjustment[c.Tree]] = {
+    import c.universe._
+    if (isScalaSubtype(c)(actual, expected))
+      Some(NoChange)
+    else {
+      c.inferImplicitView(arg, actual, expected) match {
+        case q"" =>
+          None
+
+        case view =>
+          Some(Adjusted(q"$view($arg)"))
       }
     }
   }

@@ -5,9 +5,11 @@ import nominal.functors._
 // maybe should include .lib in .functors?
 import nominal.lib._
 
+import nominal.annotation.dataWithoutImplicits
+
 object Main extends App with Coercion {
 
-  @datatype trait Term {
+  @dataWithoutImplicits trait Term {
     Void
     Var(name = String)
     Abs(param = String, body = Term)
@@ -117,19 +119,19 @@ object Main extends App with Coercion {
   // Execution begins
 
   // \x -> x
-  val id: Term = coerce(Abs("x", Var("x")))
+  val id: Term = coerce(Abs("x", "x"))
 
   // (\x -> x) y
-  val idy: Term = coerce(App(id, Var("y")))
+  val idy: Term = coerce(App(id, "y"))
 
   // \x -> f (x y)
-  val f_xy: Term = coerce(Abs("x", App(Var("f"), App(Var("x"), Var("y")))))
+  val f_xy: Term = coerce(Abs("x", App("f", App("x", "y"))))
 
   // \y -> (f x) y
-  val fx_y: Term = coerce(Abs("y", App(App(Var("f"), Var("x")), Var("y"))))
+  val fx_y: Term = coerce(Abs("y", App(App("f", "x"), "y")))
 
   // \f -> f (\z -> ())
-  val fzv: Term = coerce(Abs("f", App(Var("f"), Abs("z", Void))))
+  val fzv: Term = coerce(Abs("f", App("f", Abs("z", Void))))
 
   def put (name: String, obj : Any ) = println(s"$name = $obj")
   def show(name: String, term: Term) = put(name, pretty(term))
@@ -143,9 +145,9 @@ object Main extends App with Coercion {
       show(name, term)
       put(s"freevars($name)", freevars(term))
       show(s"prependUnderscore($name)", prependUnderscore(term))
-      List(
-        ("y", App("x", "x")),
-        ("y", App("x", "y"))
+      List[(String, Term)](
+        ("y", coerce(App("x", "x"))),
+        ("y", coerce(App("x", "y")))
       ).foreach {
         case (y, ysub) =>
           val s1 = subst1(y, ysub, term)
