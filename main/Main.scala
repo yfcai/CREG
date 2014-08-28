@@ -117,21 +117,19 @@ object Main extends App with Coercion {
   // Execution begins
 
   // \x -> x
-  // coercion still can't deal with nesting. (27.08.2014)
-  // figure this out before deploying it further.
-  val id: Term = coerce(Abs("x", coerce(Var("x")): Term))
+  val id: Term = coerce(Abs("x", Var("x")))
 
   // (\x -> x) y
-  val idy: Term = App(id, "y")
+  val idy: Term = coerce(App(id, Var("y")))
 
   // \x -> f (x y)
-  val f_xy: Term = Abs("x", App("f", App("x", "y")))
+  val f_xy: Term = coerce(Abs("x", App(Var("f"), App(Var("x"), Var("y")))))
 
   // \y -> (f x) y
-  val fx_y: Term = Abs("y", App(App("f", "x"), "y"))
+  val fx_y: Term = coerce(Abs("y", App(App(Var("f"), Var("x")), Var("y"))))
 
   // \f -> f (\z -> ())
-  val fzv: Term = Abs("f", App("f", Abs("z", Void)))
+  val fzv: Term = coerce(Abs("f", App(Var("f"), Abs("z", Void))))
 
   def put (name: String, obj : Any ) = println(s"$name = $obj")
   def show(name: String, term: Term) = put(name, pretty(term))

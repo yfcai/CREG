@@ -14,7 +14,6 @@ import scala.language.implicitConversions
 import scala.language.experimental.macros
 
 import scala.reflect.macros.blackbox.Context
-import scala.reflect.macros.whitebox.{ Context => WhiteContext }
 
 import compiler._
 import DatatypeRepresentation._
@@ -59,8 +58,28 @@ object Coercion extends UniverseConstruction {
     (arg: c.Tree)
     (witness: c.Tree)
     (implicit actualTag: c.WeakTypeTag[Actual], expectedTag: c.WeakTypeTag[Expected]):
-      c.Tree = {
-    performCoercion(c)(arg, actualTag.tpe, expectedTag.tpe)
+      c.Tree = try {
+    import c.universe._
+
+    val argName = TermName(c freshName "coerced")
+    val result = performCoercion(c)(q"$argName", actualTag.tpe, expectedTag.tpe)
+
+    q"""{
+      val $argName = $arg
+      $result
+    }"""
+  }
+  catch {
+    case e: Throwable =>
+      if (
+        false && // disable stack trace printing
+        ! isNothingType(expectedTag.tpe)
+      ) {
+        println(e.getMessage)
+        println(e.printStackTrace)
+        println
+      }
+      throw e
   }
 
   def performCoercion(c: Context)(arg: c.Tree, actualType: c.Type, expectedType: c.Type): c.Tree = {
@@ -68,15 +87,15 @@ object Coercion extends UniverseConstruction {
     val actual = representOnce(c)(actualType)
     val expected = representOnce(c)(expectedType)
     (actual, expected) match {
+
       // actual & expected has compatible runtime type. do a cast.
+      // question: can `adjust` subsume this?
       case _ if compatibleRuntimeTypes(c)(actualType, expectedType) =>
         q"$arg.asInstanceOf[$expectedType]"
 
-      case (FixedPoint(_, _), FixedPoint(_, _)) =>
-        sys error s"TODO: coercion between fixed points\nfrom: $actual\n..to: $expected"
-
       // from non-fixed to fixed: auto-roll at top level
-      case (actual, expected @ FixedPoint(_, _))
+      // record case replaced by auto-rolling at all levels (record-only for now)
+      case (actual @ Variant(_, _), expected @ FixedPoint(_, _))
           if isScalaSubtype(c)(scalaType(c)(actual), scalaType(c)(expected.unrollOnce)) =>
         val tq"$fix[$functor]" = meaning(c)(expected)
         q"${getRoll(c)}[$functor]($arg)"
@@ -86,14 +105,25 @@ object Coercion extends UniverseConstruction {
           if isScalaSubtype(c)(scalaType(c)(actual.unrollOnce), scalaType(c)(expected)) =>
         q"$arg.unroll"
 
-      // otherwise it's unsound.
-      // somehow the first error message gets eaten and we're left with something about Nothing.
-      case _ =>
-        abortWithError(c)(
-          c.enclosingPosition,
-          s"cannot coerce $actualType to $expectedType")
+      case (actual, expected) => adjust(c)(arg, actualType, expectedType) match {
+        case TypeError =>
+          if (! isNothingType(expectedType))
+            c.echo(arg.pos, s"ERROR: cannot coerce $actualType to $expectedType")
+          abortWithError(c)(
+            c.enclosingPosition,
+            s"type error during coercion, see above.")
+
+        case NoChange =>
+          arg
+
+        case Adjusted(code) =>
+          code
+      }
     }
   }
+
+  def isNothingType(tpe: Context#Type): Boolean =
+    tpe.typeSymbol.fullName == "scala.Nothing"
 
   def compatibleRuntimeTypes(c: Context)(actual: c.Type, expected: c.Type): Boolean =
     isSubDatatype(c)(Set.empty, actual, expected).nonEmpty
@@ -124,7 +154,7 @@ object Coercion extends UniverseConstruction {
           println
           println(supertype)
           println
-          sys error "reached 300 assumptions"
+          return None
         }
 
         (subRep, superRep) match {
@@ -168,6 +198,81 @@ object Coercion extends UniverseConstruction {
     c.inferImplicitValue(treeToType(c)(tq"$subtype <:< $supertype")) match {
       case q"" => false
       case _ => true
+    }
+  }
+
+  sealed trait Adjustment[+T]
+  case object TypeError extends Adjustment[Nothing]
+  case object NoChange extends Adjustment[Nothing]
+  case class Adjusted[T](code: T) extends Adjustment[T]
+
+  def adjust(c: Context)(arg: c.Tree, actual: c.Type, expected: c.Type): Adjustment[c.Tree] = {
+    import c.universe._
+    if (isScalaSubtype(c)(actual, expected))
+      NoChange
+    else {
+      val (actualRep, expectedRep) = (representOnce(c)(actual), representOnce(c)(expected))
+      (actualRep, expectedRep) match {
+        // record to fixed point
+        case (actualRecord @ Record(_, _), fixed @ FixedPoint(fixedName, Variant(header, records))) =>
+          records.find(_.name == actualRecord.name) match {
+            case Some(expectedRecord0 @ Record(_, _)) =>
+              val expectedRecord = (expectedRecord0 subst (fixedName, fixed)).asInstanceOf[Record]
+              val tq"$fix[$functor]" = meaning(c)(expectedRep)
+              adjustRecordBody(c)(arg, actualRecord, expectedRecord) match {
+                case Some(body) => Adjusted(q"${getRoll(c)}[$functor]($body)")
+                case None => TypeError
+              }
+
+            // no record of identical name found
+            case _ => TypeError
+          }
+
+        // variant to fixed point, fixed point to variant, etc
+        case _ =>
+          TypeError
+      }
+    }
+  }
+
+  def adjustRecordBody(c: Context)(arg: c.Tree, actual: Record, expected: Record): Option[c.Tree] = {
+    import c.universe._
+    if (
+      actual.name != expected.name ||
+      actual.fields.map(_.name) != expected.fields.map(_.name)
+    )
+      None
+    else if (actual.fields.isEmpty)
+      Some(arg)
+    else {
+      val subAdjustments = actual.fields.zip(expected.fields).foldRight[Option[List[c.Tree]]](Some(Nil)) {
+        case (_, None) =>
+          None
+
+        case ((Field(fieldName, fieldRep), Field(_, expectedFieldRep)), Some(otherCode)) =>
+          val projectedArg = q"$arg.${TermName(fieldName)}"
+          val (fieldType, expectedFieldType) = (scalaType(c)(fieldRep), scalaType(c)(expectedFieldRep))
+          adjust(c)(projectedArg, fieldType, expectedFieldType) match {
+            case TypeError =>
+              None
+
+            case NoChange =>
+              Some(otherCode)
+
+            case Adjusted(code) =>
+              Some(q"${TermName(fieldName)} = $code" :: otherCode)
+          }
+      }
+      subAdjustments match {
+        case None =>
+          None
+
+        case Some(adjustments) if adjustments.isEmpty =>
+          Some(arg)
+
+        case Some(adjustments) if adjustments.nonEmpty =>
+          Some(q"$arg.copy(..$adjustments)")
+      }
     }
   }
 }
