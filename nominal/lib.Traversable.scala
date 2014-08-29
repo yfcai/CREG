@@ -10,9 +10,18 @@ object Traversable {
     type Cat = Any
     type Map[+X] = F[X]
   }
+
+  def compose[F[+_], G[+_]](f: Endofunctor[F], g: Endofunctor[G]):
+      Endofunctor[({ type λ[+X] = F[G[X]] })#λ] =
+    new Traversable {
+      type Cat = Any
+      type Map[+X] = F[G[X]]
+      def traverse[H[+_]: Applicative.Endofunctor, A, B](h: A => H[B], m: F[G[A]]): H[F[G[B]]] =
+        f.traverse[H, G[A], G[B]](ga => g.traverse(h, ga), m)
+    }
 }
 
-trait Traversable {
+trait Traversable { thisFunctor =>
   // traversable functors can be defined on a subcategory
   type Cat
   type Map[+A <: Cat]
