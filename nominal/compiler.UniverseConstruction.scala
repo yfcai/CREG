@@ -397,7 +397,9 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
           // given that `tpe` is not a leaf.
           //
           // empty records are leaves and their types are abstract.
-          if (symbol.isAbstract) {
+          if (symbol.isAbstract && overriddenByTypeParam(overrider, care))
+            IDoCare(overrider.get)
+          else if (symbol.isAbstract) {
 
             // if there's an overrider, it should not be anything that cannot expand to a variant
             require(
@@ -472,6 +474,12 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
     }
 
   }
+
+  def overriddenByTypeParam(overrider: Option[Datatype], care: Set[Name]): Boolean =
+    overrider match {
+      case Some(TypeVar(x)) => care(x)
+      case _ => false
+    }
 
   // requires `tpe` be dealiased
   def isFixedPointOfSomeFunctor(c: Context)(tpe: c.Type): Boolean = {
