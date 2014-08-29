@@ -13,3 +13,8 @@ class datatype extends StaticAnnotation {
 class functor extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro annotation.functor.impl
 }
+
+object coerce {
+  def apply[S, T](arg: S)(implicit witness: lib.Fix.TypeWitness[T]): T =
+    macro lib.Coercion.coerceImpl[S, T]
+}
