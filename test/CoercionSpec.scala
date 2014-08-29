@@ -10,6 +10,11 @@ class CoercionSpec extends FlatSpec with Coercion {
     Cons(head = A, tail = List)
   }
 
+  def listF[A] = {
+    @functor val listF = L => List { Cons(A, L) }
+    listF
+  }
+
   type ILF[+X] = ListF[Int, X]
   type ILT = ListT[Nil, Cons[Int, List[Int]]]
 
@@ -93,5 +98,13 @@ class CoercionSpec extends FlatSpec with Coercion {
 
     val list5: ListF[Cons[Int, Nil], Nil] = Cons(Cons(3, Nil), Nil)
     val list6: ListF[List[Int], List[List[Int]]] = coerce(list5)
+
+    def ana[A, T](seed: T)(coalgebra: T => ListF[A, T]): List[A] =
+      coerce( listF[A](coalgebra(seed)) map (x => ana(x)(coalgebra)) )
+  }
+
+  it should "unroll fixed points as appropriate" in {
+    val intList: List[Int] = coerce(Cons(3, Nil))
+    val ints: ILT = coerce(intList)
   }
 }
