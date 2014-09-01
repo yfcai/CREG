@@ -315,7 +315,7 @@ trait TraversableGenerator extends SynonymGenerator {
     import c.universe._
     val recordIdentName = TermName(record.name)
     val recordIdent = Ident(recordIdentName)
-    val recordName = TermName(c freshName record.name)
+    val recordName = TermName(c freshName record.name.toLowerCase)
     val fieldNames = record.fields.map(field => TermName(c freshName field.name))
     val fieldBindings = fieldNames.map(name => Bind(name, Ident(termNames.WILDCARD)))
     if (fieldNames.isEmpty)
