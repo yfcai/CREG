@@ -147,11 +147,19 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   // FROM SCALA TO DATATYPE //
   // ====================== //
 
+  object UC extends Enumeration {
+    type Flag = Value
+    type Flags = Set[Flag]
+    val AllowFixedPointsOfConstantFunctors = Value
+
+    implicit val defaultFlags: Flags = Set.empty
+  }
+
   def nothingType: String = "_root_.scala.Nothing"
   def anyType: String = "_root_.scala.Any"
 
   /** flesh out parsed datatype with some cases/fields omitted */
-  def fleshOut(c: Context)(raw: DataConstructor): DataConstructor = {
+  def fleshOut(c: Context)(raw: DataConstructor)(implicit flags: UC.Flags): DataConstructor = {
     val care = raw.params.view.map(_.name).toSet
 
     // have to consider that the whole body is a typevar
@@ -166,12 +174,13 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
         treeToType(c)(c.universe.TypeTree())
     }
 
-    val body = representation(c)(tpe, care, Some(raw.body))
+    val body = representation(c)(tpe, care, Some(raw.body))(flags)
     DataConstructor(raw.params, body)
   }
 
-  def representation(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype]): Datatype =
-    carePackage(c)(tpe, care, overrider).get
+  def representation(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype])
+      (implicit flags: UC.Flags): Datatype =
+    carePackage(c)(tpe, care, overrider)(flags).get
 
   /** starting type hidden in an overrider; in other words, the entry point */
   def startingType(c: Context)(body: Datatype, care: Set[Name]): Option[c.Type] = 
@@ -294,8 +303,9 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
   def carePackage(c: Context)(
     tpe0: c.Type,
     care: Set[Name],
-    overrider: Option[Datatype]
-  ): DoICare = {
+    overrider: Option[Datatype])
+    (implicit flags: UC.Flags): DoICare =
+  {
     // dealiasing is not recursive. do it here.
     val tpe = (overrider flatMap (x => startingType(c)(x, care)) getOrElse tpe0).dealias
 
@@ -315,59 +325,66 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
       if (isFixedPointOfSomeFunctor(c)(tpe)) {
         import c.universe._
 
-        // name the fixed point
-        val fixedPointName = c.freshName("Fixed").toString
-        assert(
-          ! care(fixedPointName),
-          s"500 internal error: Context.freshName produces the clashing name $fixedPointName")
-        val newCare = care + fixedPointName
+        // handle overridden fixed points
+        if (overriddenByTypeParam(overrider, care))
+          IDoCare(overrider.get)
+        else {
 
-        // get the functor
-        val List(functor) = tpe.typeArgs
-        val unrolledTpe = functor.etaExpand.resultType.substituteTypes(
-          functor.typeParams,
-          List(dodgeFreeTypeVariables(c)(tq"${TypeName(fixedPointName)}", newCare)))
+          // name the fixed point
+          val fixedPointName = c.freshName("Fixed").toString
+          assert(
+            ! care(fixedPointName),
+            s"500 internal error: Context.freshName produces the clashing name $fixedPointName")
+          val newCare = care + fixedPointName
 
-        // adjust overrider
-        // it has to be a variant whose typeVar reflects the overriders
-        def adjustOverrider(overrider: Option[Datatype]): Option[Datatype] = overrider match {
-          case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
+          // get the functor
+          val List(functor) = tpe.typeArgs
+          val unrolledTpe = functor.etaExpand.resultType.substituteTypes(
+            functor.typeParams,
+            List(dodgeFreeTypeVariables(c)(tq"${TypeName(fixedPointName)}", newCare)))
 
-            Some(Variant(
-              // e. g., replace "List" by "ListT[..., ...]"
-              TypeVar(typeToCode(c)(unrolledTpe)),
+          // adjust overrider
+          // it has to be a variant whose typeVar reflects the overriders
+          def adjustOverrider(overrider: Option[Datatype]): Option[Datatype] = overrider match {
+            case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
 
-              // e. g., rename "List" to `fixedPointName`
-              nominals.map { nominal =>
-                nominal.replaceBody(
-                  nominal.get everywhere {
-                    case TypeVar(name) if name == fixedPointDataTag =>
-                      TypeVar(fixedPointName)
-                  }
-                )
-              }
-            ))
+              Some(Variant(
+                // e. g., replace "List" by "ListT[..., ...]"
+                TypeVar(typeToCode(c)(unrolledTpe)),
 
-          // convert `Term` to `Term {}`, coz the first case is tough to handle downstream
-          case Some(header @ TypeVar(_)) =>
-            adjustOverrider(Some(Variant(header, Many.empty)))
+                // e. g., rename "List" to `fixedPointName`
+                nominals.map { nominal =>
+                  nominal.replaceBody(
+                    nominal.get everywhere {
+                      case TypeVar(name) if name == fixedPointDataTag =>
+                        TypeVar(fixedPointName)
+                    }
+                  )
+                }
+              ))
 
-          case otherwise =>
-            otherwise
-        }
+            // convert `Term` to `Term {}`, coz the first case is tough to handle downstream
+            case Some(header @ TypeVar(_)) =>
+              adjustOverrider(Some(Variant(header, Many.empty)))
 
-        val newOverrider = adjustOverrider(overrider)
+            case otherwise =>
+              otherwise
+          }
 
-        // since I care about tpe, I should also care about it when it's unrolled
-        carePackage(c)(unrolledTpe, newCare, newOverrider) match {
-          case IDoCare(result) =>
-            if (result hasFreeOccurrencesOf fixedPointName)
-              IDoCare(FixedPoint(fixedPointName, result))
-            else
-              IDoCare(result)
+          val newOverrider = adjustOverrider(overrider)
 
-          case IDontCare(TypeVar(body)) =>
-            sys error "FIXME: this should not happen, right?"
+          // since I care about tpe, I should also care about it when it's unrolled
+          carePackage(c)(unrolledTpe, newCare, newOverrider)(flags) match {
+            case IDoCare(result) =>
+              if ( flags(UC.AllowFixedPointsOfConstantFunctors)
+                || (result hasFreeOccurrencesOf fixedPointName) )
+                IDoCare(FixedPoint(fixedPointName, result))
+              else
+                IDoCare(result)
+
+            case IDontCare(TypeVar(body)) =>
+              sys error "FIXME: this should not happen, right?"
+          }
         }
       }
       else {
@@ -379,7 +396,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
         // recursive calls
         val childCare = tpe.typeArgs.zip(suboverriders).map {
           case (child, overrider) =>
-            carePackage(c)(child, care, overrider)
+            carePackage(c)(child, care, overrider)(flags)
         }
 
         // I should care about `tpe` if I care about at least one of its children
@@ -443,7 +460,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
                   typeArg,
                   typeArg.typeArgs.zip(subsuboverriders).map {
                     case (tpe, overrider) =>
-                      carePackage(c)(tpe, care, overrider)
+                      carePackage(c)(tpe, care, overrider)(flags)
                   })
             })(collection.breakOut)
             IDoCare(Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases))

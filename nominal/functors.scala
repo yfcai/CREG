@@ -11,7 +11,11 @@ class datatype extends StaticAnnotation {
 }
 
 class functor extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro annotation.functor.impl
+  def macroTransform(annottees: Any*): Any = macro annotation.functor.defaultImpl
+}
+
+class functorNoUnroll extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro annotation.functor.implNoUnroll
 }
 
 object coerce {

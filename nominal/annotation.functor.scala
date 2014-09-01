@@ -19,12 +19,18 @@ object functor extends Parser with TraversableGenerator with util.AbortWithError
   private[this] def classLevelSignal(c: Context)(name: c.TermName): Boolean =
     name.toString == c.universe.termNames.WILDCARD.toString
 
-  def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+  def defaultImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
+    impl(c)(annottees, UC.defaultFlags)
+
+  def implNoUnroll(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
+    impl(c)(annottees, Set(UC.AllowFixedPointsOfConstantFunctors))
+
+  def impl(c: Context)(annottees: Seq[c.Expr[Any]], flags: UC.Flags): c.Expr[Any] = {
     import c.universe._
     annottees match {
       case Seq(Expr(ValDef(mods, name, emptyType @ TypeTree(), tree))) =>
         val input = parseOrAbort(c)(FunctorP, tree)
-        val rep = fleshOut(c)(input)
+        val rep = fleshOut(c)(input)(flags)
         val instance = generateTraversable(c)(rep)
 
         if (classLevelSignal(c)(name))
@@ -40,5 +46,9 @@ object functor extends Parser with TraversableGenerator with util.AbortWithError
 }
 
 class functor extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro functor.impl
+  def macroTransform(annottees: Any*): Any = macro functor.defaultImpl
+}
+
+class functorNoUnroll extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro functor.implNoUnroll
 }
