@@ -10,6 +10,11 @@ trait Applicative {
   type Map[+X]
   def pure[A](x: A): Map[A]
   def call[A, B](f: Map[A => B], x: Map[A]): Map[B]
+
+  def roll[F[+_]](x: Map[F[Fix[F]]]): Map[Fix[F]] =
+    call(
+      pure[F[Fix[F]] => Fix[F]](y => Roll(y)),
+      x)
 }
 
 // specific applicative functors
