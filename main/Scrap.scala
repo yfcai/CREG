@@ -156,7 +156,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Person => W[Person] =
-      person => functor(person).traverse(sp[String], sp[String])(apl)
+      person => functor(person).traverse(sp[Name], sp[Address])(apl)
   }
 
   implicit object dataEmployee extends Term[Employee] {
@@ -186,30 +186,29 @@ object Scrap {
 
     new Term[List[A]] {
       val functor = {
-        @functorNoUnroll val fun = (x, xs) => List[A] { Cons(x, xs) }
+        @functor val fun = (x, xs) => List[A] { Cons(x, xs) }
         fun
       }
 
       implicit val genList: Term[List[A]] = this
 
       def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): List[A] => W[List[A]] =
-        xs => functor(
-          xs.asInstanceOf[functor.Map[A, List[A]]]
-        ).traverse(sp[A], sp[List[A]])(apl
-        ).asInstanceOf[W[List[A]]]
+        xs => apl.roll[({ type λ[+X] = functor.Map[A, X] })#λ] {
+          functor(xs.unroll).traverse(sp[A], sp[List[A]])(apl)
+        }
     }
   }
 
   implicit object departmentTerm extends Term[Department] {
     val functor = {
-      @functorNoUnroll val fun = (name, manager, subunit) => Department { D(name, manager, subunit) }
+      @functor val fun = (name, manager, subunit) => Department { D(name, manager, subunit) }
       fun
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Department => W[Department] =
-      dept => functor(
-        dept.asInstanceOf[functor.Map[Name, Manager, List[SubUnit]]]
-      ).traverse(sp[Name], sp[Manager], sp[List[SubUnit]])(apl).asInstanceOf[W[Department]]
+      dept => apl.roll[deptF.Map] {
+        functor(dept.unroll).traverse(sp[Name], sp[Manager], sp[List[SubUnit]])(apl)
+      }
   }
 
   implicit object companyTerm extends Term[Company] {
