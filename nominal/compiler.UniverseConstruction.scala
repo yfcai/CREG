@@ -277,7 +277,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
           case other =>
             abortWithError(c)(
               c.enclosingPosition,
-              s"representOnce: expect record, got $other")
+              s"representOnce on $tpe:\n expect record, got $other")
         }
       })(collection.breakOut)
 
