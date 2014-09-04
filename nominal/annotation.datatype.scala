@@ -21,8 +21,6 @@ extends Parser
     val ImplicitConstructor = Value
   }
 
-  // enable implicit constructors by default
-  // TODO: disable them after fixed point typing macro is done
   def vanillaImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
     expandData(c)(annottees, Set())
 
