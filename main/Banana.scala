@@ -19,7 +19,7 @@ object Banana {
 
   implicit class ListIsMappable[A](xs: List[A]) {
     def map[B](f: A => B): List[B] = {
-      @functor val elemF = Elem => List { Nil ; Cons(Elem, List) }
+      @functor val elemF = elem => List { Nil ; Cons(elem, List) }
 
       // alternatively:
       //@functor val list = Elem => List[Elem]
@@ -30,7 +30,7 @@ object Banana {
 
   // pattern functor
   def listF[A] = {
-    @functor val fun = T => List { Cons(A, T) }
+    @functor val fun = rec => List { Cons(A, rec) }
     fun
   }
 
@@ -94,7 +94,7 @@ object Banana {
 
     type Paired[+X] = F[Pair[Fix[F], X]]
 
-    @functor val sndF = Y => Pair { MkPair(Fix[F], Y) }
+    @functor val sndF = y => Pair { MkPair(Fix[F], y) }
     // but not: Y => Pair[Fix[F], Y]. should investigate.
 
     val pairingF = compose[F, sndF.Map](functor, sndF)
@@ -112,7 +112,7 @@ object Banana {
   @datatype trait Nat { Zero ; Succ(Nat) }
 
   val natF = {
-    @functor val fun = N => Nat { Succ(N) }
+    @functor val fun = n => Nat { Succ(n) }
     fun
   }
 

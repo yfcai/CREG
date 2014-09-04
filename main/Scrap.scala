@@ -35,9 +35,9 @@ object Scrap {
   type Address    = String
 
   val deptF = {
-    @functor val deptF = Department => Dept {
+    @functor val deptF = department => Dept {
       // BUG: does not work if we write D(Name, Manager, List { ... }) instead.
-      D(subunits = List { Cons(head = SubU { DU(Department) }) })
+      D(subunits = List { Cons(head = SubU { DU(department) }) })
     }
     deptF
   }
@@ -128,7 +128,7 @@ object Scrap {
 
   class DataWithConstantFunctor[T: TypeTag] extends Data[T] {
     val functor = {
-      @functor val constantFunctor = F => T
+      @functor val constantFunctor = _ => T
       constantFunctor
     }
 
@@ -141,7 +141,7 @@ object Scrap {
 
   implicit object salaryData extends Data[Salary] {
     val functor = {
-      @functor val fun = X => Salary { S(X) }
+      @functor val fun = amount => Salary { S(amount) }
       fun
     }
 
@@ -151,7 +151,7 @@ object Scrap {
 
   implicit object personData extends Data[Person] {
     val functor = {
-      @functor val fun = (N, A) => Person { P(N, A) }
+      @functor val fun = (name, address) => Person { P(name, address) }
       fun
     }
 
@@ -161,7 +161,7 @@ object Scrap {
 
   implicit object dataEmployee extends Data[Employee] {
     val functor = {
-      @functor val fun = (P, A) => Employee { E(P, A) }
+      @functor val fun = (person, salary) => Employee { E(person, salary) }
       fun
     }
 
@@ -172,7 +172,7 @@ object Scrap {
   // needs: Data[Department]
   implicit def subunitData(implicit genDept: Data[Department]): Data[SubUnit] = new Data[SubUnit] {
     val functor = {
-      @functor val fun = (p, d) => SubUnit { PU(p) ; DU(d) }
+      @functor val fun = (person, department) => SubUnit { PU(person) ; DU(department) }
       fun
     }
 
@@ -226,7 +226,7 @@ object Scrap {
   // ===== //
 
   def concat[A](xs: List[A], ys: List[A]): List[A] = {
-    @functor val listF = L => ListF[A, L]
+    @functor val listF = rec => ListF[A, rec]
     new Foldable[listF.Map](xs)(listF).fold[List[A]] {
       case Nil  => ys
       case cons => coerce(cons)
@@ -234,7 +234,7 @@ object Scrap {
   }
 
   def concatMap[A, B](f: A => List[B], xs: List[A]): List[B] = {
-    @functor val list = X => List[X]
+    @functor val list = x => List[x]
     list(list(xs) map f) reduce (coerce(Nil), concat)
   }
 

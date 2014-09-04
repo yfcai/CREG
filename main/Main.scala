@@ -16,7 +16,7 @@ object Main extends App with Coercion {
 
   // @functor only works in block scope >_<
   implicit val termF = {
-    @functor implicit val termF = X => TermF[X]
+    @functor implicit val termF = x => TermF[x]
     termF
   }
 
@@ -66,7 +66,7 @@ object Main extends App with Coercion {
   // USAGE: PREPEND UNDERSCORE
 
   def prependUnderscore(t: Term): Term = {
-    @functor val namesF = N => Term { Var(N) ; Abs(param = N) }
+    @functor val namesF = name => Term { Var(name) ; Abs(param = name) }
     namesF(t) map ("_" + _)
   }
 
@@ -74,9 +74,9 @@ object Main extends App with Coercion {
   // USAGE: CAPTURE-AVOIDING SUBSTITUTION
 
   val avoidF = {
-    @functor val avoidF = (Bound, Binding) => Term {
-      Var(Bound)
-      Abs = Binding
+    @functor val avoidF = (bound, binding) => Term {
+      Var(bound)
+      Abs = binding
     }
     avoidF
   }
