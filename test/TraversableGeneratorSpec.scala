@@ -10,7 +10,7 @@ class TraversableGeneratorSpec extends FlatSpec with Coercion with nominal.util.
 
   @datatype trait List[+A] {
     Nil
-    Cons(head = A, tail = List)
+    Cons(head = A, tail = List[A])
   }
 
   @datatype trait Plus[+A, +B] {

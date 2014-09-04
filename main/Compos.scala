@@ -202,7 +202,7 @@ object Compos {
 
   @datatype trait List[A] {
     Nil
-    Cons(head = A, tail = List)
+    Cons(head = A, tail = List[A])
   }
 
   @datatype trait Expression[E, S] {

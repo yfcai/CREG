@@ -16,23 +16,28 @@ trait Preprocessor extends util.AbortWithError {
     extractVariants(appendLetterT(variant))
   }
 
-  /** @return packaged food for synonym generator
+  /** @param input the trait
+    *
+    * @return packaged food for synonym generator
     */
   def digestForSynonymGenerator(c: Context)(input: c.Tree, parseTree: DataConstructor): SynonymGeneratorFood = {
     val variant = topLevelVariant(c)(input, parseTree)
     val name = variant.header.name
-    if (isRecursiveVariant(variant)) {
-      // recursive
-      val pointless = DataConstructor(parseTree.params, pointlessify(variant, parseTree.params))
-      SynonymGeneratorFood(
-        (name, pointless),
-        Some((appendF(name), pointless)))
-    }
-    else
+
+    renameRecursiveVariant(c)(input, variant) match {
       // not recursive
-      SynonymGeneratorFood(
+      case None =>
+        SynonymGeneratorFood(
         (name, DataConstructor(parseTree.params, appendLetterT(variant))),
         None)
+
+      // recursive
+      case Some(variant) =>
+        val pointless = DataConstructor(parseTree.params, pointlessify(variant, parseTree.params))
+        SynonymGeneratorFood(
+          (name, pointless),
+          Some((appendF(name), pointless)))
+    }
   }
 
   sealed case class SynonymGeneratorFood(
@@ -64,17 +69,30 @@ trait Preprocessor extends util.AbortWithError {
         abortWithError(c)(input.pos, "500 internal error: parse tree isn't a top-level variant")
     }
 
-  /** @return whether a top-level variant is recursive */
-  def isRecursiveVariant(variant: Variant): Boolean = {
+  /** @param input the trait annotated by @datatype macro
+    * @param variant parsed variant
+    *
+    * @return renaming recursive positions to variant.header.name if variant is recursive
+    *         nothing otherwise
+    */
+  def renameRecursiveVariant(c: Context)(input: c.Tree, variant: Variant): Option[Variant] = {
     val dangerMarker = variant.header.name + "["
-    exists(variant) {
-      case TypeVar(name) if name == variant.header.name => ()
-      case TypeVar(name) if name startsWith dangerMarker =>
+    val expectedName = getFullNameOfTrait(c)(input).get
+    val isRecursive = exists(variant) {
+      case TypeVar(name) if name == expectedName => ()
+
+      case TypeVar(name) if name != expectedName & name == variant.header.name =>
         throw new PreprocessorException(
-          s"Never mark recursive positions by $name. " +
-            s"Marked them by `${variant.header.name}` without arguments. " +
-            "The @datatype macro does not support GADTs.")
+          s"recursive position of $expectedName should not be marked by just $name")
+
+      case TypeVar(name) if name != expectedName & name.startsWith(dangerMarker) =>
+        throw new PreprocessorException(
+          s"$name should not occur in the definition of $expectedName, because we don't support GADTs")
     }
+    if (isRecursive)
+      Some(variant.rename(Map(expectedName -> variant.header.name)).asInstanceOf[Variant])
+    else
+      None
   }
 
   private[this] def exists(data: Datatype)(predicate: PartialFunction[Datatype, Unit]): Boolean =
@@ -96,5 +114,39 @@ trait Preprocessor extends util.AbortWithError {
     */
   def extractVariants(datatype: Datatype): Iterator[Variant] = datatype everywhereQ {
     case variant @ Variant(_, _) => variant
+  }
+
+  def getNameOfTrait(c: Context)(tree: c.Tree): Option[String] = {
+    import c.universe._
+    tree match {
+      case q"trait $name [..$params]" => Some(name.toString)
+      case q"trait $name [..$params] {}" => Some(name.toString)
+      case q"trait $name [..$params] { ..$body }" => Some(name.toString)
+      case _ => None
+    }
+  }
+
+  def getFullNameOfTrait(c: Context)(tree: c.Tree): Option[String] = {
+    import c.universe._
+
+    def mkName(name: c.TypeName, params: List[c.universe.TypeDef]): String = {
+      //
+      val paramNames = params map {
+        case TypeDef(modifiers, typeName, typeParams, rhs) =>
+          typeName.toString
+      }
+
+      if (paramNames.isEmpty)
+        name.toString
+      else
+        s"$name[${paramNames mkString ", "}]"
+    }
+
+    tree match {
+      case q"trait $name [..$params]" => Some(mkName(name, params))
+      case q"trait $name [..$params] {}" => Some(mkName(name, params))
+      case q"trait $name [..$params] { ..$body }" => Some(mkName(name, params))
+      case _ => None
+    }
   }
 }

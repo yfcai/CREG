@@ -9,7 +9,7 @@ import nominal.annotation.datatype
 class UniverseConstructionSpec extends FlatSpec with Coercion {
   import UniverseConstruction.Tests._
 
-  @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
+  @datatype trait List[+A] { Nil ; Cons(A, tail = List[A]) }
 
   "UniverseConstruction" should "be able to interpret list of integers" in {
     @interpretIntList trait IntList {

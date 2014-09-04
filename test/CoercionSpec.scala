@@ -7,7 +7,7 @@ import scala.language.experimental.macros
 class CoercionSpec extends FlatSpec with Coercion {
   @datatype trait List[A] {
     Nil
-    Cons(head = A, tail = List)
+    Cons(head = A, tail = List[A])
   }
 
   def listF[A] = {

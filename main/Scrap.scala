@@ -19,7 +19,7 @@ object Scrap {
   // DECLARATION //
   // =========== //
 
-  @datatype trait List[A]    { Nil ; Cons(head = A, tail = List) }
+  @datatype trait List[A]    { Nil ; Cons(head = A, tail = List[A]) }
 
   @datatype trait Company    { C(List[Department]) }
   @datatype trait Dept[SubU] { D(name = Name, manager = Manager, subunits = List[SubU]) }

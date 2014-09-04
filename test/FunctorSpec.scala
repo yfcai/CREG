@@ -9,7 +9,7 @@ import nominal.functors._
 class FunctorSpec extends FlatSpec with Coercion {
   @datatype trait List[+A] {
     Nil
-    Cons(head = A, tail = List)
+    Cons(head = A, tail = List[A])
   }
 
   object List {

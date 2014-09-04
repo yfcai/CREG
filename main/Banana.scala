@@ -12,7 +12,7 @@ import nominal.lib.Traversable.{Endofunctor => Functor, _}
 object Banana {
   @datatype trait List[A] {
     Nil
-    Cons(A, List)
+    Cons(A, List[A])
   }
 
   val xs1: List[Int] = coerce( Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) )

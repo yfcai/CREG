@@ -373,7 +373,7 @@ class DataSpec extends FlatSpec with Coercion {
   it should "generate enough scala types for the list example" in {
     // since GADT not surpported anyway, recursion is marked by name
 
-    @datatype trait List[+A] { Nil ; Cons(A, tail = List) }
+    @datatype trait List[+A] { Nil ; Cons(A, tail = List[A]) }
 
     // superclass of object List is nonsensical on purpose
     // it's there to test that attributes got passed around

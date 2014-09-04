@@ -94,16 +94,6 @@ extends Parser
     }
   }
 
-  def getNameOfTrait(c: Context)(tree: c.Tree): Option[String] = {
-    import c.universe._
-    tree match {
-      case q"trait $name [..$params]" => Some(name.toString)
-      case q"trait $name [..$params] {}" => Some(name.toString)
-      case q"trait $name [..$params] { ..$body }" => Some(name.toString)
-      case _ => None
-    }
-  }
-
   def injectIntoObject(c: Context)(obj: c.Tree, newDecls: Seq[c.Tree]): c.Tree = {
     import c.universe._
     obj match {
