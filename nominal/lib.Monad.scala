@@ -32,7 +32,7 @@ trait MonadWithBind extends Monad {
   def bind[A, B](m: Map[A], f: A => Map[B]): Map[B]
 
   def call[A, B](f: Map[A => B], x: Map[A]): Map[B] =
-    bind(f, (f: A => B) => fmap(f, x))
+    bind(f, (f: A => B) => bind(x, (x: A) => pure(f(x))))
 
   def join[A](x: Map[Map[A]]): Map[A] =
     bind(x, (y: Map[A]) => y)
