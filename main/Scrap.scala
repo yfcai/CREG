@@ -47,25 +47,25 @@ object Scrap {
   // ============== //
 
   trait SpecialCase[W[_]] {
-    def apply[A: Term](x: A): W[A]
+    def apply[A: Data](x: A): W[A]
   }
 
-  // forall a. Term a => a -> a
+  // forall a. Data a => a -> a
   trait Transform {
-    def apply[A: Term](x: A): A
+    def apply[A: Data](x: A): A
   }
 
-  // forall a. Term a => a -> R
+  // forall a. Data a => a -> R
   trait Query[R] {
-    def apply[A: Term](x: A): R
+    def apply[A: Data](x: A): R
   }
 
   // CAVEAT:
   // due to limitation of runtime.universe.TypeTag,
   // `safeCast` only works when used in the same class
   // where type `T` is declared.
-  def safeCast[A: Term, T: TypeTag](x: A): Option[T] = {
-    val tpeA = implicitly[Term[A]].typeTag.tpe.dealias
+  def safeCast[A: Data, T: TypeTag](x: A): Option[T] = {
+    val tpeA = implicitly[Data[A]].typeTag.tpe.dealias
     val tpeT = implicitly[TypeTag[T]].tpe.dealias
     if (tpeA <:< tpeT)
       Some(x.asInstanceOf[T])
@@ -74,7 +74,7 @@ object Scrap {
   }
 
   def mkT[T: TypeTag](f: T => T): Transform = new Transform {
-    def apply[A: Term](x: A): A =
+    def apply[A: Data](x: A): A =
       safeCast[A, T](x) match {
         case Some(x) => f(x).asInstanceOf[A]
         case None => x
@@ -82,11 +82,11 @@ object Scrap {
   }
 
   def mkQ[T: TypeTag, R](default: R, query: T => R): Query[R] = new Query[R] {
-    def apply[A: Term](x: A): R =
+    def apply[A: Data](x: A): R =
       safeCast[A, T](x) map query getOrElse default
   }
 
-  abstract class Term[T: TypeTag] {
+  abstract class Data[T: TypeTag] {
     val typeTag: TypeTag[T] = implicitly
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): T => W[T]
@@ -94,52 +94,52 @@ object Scrap {
     type ID[+X] = Applicative.Identity[X]
 
     def gmapT(tr: Transform): T => T =
-      gfoldl[ID](Applicative.Identity)(new SpecialCase[ID] { def apply[A: Term](x: A): A = tr(x) })
+      gfoldl[ID](Applicative.Identity)(new SpecialCase[ID] { def apply[A: Data](x: A): A = tr(x) })
 
     type Const[A] = { type λ[+X] = A }
 
     def gmapQ[R](query: Query[R]): T => Seq[R] =
       gfoldl[Const[Seq[R]]#λ](Applicative.Const(Seq.empty, _ ++ _))(
         new SpecialCase[Const[Seq[R]]#λ] {
-          def apply[A: Term](x: A): Seq[R] = Seq(query(x))
+          def apply[A: Data](x: A): Seq[R] = Seq(query(x))
         })
   }
 
-  implicit class GenericOps[A](term: A)(implicit gen: Term[A]) {
-    def gmapT(tr: Transform): A = gen.gmapT(tr)(term)
-    def gmapQ[R](query: Query[R]): Seq[R] = gen.gmapQ(query)(term)
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): W[A] = gen.gfoldl(apl)(sp)(term)
+  implicit class GenericOps[A](data: A)(implicit gen: Data[A]) {
+    def gmapT(tr: Transform): A = gen.gmapT(tr)(data)
+    def gmapQ[R](query: Query[R]): Seq[R] = gen.gmapQ(query)(data)
+    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): W[A] = gen.gfoldl(apl)(sp)(data)
 
     def everywhere(f: Transform): A =
       f(gmapT(new Transform {
-        def apply[B: Term](x: B): B = x everywhere f
+        def apply[B: Data](x: B): B = x everywhere f
       }))
 
     def everything[R](combine: (R, R) => R, query: Query[R]): R = {
-      query(term) +: gmapQ(
+      query(data) +: gmapQ(
         new Query[R] {
-          def apply[A: Term](x: A): R = x.everything(combine, query)
+          def apply[A: Data](x: A): R = x.everything(combine, query)
         }
       ) reduce combine
     }
   }
 
-  implicit object nothingTerm extends TermWithConstantFunctor[Nothing]
+  implicit object nothingData extends DataWithConstantFunctor[Nothing]
 
-  class TermWithConstantFunctor[T: TypeTag] extends Term[T] {
+  class DataWithConstantFunctor[T: TypeTag] extends Data[T] {
     val functor = {
       @functor val constantFunctor = F => T
       constantFunctor
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): T => W[T] =
-      term => functor(term).traverse(sp[Nothing])(apl)
+      data => functor(data).traverse(sp[Nothing])(apl)
   }
 
-  implicit object stringTerm extends TermWithConstantFunctor[String]
-  implicit object floatTerm  extends TermWithConstantFunctor[Double]
+  implicit object stringData extends DataWithConstantFunctor[String]
+  implicit object floatData  extends DataWithConstantFunctor[Double]
 
-  implicit object salaryTerm extends Term[Salary] {
+  implicit object salaryData extends Data[Salary] {
     val functor = {
       @functor val fun = X => Salary { S(X) }
       fun
@@ -149,7 +149,7 @@ object Scrap {
       salary => functor(salary).traverse(sp[Double])(apl)
   }
 
-  implicit object personTerm extends Term[Person] {
+  implicit object personData extends Data[Person] {
     val functor = {
       @functor val fun = (N, A) => Person { P(N, A) }
       fun
@@ -159,7 +159,7 @@ object Scrap {
       person => functor(person).traverse(sp[Name], sp[Address])(apl)
   }
 
-  implicit object dataEmployee extends Term[Employee] {
+  implicit object dataEmployee extends Data[Employee] {
     val functor = {
       @functor val fun = (P, A) => Employee { E(P, A) }
       fun
@@ -169,8 +169,8 @@ object Scrap {
       employee => functor(employee).traverse(sp[Person], sp[Salary])(apl)
   }
 
-  // needs: Term[Department]
-  implicit def subunitTerm(implicit genDept: Term[Department]): Term[SubUnit] = new Term[SubUnit] {
+  // needs: Data[Department]
+  implicit def subunitData(implicit genDept: Data[Department]): Data[SubUnit] = new Data[SubUnit] {
     val functor = {
       @functor val fun = (p, d) => SubUnit { PU(p) ; DU(d) }
       fun
@@ -180,17 +180,17 @@ object Scrap {
       subunit => functor(subunit).traverse(sp[Employee], sp[Department])(apl)
   }
 
-  implicit def listTerm[A](implicit genA: Term[A]): Term[List[A]] = {
+  implicit def listData[A](implicit genA: Data[A]): Data[List[A]] = {
     implicit val tagA = genA.typeTag
     implicit val tagL = implicitly[TypeTag[List[A]]]
 
-    new Term[List[A]] {
+    new Data[List[A]] {
       val functor = {
         @functor val fun = (x, xs) => List[A] { Cons(x, xs) }
         fun
       }
 
-      implicit val genList: Term[List[A]] = this
+      implicit val genList: Data[List[A]] = this
 
       def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): List[A] => W[List[A]] =
         xs => apl.roll[({ type λ[+X] = functor.Map[A, X] })#λ] {
@@ -199,7 +199,7 @@ object Scrap {
     }
   }
 
-  implicit object departmentTerm extends Term[Department] {
+  implicit object departmentData extends Data[Department] {
     val functor = {
       @functor val fun = (name, manager, subunit) => Department { D(name, manager, subunit) }
       fun
@@ -211,7 +211,7 @@ object Scrap {
       }
   }
 
-  implicit object companyTerm extends Term[Company] {
+  implicit object companyData extends Data[Company] {
     val functor = {
       @functor val fun = depts => Company { C(depts) }
       fun
