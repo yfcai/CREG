@@ -213,8 +213,9 @@ trait TraversableGenerator extends SynonymGenerator {
         val newEnv = env.updated(x, recursiveCall)
         // body of things to jump into
         val unrolled = q"$mA.unroll"
-        val newMangleA = mangleA - x
-        val newMangleB = mangleB - x
+        // update mangeleA and mangleB with new info
+        val newMangleA = mangleA + (x -> mAType.toString) // toString is okay because mAType: TypeName
+        val newMangleB = mangleB - x // B doesn't have to be mangled, because mBType = TypeName(x)
         val unrolledBody = generateDefTraverseBody(c)(unrolled, body, newMangleA, newMangleB, newEnv, applicative)
 
         // get unfolded part of the synonym
