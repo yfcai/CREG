@@ -124,7 +124,7 @@ object Compos {
 
   def readState[S]: State[S]#λ[S] = s => (s, s)
   def writeState[S](s: S): State[S]#λ[Unit] = _ => ((), s)
-  def runState[S, A](s: S, sm: State[S]#λ[A]): (A, S) = sm(s)
+  def evalState[S, A](sm: State[S]#λ[A], s: S): A = sm(s)._1
 
   // type of infinite lists of hopefully fresh names
   type Names = Stream[String]
@@ -168,47 +168,46 @@ object Compos {
           e)
     }
 
-    runState(names, f(Seq.empty)(e))._1
+    evalState(f(Seq.empty)(e), names)
   }
 
   // functor for capture avoidance
-  val avoidF = {
-    @functor val avoidF = (abs, name) => Exp { EAbs = abs ; EVar(name) }
-    avoidF
+  val freshF = {
+    @functor val freshF = (abs, name) => Exp { EAbs = abs ; EVar(name) }
+    freshF
   }
 
   def fresh2(e: Exp): Exp = {
+    // bad memory behavior
+    // it'd be better if there's no pointer to the head of the fresh name stream.
     val names: Names = Stream.from(0).map("_" + _)
 
     // name the record type for the EAbs case
     type RAbs = EAbs[String, Exp]
 
     def f(vs: Subst)(e: Exp): State[Names]#λ[Exp] =
-      avoidF[RAbs, String](coerce(e)).traverse[State[Names]#λ, RAbs, String](
+      freshF[RAbs, String](coerce(e)).traverse[State[Names]#λ, RAbs, String](
+        // RAbs => Names => RAbs
         {
           case EAbs(x, b) =>
-            ???
-            /*
             for {
               freshNames <- readState[Names]
-              //_ <- writeState(freshNames.tail)
-              //x2 = freshNames.head
-              //b2 <- f((x, x2) +: vs)(b)
+              _ <- writeState(freshNames.tail)
+              x2 = freshNames.head
+              b2 <- f((x, x2) +: vs)(b)
             }
-            yield EAbs("x", coerce(EVar("x"))) //EAbs(x2, b2)
-             */
+            yield coerce { EAbs(x2, b2) } : RAbs
         }
           ,
-        // String => State[String]#λ[Exp]
-        //x => stateMonad[Names] pure findWithDefault(x, x, vs)
-        _ => _ => ??? // TODO: FIXME: stackoverflow
-      )(stateMonad).asInstanceOf[State[Names]#λ[Exp]] // coercion doesn't work for this case yet
+        // String => Names => String
+        x => stateMonad[Names] pure findWithDefault(x, x, vs)
+      ).asInstanceOf[State[Names]#λ[Exp]] // coercion doesn't work for this case yet
 
-    runState(names, f(Seq.empty)(e))._1
+    evalState(f(Seq.empty)(e), names)
   }
 
   assert(fresh(fst) == (coerce { EAbs("_0", EAbs("_1", EVar("_0"))) }: Exp))
-  //assert(fresh(fst) == fresh2(fst))
+  assert(fresh(fst) == fresh2(fst))
 }
 
 import Compos._
