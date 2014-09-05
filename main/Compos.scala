@@ -96,9 +96,6 @@ object Compos {
     EAbs("x", EAbs("y", EVar("x")))
   }
 
-  assert(rename(fst) == (coerce { EAbs("_x", EAbs("_y", EVar("_x"))) }: Term))
-  assert(rename(fst) == rename2(fst))
-
   // MAKE NAMES GLOBALLY UNIQUE //
 
   private[this] // necessary to make inner type λ covariant
@@ -194,9 +191,6 @@ object Compos {
 
     evalState(f(Seq.empty)(e), names)
   }
-
-  assert(fresh(fst) == (coerce { EAbs("_0", EAbs("_1", EVar("_0"))) }: Term))
-  assert(fresh(fst) == fresh2(fst))
 
   // MUTUAL RECURSION EXAMPLE //
 
@@ -310,14 +304,6 @@ object Compos {
   }
 
   def renameExp2(e: Exp): Exp = renameF(e) map ("_" + _)
-
-  assert(renameExp(plusExp) == (coerce {
-    Block(Cons(
-      Assign("_x", Add("_y", "_z")), Cons(
-        Return("_x"), Nil)))
-  }: Exp))
-
-  assert(renameExp(plusExp) == renameExp2(plusExp))
 
   def vars(e: Exp): Set[String] = renameF(renameF(e) map (x => Set(x))) reduce (Set.empty, _ ++ _)
 
