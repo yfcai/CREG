@@ -46,6 +46,14 @@ object Scrap {
   // IMPLEMENTATION //
   // ============== //
 
+  object List {
+    def apply[A](xs: A*): List[A] =
+      if (xs.isEmpty)
+        coerce(Nil)
+      else
+        coerce(Cons(xs.head, apply(xs.tail: _*)))
+  }
+
   trait SpecialCase[W[_]] {
     def apply[A: Data](x: A): W[A]
   }
@@ -235,7 +243,7 @@ object Scrap {
 
   def concatMap[A, B](f: A => List[B], xs: List[A]): List[B] = {
     @functor val list = x => List[x]
-    list(list(xs) map f) reduce (coerce(Nil), concat)
+    list(xs).mapReduce(f)(coerce(Nil), concat)
   }
 
   val ralf   = E(P("Ralf",   "Amsterdam"), S(8000))
@@ -264,7 +272,32 @@ object Scrap {
   def increase(percentage: Long, company: Company): Company =
     company everywhere mkT[Long](_ * (100 + percentage) / 100)
 
-  // increase(0.1, genCom)
+  val employeeF = {
+    @functor val employeeF = employee => Company {
+      C(List {
+        Cons(head = Department {
+          D(
+            manager = employee,
+            subunits = List { Cons(head = SubUnit {
+              DU(Department)
+              PU(employee)
+            }) }
+          )
+        })
+      })
+    }
+    employeeF
+  }
+
+  val salaryF = {
+    // salaryF is written as a composite with employeeF instead of a stand-alone functor
+    // because a bug makes the latter impossible (05.09.2014).
+    @functor val salaryOfEmployee = amount => Employee { E(salary = Salary { S(amount) }) }
+    Traversable.compose[employeeF.Map, salaryOfEmployee.Map](employeeF, salaryOfEmployee)
+  }
+
+  def increase2(percentage: Long, company: Company): Company =
+    salaryF(company).map[Long](_ * (100 + percentage) / 100)
 
   // EXAMPLE: flatten departments
 
@@ -283,6 +316,27 @@ object Scrap {
       coerce(D(n, m, concatMap(unwrap, us)))
   }
 
+  def flatten2(com: Company): Company = {
+    @functor val dcom = dept => Company { C(List { Cons(head = dept) }) }
+
+    @functor val each = subunit => List[subunit]
+
+    implicit class deptIsFoldable(d: Department) extends Foldable[deptF.Map](d)(deptF)
+
+    dcom(com).map(_.fold[Department] {
+      case D(name, manager, subunits) => coerce {
+        D(name     = name,
+          manager  = manager,
+          subunits = concatMap[SubUnit, SubUnit]({
+            case PU(person) => List(PU(person))
+            case DU(dept) => dept.unroll match {
+              case D(_, manager, subunits) => concat(List(PU(manager)), subunits)
+            }
+          }, subunits))
+      }
+    })
+  }
+
   // EXAMPLE: get department names
 
   def deptNames(com: Company): List[Name] =
@@ -294,6 +348,11 @@ object Scrap {
           case D(name, _, _) => coerce(Cons(name, Nil))
         })
     )
+
+  def deptNames2(com: Company): List[Name] = {
+    @functor val deptNameF = name => Company { C(List { Cons(head = Department { D(name = name) }) }) }
+    deptNameF(com).mapReduce(name => List(name))(coerce(Nil), concat)
+  }
 
   // deptNames(genCom)
   // deptNames(overmanaged)
