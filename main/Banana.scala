@@ -15,6 +15,14 @@ object Banana {
     Cons(A, List[A])
   }
 
+  object List {
+    def apply[A](xs: A*): List[A] =
+      if (xs.isEmpty)
+        coerce(Nil)
+      else
+        coerce(Cons(xs.head, apply(xs.tail: _*)))
+  }
+
   val xs1: List[Int] = coerce( Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) )
 
   implicit class ListIsMappable[A](xs: List[A]) {
