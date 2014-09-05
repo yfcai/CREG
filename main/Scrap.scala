@@ -24,9 +24,9 @@ object Scrap {
   @datatype trait Company    { C(List[Department]) }
   @datatype trait Dept[SubU] { D(name = Name, manager = Manager, subunits = List[SubU]) }
   @datatype trait SubU[Dept] { PU(Employee) ; DU(Dept) }
-  @datatype trait Employee   { E(Person, Salary) }
+  @datatype trait Employee   { E(Person, salary = Salary) }
   @datatype trait Person     { P(Name, Address) }
-  @datatype trait Salary     { S(Double) }
+  @datatype trait Salary     { S(Long) }
 
   type Department = Fix[deptF.Map]
   type SubUnit    = SubU[Department]
@@ -137,7 +137,7 @@ object Scrap {
   }
 
   implicit object stringData extends DataWithConstantFunctor[String]
-  implicit object floatData  extends DataWithConstantFunctor[Double]
+  implicit object floatData  extends DataWithConstantFunctor[Long]
 
   implicit object salaryData extends Data[Salary] {
     val functor = {
@@ -146,7 +146,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Salary => W[Salary] =
-      salary => functor(salary).traverse(sp[Double])(apl)
+      salary => functor(salary).traverse(sp[Long])(apl)
   }
 
   implicit object personData extends Data[Person] {
@@ -261,8 +261,8 @@ object Scrap {
 
   // EXAMPLE: increase salary
 
-  def increase(rate: Double, company: Company): Company =
-    company everywhere mkT[Double](_ * (1.0f + rate))
+  def increase(percentage: Long, company: Company): Company =
+    company everywhere mkT[Long](_ * (100 + percentage) / 100)
 
   // increase(0.1, genCom)
 
