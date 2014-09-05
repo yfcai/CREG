@@ -46,6 +46,9 @@ trait Traversable { thisFunctor =>
           def pure[X](x: X): A = monoidId
           def call[X, Y](f: A, x: A): A = monoidOp(f, x)
         })
+
+    def mapReduce[B <: Cat](f: A => B)(monoidID: B, monoidOp: (B, B) => B): B =
+      thisFunctor(map(f)) reduce (monoidID, monoidOp)
   }
 }
 
