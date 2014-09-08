@@ -11,7 +11,7 @@ object Traversable {
     type Map[+X]
   }
 
-  type FunctorOf[F[+_]] = Endofunctor {
+  type EndofunctorOf[F[+_]] = Endofunctor {
     type Map[+X] = F[X]
   }
 
