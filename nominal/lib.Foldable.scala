@@ -3,6 +3,6 @@ package lib
 
 import language.higherKinds
 
-class Foldable[F[+_]](term: Fix[F])(implicit functor: Traversable.Endofunctor[F]) {
+class Foldable[F[+_]](term: Fix[F])(implicit functor: Traversable.FunctorOf[F]) {
   def fold[T](f: F[T] => T): T = f(functor(term.unroll) map (x => new Foldable(x) fold f))
 }

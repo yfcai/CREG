@@ -6,14 +6,19 @@ import language.higherKinds
 object Traversable {
   // fixed-point of a functor is only guaranteed to exist in the entire scala category
   // in other words, it's only permissible to take the fixed point of a traversable endofunctor
-  type Endofunctor[F[+_]] = Traversable {
+  type Endofunctor = Traversable {
     type Cat = Any
+    type Map[+X]
+  }
+
+  type FunctorOf[F[+_]] = Endofunctor {
     type Map[+X] = F[X]
   }
 
-  def compose[F[+_], G[+_]](f: Endofunctor[F], g: Endofunctor[G]):
-      Endofunctor[({ type λ[+X] = F[G[X]] })#λ] =
+  def compose(f: Endofunctor, g: Endofunctor): Endofunctor { type Map[+X] = f.Map[g.Map[X]] } =
     new Traversable {
+      private[this] type F[+X] = f.Map[X]
+      private[this] type G[+X] = g.Map[X]
       type Cat = Any
       type Map[+X] = F[G[X]]
       def traverse[H[+_]: Applicative.Endofunctor, A, B](h: A => H[B], m: F[G[A]]): H[F[G[B]]] =

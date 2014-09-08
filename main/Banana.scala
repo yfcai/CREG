@@ -7,7 +7,7 @@
 import language.higherKinds
 import nominal.functors._
 import nominal.lib._
-import nominal.lib.Traversable.{Endofunctor => Functor, _}
+import nominal.lib.Traversable.{compose}
 
 object Banana {
   @datatype trait List[A] {
@@ -44,14 +44,17 @@ object Banana {
 
   // type List[A] = Fix[listF[A].Map]
 
-  def cataWith[F[+_], T](functor: Functor[F])(algebra: F[T] => T): Fix[F] => T =
-    xs => algebra( functor(xs.unroll) map cataWith(functor)(algebra) )
+  // should Endofunctor be a more reusable synonym?
+  type Endofunctor = Traversable { type Cat = Any ; type Map[+X] }
+
+  def cataWith[T](fun: Endofunctor)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
+    xs => algebra( fun(xs.unroll) map cataWith(fun)(algebra) )
 
   implicit class ListIsFoldable[A](xs: List[A]) {
     val patternFunctor = listF[A]
 
     def fold[T](algebra: patternFunctor.Map[T] => T): T =
-      cataWith[patternFunctor.Map, T](patternFunctor)(algebra)(xs)
+      cataWith(patternFunctor)(algebra)(xs)
   }
 
   def sum(xs: List[Int]): Int = xs.fold[Int] {
@@ -59,13 +62,11 @@ object Banana {
     case Cons(head, tail) => head + tail
   }
 
-  def anaWith[F[+_], T](functor: Functor[F])(coalgebra: T => F[T]): T => Fix[F] =
-    seed => Roll[F](functor(coalgebra(seed)) map anaWith(functor)(coalgebra))
+  def anaWith[T](fun: Endofunctor)(coalgebra: T => fun.Map[T]): T => Fix[fun.Map] =
+    seed => Roll[fun.Map]( fun(coalgebra(seed)) map anaWith(fun)(coalgebra) )
 
-  def mkList[A, T](seed: T)(coalgebra: T => ListF[A, T]): List[A] = {
-    val functor = listF[A]
-    anaWith[functor.Map, T](functor)(coalgebra)(seed)
-  }
+  def mkList[A, T](seed: T)(coalgebra: T => ListF[A, T]): List[A] =
+    anaWith(listF[A])(coalgebra)(seed)
 
   def incrementCoalgebra(n: Int): Int => ListF[Int, Int] = i =>
     if (i > n)
@@ -76,15 +77,12 @@ object Banana {
   def upTo(n: Int): List[Int] =
     mkList[Int, Int](1)(incrementCoalgebra(n))
 
-  def hyloWith[F[+_], T, R](functor: Functor[F])(coalgebra: T => F[T])(algebra: F[R] => R): T => R =
-    seed =>
-      cataWith(functor)(algebra)(
-        anaWith(functor)(coalgebra)(seed)
-      )
+  def hyloWith[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
+    cataWith(fun)(algebra) compose anaWith(fun)(coalgebra)
 
   def hylo[A, T, R](seed: T)(coalgebra: T => ListF[A, T])(algebra: ListF[A, R] => R): R = {
     val functor = listF[A]
-    hyloWith[functor.Map, T, R](functor)(coalgebra)(algebra)(seed)
+    hyloWith(functor)(coalgebra)(algebra)(seed)
   }
 
   def hyloFactorial(n: Int): Int =
@@ -98,23 +96,21 @@ object Banana {
   // show this after the type signature of `paraWith`
   @datatype trait Pair[A, B] { MkPair(A, B) }
 
-  def paraWith[F[+_], T](functor: Functor[F])(psi: F[Pair[Fix[F], T]] => T): Fix[F] => T = {
+  def paraWith[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
 
+    type F[+X]      = fun.Map[X]
     type Paired[+X] = F[Pair[Fix[F], X]]
 
     @functor val sndF = y => Pair { MkPair(Fix[F], y) }
-    // but not: Y => Pair[Fix[F], Y]. should investigate.
 
-    val pairingF = compose[F, sndF.Map](functor, sndF)
+    val pairingF = compose(fun, sndF)
 
     implicitly[ pairingF.Map[Any] =:= Paired[Any] ]
 
     val pairingCoalgebra: Fix[F] => Paired[Fix[F]] =
-      data => functor(data.unroll) map {
-        child => MkPair(child, child)
-      }
+      xs => fun(xs.unroll) map { child => MkPair(child, child) }
 
-    hyloWith[Paired, Fix[F], T](pairingF)(pairingCoalgebra)(psi)
+    hyloWith(pairingF)(pairingCoalgebra)(psi)
   }
 
   @datatype trait Nat { Zero ; Succ(Nat) }
@@ -125,13 +121,13 @@ object Banana {
   }
 
   val natToInt: Nat => Int =
-    cataWith[natF.Map, Int](natF) {
+    cataWith[Int](natF) {
       case Zero => 0
       case Succ(n) => n + 1
     }
 
   val intToNat: Int => Nat =
-    anaWith[natF.Map, Int](natF) { i =>
+    anaWith[Int](natF) { i =>
       if (i == 0)
         Zero
       else
@@ -139,7 +135,7 @@ object Banana {
     }
 
   def paraFactorial: Int => Int =
-    paraWith[natF.Map, Int](natF) {
+    paraWith[Int](natF) {
       case Zero => 1
       case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
     } compose intToNat

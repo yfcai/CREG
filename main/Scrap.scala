@@ -9,7 +9,6 @@
 import language.higherKinds
 import nominal.functors._
 import nominal.lib._
-import nominal.lib.Traversable.{Endofunctor => Functor, _}
 
 import reflect.runtime.universe.TypeTag
 
@@ -293,7 +292,7 @@ object Scrap {
     // salaryF is written as a composite with employeeF instead of a stand-alone functor
     // because a bug makes the latter impossible (05.09.2014).
     @functor val salaryOfEmployee = amount => Employee { E(salary = Salary { S(amount) }) }
-    Traversable.compose[employeeF.Map, salaryOfEmployee.Map](employeeF, salaryOfEmployee)
+    Traversable.compose(employeeF, salaryOfEmployee)
   }
 
   def increase2(percentage: Long, company: Company): Company =

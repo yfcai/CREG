@@ -8,8 +8,7 @@ import language.higherKinds
 import language.implicitConversions
 import nominal.functors._
 import nominal.lib._
-import nominal.lib.Applicative.{Endofunctor => _, _}
-import nominal.lib.Traversable.{Endofunctor => Functor}
+import nominal.lib.Applicative._
 
 object Compos {
 
