@@ -96,6 +96,18 @@ object Banana {
   // show this after the type signature of `paraWith`
   @datatype trait Pair[A, B] { MkPair(A, B) }
 
+  def paraWith0[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
+    type F[+X] = fun.Map[X]
+    xs => cataWith[Pair[Fix[fun.Map], T]](fun)({
+      (input: F[Pair[Fix[F], T]]) => MkPair(
+        Roll(fun(input) map { case MkPair(subterm, result) => subterm }),
+        psi(input)
+      )
+    })(xs) match {
+      case MkPair(xs, result) => result
+    }
+  }
+
   def paraWith[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
 
     type F[+X]      = fun.Map[X]
@@ -133,6 +145,12 @@ object Banana {
       else
         Succ(i - 1)
     }
+
+  def paraFactorial0: Int => Int =
+    paraWith0[Int](natF) {
+      case Zero => 1
+      case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
+    } compose intToNat
 
   def paraFactorial: Int => Int =
     paraWith[Int](natF) {
