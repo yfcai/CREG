@@ -67,7 +67,7 @@ object Compos {
       implicitly[TermFamily[C]] match {
         case Term =>
           implicitly[Applicative.Endofunctor[F]].roll[termF.Map](
-            termF(data.unroll) traverse f[Term]
+            termF(data.unroll).traverse(implicitly[Applicative.Endofunctor[F]])(f[Term])
           )
       }
     }

@@ -32,29 +32,27 @@ trait Traversable { thisFunctor =>
   type Cat
   type Map[+A <: Cat]
 
-  def traverse[A <: Cat, B <: Cat](G: Applicative)(f: A => G.Map[B], mA: this.Map[A]): G.Map[this.Map[B]]
-
   // McBride & Paterson's traverse
-  def traverse[F[+_]: Applicative.Endofunctor, A <: Cat, B <: Cat](f: A => F[B], mA: Map[A]): F[Map[B]] =
-    this.traverse[A, B](implicitly[Applicative.Endofunctor[F]])(f, mA)
+  def traverse[A <: Cat, B <: Cat](G: Applicative)(f: A => G.Map[B], mA: this.Map[A]): G.Map[this.Map[B]]
 
   // reinterpret `x` in the light of `Map` being a traversable functor
   def apply[A <: Cat](mA: Map[A]): View[A] = new View(mA)
 
   class View[A <: Cat](mA: Map[A]) {
-    def traverse[F[+_]: Applicative.Endofunctor, B <: Cat](f: A => F[B]): F[Map[B]] = Traversable.this.traverse(f, mA)
+    trait Traversal[G[+_]] { def apply[B <: Cat](f: A => G[B]): G[Map[B]] }
+
+    def traverse(G: Applicative): Traversal[G.Map] = new Traversal[G.Map] {
+      def apply[B <: Cat](f: A => G.Map[B]): G.Map[Map[B]] =
+        Traversable.this.traverse(G)(f, mA)
+    }
 
     // fmap
-    def map[B <: Cat](f: A => B): Map[B] = this.traverse[Applicative.Identity, B](f)
+    def map[B <: Cat](f: A => B): Map[B] =
+      Traversable.this.traverse(Applicative.Identity)(f, mA)
 
     // McBride & Paterson's reduce
     def reduce(monoidId: A, monoidOp: (A, A) => A): A =
-      this.traverse[Applicative.Const[A]#λ, A](identity)(
-        new Applicative {
-          type Map[+X] = A
-          def pure[X](x: X): A = monoidId
-          def call[X, Y](f: A, x: A): A = monoidOp(f, x)
-        })
+      Traversable.this.traverse(Applicative.Const(monoidId, monoidOp))(identity[A], mA)
 
     def mapReduce[B <: Cat](f: A => B)(monoidID: B, monoidOp: (B, B) => B): B =
       thisFunctor(map(f)) reduce (monoidID, monoidOp)

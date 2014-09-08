@@ -140,7 +140,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): T => W[T] =
-      data => functor(data).traverse(sp[Nothing])(apl)
+      data => functor(data).traverse(apl)(sp[Nothing])
   }
 
   implicit object stringData extends DataWithConstantFunctor[String]
@@ -153,7 +153,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Salary => W[Salary] =
-      salary => functor(salary).traverse(sp[Long])(apl)
+      salary => functor(salary).traverse(apl)(sp[Long])
   }
 
   implicit object personData extends Data[Person] {
@@ -225,7 +225,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Company => W[Company] =
-      company => functor(company).traverse(sp[List[Department]])(apl)
+      company => functor(company).traverse(apl)(sp[List[Department]])
   }
 
   // ===== //
