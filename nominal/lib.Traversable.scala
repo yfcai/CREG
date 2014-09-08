@@ -21,8 +21,9 @@ object Traversable {
       private[this] type G[+X] = g.Map[X]
       type Cat = Any
       type Map[+X] = F[G[X]]
-      def traverse[H[+_]: Applicative.Endofunctor, A, B](h: A => H[B], m: F[G[A]]): H[F[G[B]]] =
-        f.traverse[H, G[A], G[B]](ga => g.traverse(h, ga), m)
+
+      def traverse[A, B](H: Applicative)(h: A => H.Map[B], m: F[G[A]]): H.Map[F[G[B]]] =
+        f.traverse[G[A], G[B]](H)(ga => g.traverse(H)(h, ga), m)
     }
 }
 
@@ -31,8 +32,11 @@ trait Traversable { thisFunctor =>
   type Cat
   type Map[+A <: Cat]
 
+  def traverse[A <: Cat, B <: Cat](G: Applicative)(f: A => G.Map[B], mA: this.Map[A]): G.Map[this.Map[B]]
+
   // McBride & Paterson's traverse
-  def traverse[F[+_]: Applicative.Endofunctor, A <: Cat, B <: Cat](f: A => F[B], mA: Map[A]): F[Map[B]]
+  def traverse[F[+_]: Applicative.Endofunctor, A <: Cat, B <: Cat](f: A => F[B], mA: Map[A]): F[Map[B]] =
+    this.traverse[A, B](implicitly[Applicative.Endofunctor[F]])(f, mA)
 
   // reinterpret `x` in the light of `Map` being a traversable functor
   def apply[A <: Cat](mA: Map[A]): View[A] = new View(mA)
