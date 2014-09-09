@@ -7,7 +7,7 @@
 import language.higherKinds
 import nominal.functors._
 import nominal.lib._
-import nominal.lib.Traversable.{compose}
+import nominal.lib.Traversable.{Endofunctor, compose}
 
 object Banana {
   @datatype trait List[A] {
@@ -43,9 +43,6 @@ object Banana {
   }
 
   // type List[A] = Fix[listF[A].Map]
-
-  // should Endofunctor be a more reusable synonym?
-  type Endofunctor = Traversable { type Cat = Any ; type Map[+X] }
 
   def cataWith[T](fun: Endofunctor)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
     xs => algebra( fun(xs.unroll) map cataWith(fun)(algebra) )
