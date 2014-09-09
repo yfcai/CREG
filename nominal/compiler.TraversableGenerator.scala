@@ -27,9 +27,8 @@ trait TraversableGenerator extends SynonymGenerator {
     val subcategories = generateSubcategories(c)(functor, subcats)
     val mapSynonym = generateBoundedSynonym(c)(mappingOnObjects, functor, subcats)
     val imports = scalaLanguageFeatureImports(c)
-    val defTraverse = explicitDefTraverse(c)(functor, subcats)
-    imports ++ subcategories :+ mapSynonym :+ defTraverse :+
-      generateDefTraverse(c)(functor, subcats) // TODO: delete me after dealing with bifunctors etc
+    val defTraverse = generateDefTraverse(c)(functor, subcats)
+    imports ++ subcategories :+ mapSynonym :+ defTraverse
   }
 
   def extractSubcatBounds(data: Datatype): Map[Name, Datatype] =
@@ -96,7 +95,7 @@ trait TraversableGenerator extends SynonymGenerator {
 
   /** def traverse[A <: Cat, B <: Cat](G: Applicative)(f: A => G.Map[B], mA: this.Map[A]): G.Map[this.Map[B]]
     */
-  def explicitDefTraverse(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): c.Tree = {
+  def generateDefTraverse(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): c.Tree = {
         import c.universe._
     // type parameters of .traverse
     val tA: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "A"))
@@ -154,72 +153,6 @@ trait TraversableGenerator extends SynonymGenerator {
       env, applicative)
 
     q"def traverse[..$typeDefs]($applicative : $applicativeType)(..$explicitParams): $resultType = $body"
-  }
-
-  /** def traverse[F[+_]: IsApplicative, A <: Cat, B <: Cat](f: A => F[B], t0: Map[A]): F[Map[B]]
-    */
-  def generateDefTraverse(c: Context)(functor: DataConstructor, subcats: Map[Name, Datatype]): c.Tree = {
-    import c.universe._
-    // type parameters of .traverse
-    val tF: TypeName = TypeName(c freshName "F")
-    val tA: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "A"))
-    val tB: Many[TypeName] = functor.params.map(_ => TypeName(c freshName "B"))
-    val q"trait Trait[$typeDefF]" = q"trait Trait[$tF[+_]]"
-    val unmangleA = Map((tA, functor.params).zipped.map({ case (a, p) => (a.toString, p.name) }): _*)
-    val unmangleB = Map((tB, functor.params).zipped.map({ case (b, p) => (b.toString, p.name) }): _*)
-    val unmangledTypeNames = unmangleA ++ unmangleB
-    val typeDefs: Many[TypeDef] =
-      typeDefF +: mkBoundedTypeDefs(c)(
-        (tA ++ tB) map (Param invariant _.toString),
-        unmangledTypeNames flatMap {
-          case (mangled, param) if subcats contains param => Some((mangled, subcats(param)))
-          case _ => None
-        })
-
-    // functions A => F[B], C => F[D], etc.
-    val functions: Many[TermName] = functor.params.map(param => TermName(c freshName "f"))
-    val functionTypes: Many[Tree] = (tA, tB).zipped.map {
-      case (a, b) =>
-        val q"??? : $functionType" = q"??? : ($a => $tF[$b])"
-        functionType
-    }
-
-    // mA: Map[A, C, ...]
-    val mA: TermName = TermName(c freshName "mA")
-    val mapping: TypeName = TypeName(mappingOnObjects)
-    val q"??? : $mAType" = q"??? : $mapping[..$tA]"
-
-    // F[Map[B, D, ...]]
-    val q"??? : $resultType" = q"??? : $tF[$mapping[..$tB]]"
-
-    // (f: A => F[B], g: C => F[D], ..., mA: Map[A, C, ...])
-    val explicitParams = mkValDefs(c)(functions :+ mA, functionTypes :+ mAType)
-
-    // applicative: Applicative.Endofunctor[F]
-    val applicative: TermName = TermName(c freshName "applicative")
-    val q"??? : $applicativeType" = q"??? : ${applicativeEndofunctor(c)(tF)}"
-
-    // mapping functor.params corresponding function calls
-    val env: Map[DatatypeRepresentation.Name, Tree => Tree] =
-      Map(
-        (functor.params, functions).zipped.map {
-          case (param, function) =>
-            (param.name, (x: c.Tree) => q"$function($x)")
-        } : _*)
-
-    val body: Tree = generateDefTraverseBody(c)(
-      q"$mA",
-      functor.body,
-      unmangleA.map(_.swap),
-      unmangleB.map(_.swap),
-      env, applicative)
-
-
-    // TODO: remove this whole madness
-    if (tA.size == 1)
-      q""
-    else
-      q"def traverse[..$typeDefs](..$explicitParams)(implicit $applicative : $applicativeType): $resultType = $body"
   }
 
   def mkValDef(c: Context)(termName: c.TermName, tpe: c.Tree): c.universe.ValDef = {

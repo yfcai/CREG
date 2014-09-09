@@ -171,7 +171,7 @@ object Compos {
     type RAbs = EAbs[String, Term]
 
     def f(vs: Subst)(e: Term): State[Names]#λ[Term] =
-      freshF[RAbs, String](coerce(e)).traverse[State[Names]#λ, RAbs, String](
+      freshF[RAbs, String](coerce(e)).traverse[RAbs, String](stateMonad[Names])(
         // RAbs => Names => RAbs
         {
           case EAbs(x, b) =>
@@ -258,11 +258,11 @@ object Compos {
       implicitly[ExpFamily[C]] match {
         case Exp =>
           apl.roll[expF.Map] {
-            expFun(data.unroll) traverse (f[Exp], f[Stm], f[Variable])
+            expFun(data.unroll).traverse(apl)(f[Exp], f[Stm], f[Variable])
           }
 
         case Stm =>
-          stmFun(data) traverse (f[Exp], f[Variable])
+          stmFun(data).traverse(apl)(f[Exp], f[Variable])
 
         case Var =>
           apl pure data

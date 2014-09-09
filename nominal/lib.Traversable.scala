@@ -65,8 +65,9 @@ trait Traversable2 {
   type Cat2
   type Map[+A <: Cat1, +B <: Cat2]
 
-  def traverse[F[+_]: Applicative.Endofunctor, A <: Cat1, B <: Cat2, C <: Cat1, D <: Cat2]
-              (f: A => F[C], g: B => F[D], mAB: Map[A, B]): F[Map[C, D]]
+  def traverse[A <: Cat1, B <: Cat2, C <: Cat1, D <: Cat2]
+              (G: Applicative)
+              (f: A => G.Map[C], g: B => G.Map[D], mAB: Map[A, B]): G.Map[Map[C, D]]
 
   def apply[A <: Cat1, B <: Cat2](mAB: Map[A, B]): View[A, B] = new View(mAB)
 
@@ -78,10 +79,12 @@ trait Traversable2 {
   // more trouble due to possible name clashes than
   // it's worth, though.
   class View[A <: Cat1, B <: Cat2](mAB: Map[A, B]) {
-    def traverse[F[+_]: Applicative.Endofunctor, C <: Cat1, D <: Cat2]
-                (f: A => F[C], g: B => F[D]): F[Map[C, D]] = Traversable2.this.traverse(f, g, mAB)
+    def traverse[C <: Cat1, D <: Cat2]
+                (G: Applicative)
+                (f: A => G.Map[C], g: B => G.Map[D]): G.Map[Map[C, D]] =
+      Traversable2.this.traverse(G)(f, g, mAB)
 
-    def map[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Map[C, D] = this.traverse[Applicative.Identity, C, D](f, g)
+    def map[C <: Cat1, D <: Cat2](f: A => C, g: B => D): Map[C, D] = this.traverse(Applicative.Identity)(f, g)
   }
 }
 
@@ -91,20 +94,20 @@ trait Traversable3 {
   type Cat3
   type Map[+A <: Cat1, +B <: Cat2, +C <: Cat3]
 
-  def traverse[F[+_]: Applicative.Endofunctor,
-    A <: Cat1, B <: Cat2, W <: Cat3, C <: Cat1, D <: Cat2, Y <: Cat3]
-              (f: A => F[C], g: B => F[D], h: W => F[Y],
-                mAB: Map[A, B, W]): F[Map[C, D, Y]]
+  def traverse[A <: Cat1, B <: Cat2, W <: Cat3, C <: Cat1, D <: Cat2, Y <: Cat3]
+              (G: Applicative)
+              (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y], mAB: Map[A, B, W]): G.Map[Map[C, D, Y]]
 
   def apply[A <: Cat1, B <: Cat2, W <: Cat3](mAB: Map[A, B, W]): View[A, B, W] = new View(mAB)
 
   class View[A <: Cat1, B <: Cat2, W <: Cat3](mAB: Map[A, B, W]) {
-    def traverse[F[+_]: Applicative.Endofunctor, C <: Cat1, D <: Cat2, Y <: Cat3]
-                (f: A => F[C], g: B => F[D], h: W => F[Y]): F[Map[C, D, Y]] =
-      Traversable3.this.traverse(f, g, h, mAB)
+    def traverse[C <: Cat1, D <: Cat2, Y <: Cat3]
+      (G: Applicative)
+      (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y]): G.Map[Map[C, D, Y]] =
+      Traversable3.this.traverse(G)(f, g, h, mAB)
 
     def map[C <: Cat1, D <: Cat2, Y <: Cat3](f: A => C, g: B => D, h: W => Y): Map[C, D, Y] =
-      this.traverse[Applicative.Identity, C, D, Y](f, g, h)
+      this.traverse(Applicative.Identity)(f, g, h)
   }
 }
 
@@ -115,19 +118,22 @@ trait Traversable4 {
   type Cat4
   type Map[+A <: Cat1, +B <: Cat2, +C <: Cat3, +D <: Cat4]
 
-  def traverse[F[+_]: Applicative.Endofunctor,
-    A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4, C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4]
-              (f: A => F[C], g: B => F[D], h: W => F[Y], k: X => F[Z],
-                mAB: Map[A, B, W, X]): F[Map[C, D, Y, Z]]
+  def traverse[A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4, C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4]
+              (G: Applicative)
+              (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y], k: X => G.Map[Z],
+                mAB: Map[A, B, W, X]): G.Map[Map[C, D, Y, Z]]
 
   def apply[A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4](mAB: Map[A, B, W, X]): View[A, B, W, X] = new View(mAB)
 
   class View[A <: Cat1, B <: Cat2, W <: Cat3, X <: Cat4](mAB: Map[A, B, W, X]) {
-    def traverse[F[+_]: Applicative.Endofunctor, C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4]
-                (f: A => F[C], g: B => F[D], h: W => F[Y], k: X => F[Z]): F[Map[C, D, Y, Z]] =
-      Traversable4.this.traverse(f, g, h, k, mAB)
+
+    def traverse[C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4]
+      (G: Applicative)
+      (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y], k: X => G.Map[Z]):
+        G.Map[Map[C, D, Y, Z]] =
+      Traversable4.this.traverse(G)(f, g, h, k, mAB)
 
     def map[C <: Cat1, D <: Cat2, Y <: Cat3, Z <: Cat4](f: A => C, g: B => D, h: W => Y, k: X => Z): Map[C, D, Y, Z] =
-      this.traverse[Applicative.Identity, C, D, Y, Z](f, g, h, k)
+      this.traverse(Applicative.Identity)(f, g, h, k)
   }
 }

@@ -163,7 +163,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Person => W[Person] =
-      person => functor(person).traverse(sp[Name], sp[Address])(apl)
+      person => functor(person).traverse(apl)(sp[Name], sp[Address])
   }
 
   implicit object dataEmployee extends Data[Employee] {
@@ -173,7 +173,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Employee => W[Employee] =
-      employee => functor(employee).traverse(sp[Person], sp[Salary])(apl)
+      employee => functor(employee).traverse(apl)(sp[Person], sp[Salary])
   }
 
   // needs: Data[Department]
@@ -184,7 +184,7 @@ object Scrap {
     }
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): SubUnit => W[SubUnit] =
-      subunit => functor(subunit).traverse(sp[Employee], sp[Department])(apl)
+      subunit => functor(subunit).traverse(apl)(sp[Employee], sp[Department])
   }
 
   implicit def listData[A](implicit genA: Data[A]): Data[List[A]] = {
@@ -201,7 +201,7 @@ object Scrap {
 
       def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): List[A] => W[List[A]] =
         xs => apl.roll[({ type λ[+X] = functor.Map[A, X] })#λ] {
-          functor(xs.unroll).traverse(sp[A], sp[List[A]])(apl)
+          functor(xs.unroll).traverse(apl)(sp[A], sp[List[A]])
         }
     }
   }
@@ -214,7 +214,7 @@ object Scrap {
 
     def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Department => W[Department] =
       dept => apl.roll[deptF.Map] {
-        functor(dept.unroll).traverse(sp[Name], sp[Manager], sp[List[SubUnit]])(apl)
+        functor(dept.unroll).traverse(apl)(sp[Name], sp[Manager], sp[List[SubUnit]])
       }
   }
 
