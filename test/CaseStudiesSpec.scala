@@ -2,20 +2,6 @@ import org.scalatest._
 import nominal.functors._
 
 class CaseStudiesSpec extends FlatSpec {
-  "Banana" should "work" in {
-    import Banana._
-    assert(sum(xs1) == 10)
-    assert(upTo(4) == xs1)
-
-    val factorials: List[Int] = coerce {
-      Cons(1, Cons(2, Cons(6, Cons(24, Nil))))
-    }
-
-    assert(xs1.map(hyloFactorial)  == factorials)
-    assert(xs1.map(paraFactorial)  == factorials)
-    assert(xs1.map(paraFactorial0) == factorials)
-  }
-
   "Scrap-your-boilerplate" should "work" in {
     import Scrap._
     val paradise: Company = coerce {
