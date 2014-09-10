@@ -54,7 +54,7 @@ object Scrap {
   }
 
   trait SpecialCase[W[_]] {
-    def apply[A: Data](x: A): W[A]
+    def apply[A: Data]: A => W[A]
   }
 
   // forall a. Data a => a -> a
@@ -96,26 +96,26 @@ object Scrap {
   abstract class Data[T: TypeTag] {
     val typeTag: TypeTag[T] = implicitly
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): T => W[T]
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): T => apl.Map[T]
 
     type ID[+X] = Applicative.Identity[X]
 
     def gmapT(tr: Transform): T => T =
-      gfoldl[ID](Applicative.Identity)(new SpecialCase[ID] { def apply[A: Data](x: A): A = tr(x) })
+      gfoldl(Applicative.Identity)(new SpecialCase[ID] { def apply[A: Data] = tr[A] })
 
     type Const[A] = { type λ[+X] = A }
 
     def gmapQ[R](query: Query[R]): T => Seq[R] =
-      gfoldl[Const[Seq[R]]#λ](Applicative.Const(Seq.empty, _ ++ _))(
+      gfoldl(Applicative.Const[Seq[R]](Seq.empty, _ ++ _))(
         new SpecialCase[Const[Seq[R]]#λ] {
-          def apply[A: Data](x: A): Seq[R] = Seq(query(x))
+          def apply[A: Data]: A => Seq[R] = x => Seq(query(x))
         })
   }
 
   implicit class GenericOps[A](data: A)(implicit gen: Data[A]) {
     def gmapT(tr: Transform): A = gen.gmapT(tr)(data)
     def gmapQ[R](query: Query[R]): Seq[R] = gen.gmapQ(query)(data)
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): W[A] = gen.gfoldl(apl)(sp)(data)
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): apl.Map[A] = gen.gfoldl(apl)(sp)(data)
 
     def everywhere(f: Transform): A =
       f(gmapT(new Transform {
@@ -139,7 +139,7 @@ object Scrap {
       constantFunctor
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): T => W[T] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): T => apl.Map[T] =
       data => functor(data).traverse(apl)(sp[Nothing])
   }
 
@@ -152,7 +152,7 @@ object Scrap {
       fun
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Salary => W[Salary] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Salary => apl.Map[Salary] =
       salary => functor(salary).traverse(apl)(sp[Long])
   }
 
@@ -162,7 +162,7 @@ object Scrap {
       fun
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Person => W[Person] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Person => apl.Map[Person] =
       person => functor(person).traverse(apl)(sp[Name], sp[Address])
   }
 
@@ -172,7 +172,7 @@ object Scrap {
       fun
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Employee => W[Employee] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Employee => apl.Map[Employee] =
       employee => functor(employee).traverse(apl)(sp[Person], sp[Salary])
   }
 
@@ -183,7 +183,7 @@ object Scrap {
       fun
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): SubUnit => W[SubUnit] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): SubUnit => apl.Map[SubUnit] =
       subunit => functor(subunit).traverse(apl)(sp[Employee], sp[Department])
   }
 
@@ -199,7 +199,7 @@ object Scrap {
 
       implicit val genList: Data[List[A]] = this
 
-      def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): List[A] => W[List[A]] =
+      def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): List[A] => apl.Map[List[A]] =
         xs => apl.roll[({ type λ[+X] = functor.Map[A, X] })#λ] {
           functor(xs.unroll).traverse(apl)(sp[A], sp[List[A]])
         }
@@ -212,7 +212,7 @@ object Scrap {
       fun
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Department => W[Department] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Department => apl.Map[Department] =
       dept => apl.roll[deptF.Map] {
         functor(dept.unroll).traverse(apl)(sp[Name], sp[Manager], sp[List[SubUnit]])
       }
@@ -224,7 +224,7 @@ object Scrap {
       fun
     }
 
-    def gfoldl[W[+_]](apl: Applicative.Endofunctor[W])(sp: SpecialCase[W]): Company => W[Company] =
+    def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Company => apl.Map[Company] =
       company => functor(company).traverse(apl)(sp[List[Department]])
   }
 
