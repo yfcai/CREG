@@ -44,16 +44,7 @@ object Banana extends App {
 
   // computing catamorphism: (F[T] => T) => Fix[F] => T
   def cata[T](F: Functor)(algebra: F.Map[T] => T): Fix[F.Map] => T = {
-    xs => // want a value of type T
-    algebra( // call algebra
-      F(xs.unroll) map cata(F)(algebra)
-      // want: F.Map[T]
-      // have: xs : Fix[F.Map]
-      // xs.unroll : F.Map[Fix[F.Map]]
-      // want:  F.Map[Fix[F.Map]] => F.Map[T]
-      // this is some function of type (Fix[F.Map] => T) lifted by the functor F
-      // this function is exactly cata(F)(algebra)
-    )
+    xs => algebra( F(xs.unroll) map cata(F)(algebra) )
   }
 
   val sum: List[Int] => Int =
