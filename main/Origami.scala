@@ -22,7 +22,7 @@ object Origami {
   def bimap[A, B, C, D](F: Bifunctor)(f: A => B, g: C => D): F.Map[A, C] => F.Map[B, D] =
     xs => F(xs) map (f, g)
 
-  def fmap2[A, C, D](F: Bifunctor)(g: C => D): F.Map[A, C] => F.Map[A, D] = xs => F(xs) map (identity[A], g)
+  def fmap2[A, C, D](F: Bifunctor)(g: C => D): F.Map[A, C] => F.Map[A, D] = bimap(F)(identity, g)
 
   def map[A, B](F: Bifunctor)(f: A => B): Fix2[F.Map, A] => Fix2[F.Map, B] =
     xs => roll2 { bimap(F)(f, map(F)(f))(xs.unroll) }
