@@ -45,4 +45,27 @@ object Origami {
   trait Church[F[+_]] { def apply[T](algebra: F[T] => T): T }
 
   def churchDecode(F: Traversable.Endofunctor)(fold: Church[F.Map]): Fix[F.Map] = fold(Roll.apply)
+
+
+  @datatype trait List[A] {
+    Nil
+    Cons(A, List[A])
+  }
+
+  val listB = {
+    @functor val bifun = (a, r) => List { Cons(a, r) }
+    bifun
+  }
+
+  val sum: List[Int] => Int =
+    cata[Int, Int](listB) {
+      case Nil => 0
+      case Cons(m, n) => m + n
+    }
+
+  def mapList[A, B](f: A => B): List[A] => List[B] =
+    cata[A, List[B]](listB) {
+      case Nil => coerce { Nil }
+      case Cons(x, xs) => coerce { Cons(f(x), xs) }
+    }
 }
