@@ -5,7 +5,9 @@ class CaseStudiesSpec extends FlatSpec {
   "Banana" should "work" in {
     import Banana._
     assert(sum(xs1) == 10)
-    assert(upTo(4) == xs1)
+
+    val xs2: List[Int] = coerce { Cons(4, Cons(3, Cons(2, Cons(1, Nil)))) }
+    assert(downFrom(4) == xs2)
 
     val factorials: List[Int] = coerce {
       Cons(1, Cons(2, Cons(6, Cons(24, Nil))))
