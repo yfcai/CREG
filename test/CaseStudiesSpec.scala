@@ -2,6 +2,24 @@ import org.scalatest._
 import nominal.functors._
 
 class CaseStudiesSpec extends FlatSpec {
+  "Main case study" should "work" in {
+    object main extends MainTrait
+    import main._
+
+    // freevars vs. freevars2
+
+    def fvtest(t: Term, fv: Set[String]) {
+      assert(freevars(t) == fv)
+      assert(freevars2(t) == fv)
+    }
+
+    fvtest(id  , Set())
+    fvtest(idy , Set("y"))
+    fvtest(f_xy, Set("f", "y"))
+    fvtest(fx_y, Set("f", "x"))
+    fvtest(fzv , Set())
+  }
+
   "Banana" should "work" in {
     import Banana._
     assert(sum(xs1) == 10)

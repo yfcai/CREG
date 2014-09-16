@@ -5,7 +5,35 @@ import nominal.functors._
 // maybe should include .lib in .functors?
 import nominal.lib._
 
-object Main extends App with Coercion {
+object Main extends App with MainTrait {
+  def put (name: String, obj : Any ) = println(s"$name = $obj")
+  def show(name: String, term: Term) = put(name, pretty(term))
+
+
+  List(
+    ("id", id), ("idy", idy), ("f_xy", f_xy), ("fx_y", fx_y),
+    ("fzv", fzv)
+  ).foreach {
+    case (name, term) =>
+      show(name, term)
+      put(s"freevars($name)", freevars(term))
+      show(s"prependUnderscore($name)", prependUnderscore(term))
+      List[(String, Term)](
+        ("y", coerce(App("x", "x"))),
+        ("y", coerce(App("x", "y")))
+      ).foreach {
+        case (y, ysub) =>
+          val s1 = subst1(y, ysub, term)
+          // val s2 = subst2(y, ysub, term)
+          // assert(s1 == s2)
+          show(s"subst($y, ${pretty{ysub}}, $name)", s1)
+          //show(s"subst2($y, ${pretty{ysub}}, $name)", s2)
+      }
+      println()
+  }
+}
+
+trait MainTrait {
 
   @datatype trait Term {
     Void
@@ -62,6 +90,21 @@ object Main extends App with Coercion {
     case other        => termF(other) reduce (Set.empty, _ ++ _)
   }
 
+  val avoidF = {
+    @functor val avoidF = (bound, binding) => Term {
+      Var(bound)
+      Abs = binding
+    }
+    avoidF
+  }
+
+  def freevars2(t: Term): Set[String] =
+    avoidF[String, Abs[String, Term]](
+      coerce(t)
+    ).traverse(Applicative.Const[Set[String]](Set.empty, _ ++ _))(
+      x => Set(x),
+      { case Abs(x, body) => freevars2(body) - x }
+    )
 
   // USAGE: PREPEND UNDERSCORE
 
@@ -72,14 +115,6 @@ object Main extends App with Coercion {
 
 
   // USAGE: CAPTURE-AVOIDING SUBSTITUTION
-
-  val avoidF = {
-    @functor val avoidF = (bound, binding) => Term {
-      Var(bound)
-      Abs = binding
-    }
-    avoidF
-  }
 
   def fresh(default: String, avoid: Set[String]): String = {
     var index = -1
@@ -130,30 +165,4 @@ object Main extends App with Coercion {
 
   // \f -> f (\z -> ())
   val fzv: Term = coerce(Abs("f", App("f", Abs("z", Void))))
-
-  def put (name: String, obj : Any ) = println(s"$name = $obj")
-  def show(name: String, term: Term) = put(name, pretty(term))
-
-
-  List(
-    ("id", id), ("idy", idy), ("f_xy", f_xy), ("fx_y", fx_y),
-    ("fzv", fzv)
-  ).foreach {
-    case (name, term) =>
-      show(name, term)
-      put(s"freevars($name)", freevars(term))
-      show(s"prependUnderscore($name)", prependUnderscore(term))
-      List[(String, Term)](
-        ("y", coerce(App("x", "x"))),
-        ("y", coerce(App("x", "y")))
-      ).foreach {
-        case (y, ysub) =>
-          val s1 = subst1(y, ysub, term)
-          // val s2 = subst2(y, ysub, term)
-          // assert(s1 == s2)
-          show(s"subst($y, ${pretty{ysub}}, $name)", s1)
-          //show(s"subst2($y, ${pretty{ysub}}, $name)", s2)
-      }
-      println()
-  }
 }
