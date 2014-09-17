@@ -90,6 +90,13 @@ trait MainTrait {
     case other        => termF(other) reduce (Set.empty, _ ++ _)
   }
 
+  // compos-style explicit recursion
+  def freevars1(t: Term): Set[String] = t.unroll match {
+    case Var(v)       => Set(v)
+    case Abs(x, body) => freevars(body) - x
+    case other        => termF(other).traverse(Applicative.Const[Set[String]](Set.empty, _ ++ _))(freevars1)
+  }
+
   val avoidF = {
     @functor val avoidF = (bound, binding) => Term {
       Var(bound)

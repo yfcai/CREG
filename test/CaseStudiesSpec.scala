@@ -6,10 +6,11 @@ class CaseStudiesSpec extends FlatSpec {
     object main extends MainTrait
     import main._
 
-    // freevars vs. freevars2
+    // freevars vs. freevars1 vs. freevars2
 
     def fvtest(t: Term, fv: Set[String]) {
       assert(freevars(t) == fv)
+      assert(freevars1(t) == fv)
       assert(freevars2(t) == fv)
     }
 
