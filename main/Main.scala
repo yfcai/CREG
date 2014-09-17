@@ -56,6 +56,18 @@ trait MainTrait {
 
   val t: Term = coerce(Void)
 
+  // USAGE: COUNTING VARIABLE OCCURRENCES
+
+  // typecheck folding
+  def foldTerm[T](inductiveStep: termF.Map[T] => T): Term => T =
+    t => inductiveStep(termF(t.unroll) map foldTerm(inductiveStep))
+
+  val variables: Term => Int =
+    foldTerm[Int] {
+      case Var(n) => 1
+      case other  => termF(other) reduce (0, _ + _)
+    }
+
   // USAGE: PRETTY PRINTING
 
   def prettyVisitor(t: Term) = t.fold[(String, Int)] {

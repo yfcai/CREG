@@ -21,12 +21,25 @@ class CaseStudiesSpec extends FlatSpec {
     fvtest(fzv , Set())
 
     // capture-avoidance
+
     val y0: Term = coerce { Abs("y", App("y0", "x")) }
     val y1: Term = coerce { Abs("y1", App("y0", App("y", "y"))) }
     assert(subst1("x", coerce { App("y", "y") }, y0) == y1)
 
     val id1: Term = coerce { Abs("x1", "x1") }
     assert(subst1("x0", "x", id) == id1)
+
+    // counting variable occurrences
+
+    def vars(t: Term, n: Int) {
+      assert(variables(t) == n)
+    }
+
+    vars(id  , 1)
+    vars(idy , 2)
+    vars(f_xy, 3)
+    vars(fx_y, 3)
+    vars(fzv , 1)
   }
 
   "Banana" should "work" in {
