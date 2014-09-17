@@ -19,6 +19,14 @@ class CaseStudiesSpec extends FlatSpec {
     fvtest(f_xy, Set("f", "y"))
     fvtest(fx_y, Set("f", "x"))
     fvtest(fzv , Set())
+
+    // capture-avoidance
+    val y0: Term = coerce { Abs("y", App("y0", "x")) }
+    val y1: Term = coerce { Abs("y1", App("y0", App("y", "y"))) }
+    assert(subst1("x", coerce { App("y", "y") }, y0) == y1)
+
+    val id1: Term = coerce { Abs("x1", "x1") }
+    assert(subst1("x0", "x", id) == id1)
   }
 
   "Banana" should "work" in {

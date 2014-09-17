@@ -138,16 +138,16 @@ trait MainTrait {
       coerce(t)
     ).map(
       alias withDefault identity,
-      (abs: Abs[String, Term]) => {
-        val Abs(x, body) = abs
-        val y = fresh(x, avoid)
-        Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
+      {
+        case Abs(x, body) =>
+          val y = fresh(x, avoid)
+          Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
       }
     )
   )
 
   def subst1(x: String, xsub: Term, t: Term): Term =
-    avoidCapture(freevars(xsub) + x, Map.empty, t).fold[Term] {
+    avoidCapture(freevars(xsub) ++ freevars(t) + x, Map.empty, t).fold[Term] {
       case Var(y) if x == y =>
         xsub
 
