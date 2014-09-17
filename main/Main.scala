@@ -167,6 +167,36 @@ trait MainTrait {
         coerce(other)
     }
 
+  // globally fresh name
+  var freshNameIterator = (Stream from 0 map ("_" + _)).iterator
+
+  def resetFreshNames() {
+    freshNameIterator = (Stream from 0 map ("_" + _)).iterator
+  }
+
+  def freshName: String = freshNameIterator.next
+
+  val absF = {
+    @functor val substF = abs => Term { Abs = abs }
+    substF
+  }
+
+  def avoidCapture2(x: String, xsub: Term, t: Term): Term =
+    t.fold[Term] {
+      case Abs(y, body) if x != y && freevars(xsub).contains(y) =>
+        val z = freshName
+        coerce { Abs(z, subst2(y, z, body)) }
+
+      case other =>
+        coerce { other }
+    }
+
+  def subst2(x: String, xsub: Term, t: Term): Term =
+    avoidCapture2(x, xsub, t).fold[Term] {
+      case Var(y) if x == y => xsub
+      case other            => coerce { other }
+    }
+
 
   // Execution begins
 

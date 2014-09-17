@@ -24,10 +24,16 @@ class CaseStudiesSpec extends FlatSpec {
 
     val y0: Term = coerce { Abs("y", App("y0", "x")) }
     val y1: Term = coerce { Abs("y1", App("y0", App("y", "y"))) }
+    val y2: Term = coerce { Abs("_0", App("y0", App("y", "y"))) }
+    resetFreshNames()
     assert(subst1("x", coerce { App("y", "y") }, y0) == y1)
+    assert(subst2("x", coerce { App("y", "y") }, y0) == y2)
 
     val id1: Term = coerce { Abs("x1", "x1") }
+    val id2: Term = coerce { Abs("_0", "_0") }
+    resetFreshNames()
     assert(subst1("x0", "x", id) == id1)
+    assert(subst2("x0", "x", id) == id2)
 
     // counting variable occurrences
 
