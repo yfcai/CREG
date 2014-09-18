@@ -134,7 +134,12 @@ trait MainTrait {
 
   // USAGE: FLATTEN TOP-LEVEL APPLICATION
 
-  //val app1F = mkApp1F[Term]
+  // app1F does not produce recursive types
+  // if I define instead
+  //
+  //   @functor val app1F = op => Term { App(op, Term) }
+  //
+  // then #5 will bite me.
   val app1F = {
     @functor val app1F = op => termF.Map[Term] { App(op, Term) }
     app1F
@@ -143,7 +148,6 @@ trait MainTrait {
   def foldApp1[T](f: app1F.Map[T] => T): Term => T =
     t => f( app1F[Term](coerce { t }) map foldApp1(f) )
 
-  // example of fixed-point ambiguity biting you
   val flatten: Term => Seq[Term] =
     foldApp1[Seq[Term]] {
       case App(flattenedOperator, operand) =>
