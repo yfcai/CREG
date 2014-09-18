@@ -46,6 +46,15 @@ class CaseStudiesSpec extends FlatSpec {
     vars(f_xy, 3)
     vars(fx_y, 3)
     vars(fzv , 1)
+
+    // flattening top-level applications
+
+    val x1: Term = coerce { Abs("x", App(App("x", "y"), "z")) }
+    val x2: Term = coerce { "y" }
+    val x3: Term = coerce { App("y", "z") }
+    val xx: Term = coerce { App(App(x1, x2), x3) }
+
+    assert(flatten(xx) == Seq(x1, x2, x3))
   }
 
   "Banana" should "work" in {

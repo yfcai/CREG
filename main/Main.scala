@@ -132,6 +132,26 @@ trait MainTrait {
     namesF(t) map ("_" + _)
   }
 
+  // USAGE: FLATTEN TOP-LEVEL APPLICATION
+
+  //val app1F = mkApp1F[Term]
+  val app1F = {
+    @functor val app1F = op => termF.Map[Term] { App(op, Term) }
+    app1F
+  }
+
+  def foldApp1[T](f: app1F.Map[T] => T): Term => T =
+    t => f( app1F[Term](coerce { t }) map foldApp1(f) )
+
+  // example of fixed-point ambiguity biting you
+  val flatten: Term => Seq[Term] =
+    foldApp1[Seq[Term]] {
+      case App(flattenedOperator, operand) =>
+        flattenedOperator :+ operand
+
+      case other =>
+        Seq(coerce(app1F(other) map (_ => ???)))
+    }
 
   // USAGE: CAPTURE-AVOIDING SUBSTITUTION
 
