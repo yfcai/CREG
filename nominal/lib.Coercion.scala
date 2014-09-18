@@ -104,7 +104,8 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
             c.echo(arg.pos, s"ERROR: cannot coerce $actualType to $expectedType")
           abortWithError(c)(
             c.enclosingPosition,
-            s"type error during coercion, see above.")
+            s"coercing $actualType to `Nothing`.\n" +
+              "either there's a type error or the context has to little information.")
 
         case NoChange =>
           arg
