@@ -10,7 +10,7 @@ object Main extends App with MainTrait {
   def show(name: String, term: Term) = put(name, pretty(term))
 
 
-  List(
+  Seq(
     ("id", id), ("idy", idy), ("f_xy", f_xy), ("fx_y", fx_y),
     ("fzv", fzv)
   ).foreach {
@@ -18,7 +18,7 @@ object Main extends App with MainTrait {
       show(name, term)
       put(s"freevars($name)", freevars(term))
       show(s"prependUnderscore($name)", prependUnderscore(term))
-      List[(String, Term)](
+      Seq[(String, Term)](
         ("y", coerce(App("x", "x"))),
         ("y", coerce(App("x", "y")))
       ).foreach {
@@ -33,7 +33,7 @@ object Main extends App with MainTrait {
   }
 }
 
-trait MainTrait {
+trait MainTrait extends Banana {
 
   @datatype trait Term {
     Void
@@ -67,6 +67,10 @@ trait MainTrait {
       case Var(n) => 1
       case other  => termF(other) reduce (0, _ + _)
     }
+
+  // defining foldTerm in terms of cata
+  def cataTerm[T](algebra: termF.Map[T] => T): Term => T =
+    cata(termF)(algebra)
 
   // USAGE: PRETTY PRINTING
 
@@ -147,6 +151,10 @@ trait MainTrait {
 
   def foldApp1[T](f: app1F.Map[T] => T): Term => T =
     t => f( app1F[Term](coerce { t }) map foldApp1(f) )
+
+  // foldApp1 in terms of cata
+  def cataApp1[T](f: app1F.Map[T] => T): Term => T =
+    t => coerce { cata(app1F)(f)(coerce { t }) }
 
   val flatten: Term => Seq[Term] =
     foldApp1[Seq[Term]] {

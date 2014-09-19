@@ -9,7 +9,9 @@ import nominal.functors._
 import nominal.lib._
 import nominal.lib.Traversable.{Endofunctor, compose}
 
-object Banana {
+object Banana extends Banana
+
+trait Banana {
   @datatype trait List[A] {
     Nil
     Cons(A, List[A])
@@ -62,6 +64,9 @@ object Banana {
     ana[Int](listF[Int])(decrement)
 
   def hylo[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
+    seed => algebra( fun(coalgebra(seed)) map hylo(fun)(coalgebra)(algebra) )
+
+  def hylo2[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
     cata(fun)(algebra) compose ana(fun)(coalgebra)
 
   def hyloFactorial: Int => Int =
@@ -76,17 +81,15 @@ object Banana {
   @datatype trait Pair[A, B] { MkPair(A, B) }
 
   // paramorphism agreeing with the traditional implementation in Haskell
-  def para0[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
-    type F[+X] = fun.Map[X]
-    xs => cata[Pair[Fix[fun.Map], T]](fun)({
-      (input: F[Pair[Fix[F], T]]) => MkPair(
-        Roll(fun(input) map { case MkPair(subterm, result) => subterm }),
+  def para0[T](F: Endofunctor)(psi: F.Map[Pair[Fix[F.Map], T]] => T): Fix[F.Map] => T =
+    xs => cata[Pair[Fix[F.Map], T]](F)({
+      input => MkPair(
+        Roll(F(input) map { case MkPair(subterm, result) => subterm }),
         psi(input)
       )
     })(xs) match {
       case MkPair(xs, result) => result
     }
-  }
 
   // paramorphism as a hypomorphism
   def para[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
@@ -104,6 +107,13 @@ object Banana {
       xs => fun(xs.unroll) map { child => MkPair(child, child) }
 
     hylo(pairingF)(pairingCoalgebra)(psi)
+  }
+
+  // eat a cake and keep it too
+  def cake[T](F: Endofunctor)(eat: Pair[Fix[F.Map], F.Map[T]] => T): Fix[F.Map] => T = {
+    @functor val sndF = y => Pair { MkPair(Fix[F.Map], y) }
+    val pairintF = compose(sndF, F)
+    hylo[Fix[F.Map], T](pairintF)(t => MkPair(t, t.unroll))(eat)
   }
 
   // Factorial as a paramorphism
@@ -139,6 +149,12 @@ object Banana {
     para[Int](natF) {
       case Zero => 1
       case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
+    } compose intToNat
+
+  def cakeFactorial: Int => Int =
+    cake[Int](natF) {
+      case MkPair(_, Zero)    => 1
+      case MkPair(n, Succ(m)) => natToInt(n) * m
     } compose intToNat
 }
 
