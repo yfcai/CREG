@@ -156,6 +156,38 @@ trait Banana {
       case MkPair(_, Zero)    => 1
       case MkPair(n, Succ(m)) => natToInt(n) * m
     } compose intToNat
+
+  // tail of lists
+
+  def tail0[A]: List[A] => List[A] =
+    para[List[A]](listF[A]) {
+      case Nil => coerce { Nil }
+      case Cons(head, MkPair(tail, tailOfTail)) => tail
+    }
+
+  def tail[A]: List[A] => List[A] =
+    cake[List[A]](listF[A]) {
+      case MkPair(_, Nil) => coerce { Nil }
+      case MkPair(thisList, Cons(head, tailOfTail)) =>
+        thisList.unroll match {
+          case Nil => sys error "impossible"
+          case Cons(head, tail) => tail
+        }
+    }
+
+  // suffixes
+
+  def suffixes0[A]: List[A] => List[List[A]] =
+    para[List[List[A]]](listF[A]) {
+      case Nil => coerce { Cons(Nil, Nil) }
+      case Cons(head, MkPair(tail, tails)) => coerce { Cons(Cons(head, tail), tails) }
+    }
+
+  def suffixes[A]: List[A] => List[List[A]] =
+    cake[List[List[A]]](listF[A]) {
+      case MkPair(nil, Nil) => coerce { Cons(nil, Nil) }
+      case MkPair(xs, Cons(_, tails)) => coerce { Cons(xs, tails) }
+    }
 }
 
 import Banana._

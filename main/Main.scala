@@ -229,7 +229,6 @@ trait MainTrait extends Banana {
       case other            => coerce { other }
     }
 
-
   // Execution begins
 
   // \x -> x

@@ -72,6 +72,29 @@ class CaseStudiesSpec extends FlatSpec {
     assert(xs1.map(paraFactorial)  == factorials)
     assert(xs1.map(paraFactorial0) == factorials)
     assert(xs1.map(cakeFactorial)  == factorials)
+
+    // tails
+
+    val factails: List[Int] = coerce {
+      Cons(2, Cons(6, Cons(24, Nil)))
+    }
+
+    assert(tail0(factorials) == factails)
+    assert(tail (factorials) == factails)
+
+    // suffixes
+
+    val facsufs: List[List[Int]] = coerce {
+      Cons(
+        Cons(1, Cons(2, Cons(6, Cons(24, Nil)))), Cons(
+          Cons(2, Cons(6, Cons(24, Nil))), Cons(
+            Cons(6, Cons(24, Nil)), Cons(
+              Cons(24, Nil), Cons(
+                Nil, Nil)))))
+    }
+
+    assert(suffixes0(factorials) == facsufs)
+    assert(suffixes (factorials) == facsufs)
   }
 
   "Scrap-your-boilerplate" should "work" in {
