@@ -14,17 +14,6 @@ object Traversable {
   type EndofunctorOf[F[+_]] = Endofunctor {
     type Map[+X] = F[X]
   }
-
-  def compose(f: Endofunctor, g: Endofunctor): Endofunctor { type Map[+X] = f.Map[g.Map[X]] } =
-    new Traversable {
-      private[this] type F[+X] = f.Map[X]
-      private[this] type G[+X] = g.Map[X]
-      type Cat = Any
-      type Map[+X] = F[G[X]]
-
-      def traverse[A, B](H: Applicative)(h: A => H.Map[B], m: F[G[A]]): H.Map[F[G[B]]] =
-        f.traverse[G[A], G[B]](H)(ga => g.traverse(H)(h, ga), m)
-    }
 }
 
 trait Traversable { thisFunctor =>
@@ -57,6 +46,15 @@ trait Traversable { thisFunctor =>
     def mapReduce[B <: Cat](f: A => B)(monoidID: B, monoidOp: (B, B) => B): B =
       thisFunctor(map(f)) reduce (monoidID, monoidOp)
   }
+
+  // compose with another functor
+  def compose(that: Traversable { type Map[+X] <: thisFunctor.Cat }) =
+    new Traversable {
+      type Cat = that.Cat
+      type Map[+A <: Cat] = thisFunctor.Map[that.Map[A]]
+      def traverse[A <: Cat, B <: Cat](G: Applicative)(f: A => G.Map[B], mA: this.Map[A]): G.Map[this.Map[B]] =
+        thisFunctor.traverse[that.Map[A], that.Map[B]](G)(x => that.traverse(G)(f, x), mA)
+    }
 }
 
 // Traversable2, Traversable3, Traversable4, ..., Traversable22

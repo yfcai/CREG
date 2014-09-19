@@ -7,7 +7,7 @@
 import language.higherKinds
 import nominal.functors._
 import nominal.lib._
-import nominal.lib.Traversable.{Endofunctor, compose}
+import nominal.lib.Traversable.Endofunctor
 
 object Banana extends Banana
 
@@ -99,7 +99,7 @@ trait Banana {
 
     @functor val sndF = y => Pair { MkPair(Fix[F], y) }
 
-    val pairingF = compose(fun, sndF)
+    val pairingF = fun compose sndF
 
     implicitly[ pairingF.Map[Any] =:= Paired[Any] ]
 
@@ -112,7 +112,7 @@ trait Banana {
   // eat a cake and keep it too
   def cake[T](F: Endofunctor)(eat: Pair[Fix[F.Map], F.Map[T]] => T): Fix[F.Map] => T = {
     @functor val sndF = y => Pair { MkPair(Fix[F.Map], y) }
-    val pairintF = compose(sndF, F)
+    val pairintF = sndF compose F
     hylo[Fix[F.Map], T](pairintF)(t => MkPair(t, t.unroll))(eat)
   }
 

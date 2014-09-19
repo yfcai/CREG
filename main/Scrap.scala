@@ -292,7 +292,7 @@ object Scrap {
     // salaryF is written as a composite with employeeF instead of a stand-alone functor
     // because a bug makes the latter impossible (05.09.2014).
     @functor val salaryOfEmployee = amount => Employee { E(salary = Salary { S(amount) }) }
-    Traversable.compose(employeeF, salaryOfEmployee)
+    employeeF compose salaryOfEmployee
   }
 
   def increase2(percentage: Long, company: Company): Company =
