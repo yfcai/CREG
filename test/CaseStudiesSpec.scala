@@ -144,4 +144,9 @@ class CaseStudiesSpec extends FlatSpec {
     assert(vars(renameExp(plusExp)) == Set("_x", "_y", "_z"))
     assert(vars(renameExp2(plusExp)) == Set("_x", "_y", "_z"))
   }
+
+  "Everything" should "work" in {
+    import Everything._
+    assert(elemF(xs).map(_ + 1) == xsPlus1)
+  }
 }
