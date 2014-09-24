@@ -21,4 +21,38 @@ trait Paths {
     import c.universe._
     tq"_root_.nominal.lib.Fix.Record"
   }
+
+  def getTraversableN(c: Context, n: Int): c.Tree = {
+    import c.universe._
+    val q"new $traversableN" =
+      c parse "new " + fullyQualifiedTraversableTrait + (if (n == 1) "" else n.toString)
+    traversableN
+  }
+
+  def getApplicative(c: Context): c.Tree = {
+    import c.universe._
+    tq"_root_.nominal.lib.Applicative"
+  }
+
+  def fullyQualifiedTraversableTrait: String = "_root_.nominal.lib.Traversable"
+
+  def mappingOnObjects: String = "Map"
+
+  def getFunctorMapOnObjects(c: Context)(applicative: c.TermName): c.Tree = {
+    import c.universe._
+    tq"$applicative.Map"
+  }
+
+  def getThisMapOnObjects(c: Context): c.Tree = {
+    import c.universe._
+    tq"this.Map"
+  }
+
+  def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
+
+  def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
+    import c.universe._
+    val q"??? : $tpe" = q"??? : _root_.nominal.lib.Applicative.Endofunctor[$f]"
+    tpe
+  }
 }

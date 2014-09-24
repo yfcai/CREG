@@ -5,7 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait DeclarationGenerator extends UniverseConstruction {
+trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
   /** @param datatype Representation of data type
     * @return AST of generated traits and case classes
     *
@@ -22,8 +22,10 @@ trait DeclarationGenerator extends UniverseConstruction {
     if (datatype.cases.isEmpty)
       Many(q"sealed trait $template extends ${getVariant(c)}")
     else
-      q"sealed trait $template [..${generateCaseNames(c)(datatype.cases)}] extends ${getVariant(c)}" +:
-        generateCases(c)(template, datatype.cases)
+      q"sealed trait $template [..${generateCaseNames(c)(datatype.cases)}] extends ${getVariant(c)}" +: (
+        generateCases(c)(template, datatype.cases) ++
+          generateKIRV(c)(datatype)
+      )
   }
 
   /** create the name of the template trait by appending T */
@@ -94,6 +96,39 @@ trait DeclarationGenerator extends UniverseConstruction {
     val nothing = Ident(TypeName("Nothing"))
     Many.tabulate(size)(i => if (i == index) param else nothing)
   }
+
+  def generateKIRV(c: Context)(datatype: Variant): Many[c.Tree] = {
+    generateVariantPrototype(c)(datatype) +:
+      datatype.cases.map(x => generateRecordPrototype(c)(x.asInstanceOf[Record]))
+  }
+
+  def generateVariantPrototype(c: Context)(datatype: Variant): c.Tree = {
+    import c.universe._
+    val n = datatype.cases.length
+    val objName = TermName(datatype.header.name)
+    val variantName = mkTemplate(c)(datatype.header.name)
+    val traversableN = getTraversableN(c, n)
+    val typeMap = mkTypeMap(c, n) { params => tq"$variantName[..$params]" }
+    val defTraverse = mkDefTraverse(c, n) {
+      case (g, fs, as, bs) =>
+        val caseDefs =
+          fs.zip(datatype.cases).map {
+            case (f, record) =>
+              recordCaseDef(c)(record.asInstanceOf[Record]) {
+                case (rcd, _) =>
+                  q"$f($rcd).asInstanceOf[${getFunctorMapOnObjects(c)(g)}[${getThisMapOnObjects(c)}[..$bs]]]"
+              }
+          }
+        val x = TermName(c freshName "x")
+        q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", caseDefs.toList) } }"
+    }
+    q"object $objName extends $traversableN { $typeMap ; $defTraverse }"
+  }
+
+  def generateRecordPrototype(c: Context)(record: Record): c.Tree = {
+    import c.universe._
+    q"();" // STUB: generate product traversable functor
+  }
 }
 
 object DeclarationGenerator {
@@ -111,7 +146,7 @@ object DeclarationGenerator {
           Variant(TypeVar(name.toString), Many.empty)
         )
         val expected = q"sealed trait ${TypeName(name.toString)} extends ${getVariant(c)}"
-        assertEqualBlock(c)(expected, actual)
+        assertHasPrefixBlock(c)(expected, actual)
       }
     }
 
@@ -133,7 +168,7 @@ object DeclarationGenerator {
           sealed trait $singletonType extends $template[$singletonType] with ${getRecord(c)}
           case object $singleton extends $singletonType
         """
-        assertEqualBlock(c)(expected, actual)
+        assertHasPrefixBlock(c)(expected, actual)
       }
     }
 
@@ -166,7 +201,7 @@ object DeclarationGenerator {
           sealed trait $c4 extends $template[Nothing, Nothing, Nothing, $c4] with ${getRecord(c)}
           case object ${TermName(c4.toString)} extends $c4
         """
-        assertEqualBlock(c)(expected, actual)
+        assertHasPrefixBlock(c)(expected, actual)
       }
     }
 
@@ -210,7 +245,7 @@ object DeclarationGenerator {
           sealed trait Death extends HorsemanT[Nothing, Nothing, Nothing, Death] with ${getRecord(c)}
           case object Death extends Death
         """
-        assertEqualBlock(c)(expected, actual)
+        assertHasPrefixBlock(c)(expected, actual)
       }
     }
 

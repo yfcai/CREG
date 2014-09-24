@@ -12,7 +12,7 @@ import DatatypeRepresentation._
   * @param functor the functor whose traversable instance is to be generated
   * @param subcats @see generateSubcategories
   */
-trait TraversableGenerator extends SynonymGenerator {
+trait TraversableGenerator extends SynonymGenerator with util.Traverse {
 
   // only generate 'new TraversableN { ... }'
   // leave the wrapping of generics to someone else
@@ -44,30 +44,6 @@ trait TraversableGenerator extends SynonymGenerator {
             Map.empty
         }).foldLeft(Map.empty[Name, Datatype])(_ ++ _)
     }).foldLeft(Map.empty[Name, Datatype])(_ ++ _)
-
-  /* fragile section begins */
-  def mappingOnObjects: String = "Map"
-
-  def getApplicativeMapOnObjects(c: Context)(applicative: c.TermName): c.Tree = {
-    import c.universe._
-    tq"$applicative.Map"
-  }
-
-  def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
-
-  def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
-    import c.universe._
-    val q"??? : $tpe" = q"??? : _root_.nominal.lib.Applicative.Endofunctor[$f]"
-    tpe
-  }
-
-  def applicativeTrait(c: Context): c.Tree = {
-    import c.universe._
-    tq"_root_.nominal.lib.Applicative"
-  }
-
-  def fullyQualifiedTraversableTrait: String = "_root_.nominal.lib.Traversable"
-  /* fragile section ends */
 
   def newTraversable(c: Context)(arity: Int, body: Many[c.Tree]): c.Tree = {
     import c.universe._
@@ -113,10 +89,10 @@ trait TraversableGenerator extends SynonymGenerator {
 
     // applicative: Applicative.Endofunctor[F]
     val applicative: TermName = TermName(c freshName "applicative")
-    val applicativeType = applicativeTrait(c)
+    val applicativeType = getApplicative(c)
 
     // type constructor of the applicative functor
-    val tF = getApplicativeMapOnObjects(c)(applicative)
+    val tF = getFunctorMapOnObjects(c)(applicative)
 
     // functions A => F[B], C => F[D], etc.
     val functions: Many[TermName] = functor.params.map(param => TermName(c freshName "f"))
@@ -154,16 +130,6 @@ trait TraversableGenerator extends SynonymGenerator {
 
     q"def traverse[..$typeDefs]($applicative : $applicativeType)(..$explicitParams): $resultType = $body"
   }
-
-  def mkValDef(c: Context)(termName: c.TermName, tpe: c.Tree): c.universe.ValDef = {
-    import c.universe._
-    val methodIn = TermName(c freshName "method")
-    val q"def $methodOut($valDef)" = q"def $methodIn($termName : $tpe)"
-    valDef
-  }
-
-  def mkValDefs(c: Context)(names: Many[c.TermName], types: Many[c.Tree]): Many[c.universe.ValDef] =
-    (names, types).zipped.map { case (name, tpe) => mkValDef(c)(name, tpe) }
 
   /** body of def traverse[...](...)(...)
     *
@@ -210,7 +176,7 @@ trait TraversableGenerator extends SynonymGenerator {
         val unrolledFix = TypeName(c freshName x + "U")
         val unrolledSynonym = generateConcreteSynonym(c)(unrolledFix.toString, mBData.body)
         val resultType = TypeName(c freshName "F_" + x)
-        val resultSynonym = q"type $resultType = ${getApplicativeMapOnObjects(c)(applicative)}[$mBType]"
+        val resultSynonym = q"type $resultType = ${getFunctorMapOnObjects(c)(applicative)}[$mBType]"
 
         // `recurse`: fresh label for jumping to this point
         val recurse = TermName(c freshName "recurse")
@@ -287,7 +253,7 @@ trait TraversableGenerator extends SynonymGenerator {
         val argCast = q"$arg.asInstanceOf[$argType]"
         val body = generateDefTraverseBody(c)(argCast, typeVar, mangleA, mangleB, env, applicative)
         val resultType = meaning(c)(_super rename mangleB)
-        q"$body.asInstanceOf[${getApplicativeMapOnObjects(c)(applicative)}[$resultType]]"
+        q"$body.asInstanceOf[${getFunctorMapOnObjects(c)(applicative)}[$resultType]]"
     }
 
   def generateRecordBody(c: Context)(
@@ -313,22 +279,6 @@ trait TraversableGenerator extends SynonymGenerator {
         val resultType = meaning(c)(record rename mangleB)
         q"$applicative.pure[$resultType]($recordName)"
     }
-  }
-
-  /** from record, create `case recordName @ Record(fieldNames @ _*) => body`
-    * where body = mkBody(recordName, fieldNames)
-    */
-  def recordCaseDef(c: Context)(record: Record)(mkBody: (c.TermName, Many[c.TermName]) => c.Tree): c.universe.CaseDef = {
-    import c.universe._
-    val recordIdentName = TermName(record.name)
-    val recordIdent = Ident(recordIdentName)
-    val recordName = TermName(c freshName record.name.toLowerCase)
-    val fieldNames = record.fields.map(field => TermName(c freshName field.name))
-    val fieldBindings = fieldNames.map(name => Bind(name, Ident(termNames.WILDCARD)))
-    if (fieldNames.isEmpty)
-      cq"$recordIdent => ${mkBody(recordIdentName, fieldNames)}"
-    else
-      cq"$recordName @ $recordIdent(..$fieldBindings) => ${mkBody(recordName, fieldNames)}"
   }
 
   def mkCallTree(c: Context)(applicative: c.TermName, leaves: Many[c.Tree]): c.Tree = {

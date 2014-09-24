@@ -1,6 +1,7 @@
 import org.scalatest._
 import nominal._
-import lib.Fix.{Record, Variant}
+import lib._
+import Fix.{Record, Variant}
 
 class DeclarationGeneratorSpec extends FlatSpec {
   import compiler.DeclarationGenerator.Tests._
@@ -23,6 +24,10 @@ class DeclarationGeneratorSpec extends FlatSpec {
 
     implicitly[VariantT[Int] <:< Variant]
     implicitly[Singleton <:< Record]
+
+    // traversable functor generated for variant
+    implicitly[VariantT.type <:< Traversable]
+    implicitly[VariantT.Map[Int] =:= VariantT[Int]]
   }
 
   it should "generate multiple variants without arguments" in {
@@ -40,6 +45,9 @@ class DeclarationGeneratorSpec extends FlatSpec {
     implicitly[War <:< Record]
     implicitly[Famine <:< Record]
     implicitly[Death <:< Record]
+
+    implicitly[HorsemanT.type <:< Traversable4]
+    implicitly[HorsemanT.Map[Int, Boolean, String, Double] =:= HorsemanT[Int, Boolean, String, Double]]
   }
 
   it should "generate case classes for variants with flat arguments" in {
