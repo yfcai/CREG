@@ -20,9 +20,9 @@ trait DeclarationGenerator extends UniverseConstruction {
     val template = mkTemplate(c)(datatype.header.name)
 
     if (datatype.cases.isEmpty)
-      Many(q"sealed trait $template")
+      Many(q"sealed trait $template extends ${getVariant(c)}")
     else
-      q"sealed trait $template [..${generateCaseNames(c)(datatype.cases)}]" +:
+      q"sealed trait $template [..${generateCaseNames(c)(datatype.cases)}] extends ${getVariant(c)}" +:
         generateCases(c)(template, datatype.cases)
   }
 
@@ -47,7 +47,7 @@ trait DeclarationGenerator extends UniverseConstruction {
         val termName = TermName(name)
         val params = namedParamsWithNothing(c)(typeName, i, cases.size)
         Many(
-          q"sealed trait $typeName extends $template[..$params]",
+          q"sealed trait $typeName extends $template[..$params] with ${getRecord(c)}",
           q"case object $termName extends $typeName")
 
       case (Record(name, fields), i) =>
@@ -55,10 +55,11 @@ trait DeclarationGenerator extends UniverseConstruction {
         val typeName = TypeName(name)
         val fieldNames = fields.map(_.name)
         val caseParams = covariantTypeParams(c)(fieldNames)
-        val q"??? : $myType" = q"??? : $typeName[..${fieldNames.map(name => TypeName(name))}]"
+        val myType = tq"$typeName[..${fieldNames.map(name => TypeName(name))}]"
         val templateParams = appliedParamsWithNothing(c)(myType, i, cases.size)
         val decls = generateFreeDecls(c)(fieldNames)
-        Many(q"sealed case class $typeName[..$caseParams](..$decls) extends $template[..$templateParams]")
+        Many(q"""sealed case class $typeName[..$caseParams](..$decls) extends
+          $template[..$templateParams] with ${getRecord(c)}""")
     }
   }
 
@@ -109,7 +110,7 @@ object DeclarationGenerator {
         val actual = generateDeclaration(c)(
           Variant(TypeVar(name.toString), Many.empty)
         )
-        val expected = q"sealed trait ${TypeName(name.toString)}"
+        val expected = q"sealed trait ${TypeName(name.toString)} extends ${getVariant(c)}"
         assertEqualBlock(c)(expected, actual)
       }
     }
@@ -128,8 +129,8 @@ object DeclarationGenerator {
         val singleton = TermName(singletonBody.toString)
         val singletonType = TypeName(singleton.toString)
         val expected = q"""
-          sealed trait $template[+$singletonType]
-          sealed trait $singletonType extends $template[$singletonType]
+          sealed trait $template[+$singletonType] extends ${getVariant(c)}
+          sealed trait $singletonType extends $template[$singletonType] with ${getRecord(c)}
           case object $singleton extends $singletonType
         """
         assertEqualBlock(c)(expected, actual)
@@ -155,14 +156,14 @@ object DeclarationGenerator {
         val c3 = TypeName(case3.toString)
         val c4 = TypeName(case4.toString)
         val expected = q"""
-          sealed trait $template[+$c1, +$c2, +$c3, +$c4]
-          sealed trait $c1 extends $template[$c1, Nothing, Nothing, Nothing]
+          sealed trait $template[+$c1, +$c2, +$c3, +$c4] extends ${getVariant(c)}
+          sealed trait $c1 extends $template[$c1, Nothing, Nothing, Nothing] with ${getRecord(c)}
           case object ${TermName(c1.toString)} extends $c1
-          sealed trait $c2 extends $template[Nothing, $c2, Nothing, Nothing]
+          sealed trait $c2 extends $template[Nothing, $c2, Nothing, Nothing] with ${getRecord(c)}
           case object ${TermName(c2.toString)} extends $c2
-          sealed trait $c3 extends $template[Nothing, Nothing, $c3, Nothing]
+          sealed trait $c3 extends $template[Nothing, Nothing, $c3, Nothing] with ${getRecord(c)}
           case object ${TermName(c3.toString)} extends $c3
-          sealed trait $c4 extends $template[Nothing, Nothing, Nothing, $c4]
+          sealed trait $c4 extends $template[Nothing, Nothing, Nothing, $c4] with ${getRecord(c)}
           case object ${TermName(c4.toString)} extends $c4
         """
         assertEqualBlock(c)(expected, actual)
@@ -199,14 +200,14 @@ object DeclarationGenerator {
         )
 
         val expected = q"""
-          sealed trait HorsemanT[+Conquest, +War, +Famine, +Death]
+          sealed trait HorsemanT[+Conquest, +War, +Famine, +Death] extends ${getVariant(c)}
           sealed case class Conquest[+_1, +_2, +_3](_1: _1, _2: _2, _3: _3) extends
-            HorsemanT[Conquest[_1, _2, _3], Nothing, Nothing, Nothing]
+            HorsemanT[Conquest[_1, _2, _3], Nothing, Nothing, Nothing] with ${getRecord(c)}
           sealed case class War[+_1, +_2, +_3](_1: _1, _2: _2, _3: _3) extends
-            HorsemanT[Nothing, War[_1, _2, _3], Nothing, Nothing]
+            HorsemanT[Nothing, War[_1, _2, _3], Nothing, Nothing] with ${getRecord(c)}
           sealed case class Famine[+_1](_1: _1) extends
-            HorsemanT[Nothing, Nothing, Famine[_1], Nothing]
-          sealed trait Death extends HorsemanT[Nothing, Nothing, Nothing, Death]
+            HorsemanT[Nothing, Nothing, Famine[_1], Nothing] with ${getRecord(c)}
+          sealed trait Death extends HorsemanT[Nothing, Nothing, Nothing, Death] with ${getRecord(c)}
           case object Death extends Death
         """
         assertEqualBlock(c)(expected, actual)

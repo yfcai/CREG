@@ -6,7 +6,7 @@ import scala.reflect.macros.TypecheckException
 
 import DatatypeRepresentation._
 
-trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
+trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with util.Paths {
 
   // ====================== //
   // FROM DATATYPE TO SCALA //
@@ -134,14 +134,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex {
 
   def mkBoundedTypeDefs(c: Context)(params: Many[Param], bounds: Map[Name, Datatype]): Many[c.universe.TypeDef] =
     params.map(param => mkBoundedTypeDef(c)(param, bounds))
-
-  // location of the Fix[_[_]] trait
-  def getFix(c: Context): c.Tree = {
-    import c.universe._
-    tq"_root_.nominal.lib.Fix"
-  }
-
-  def getRoll(c: Context): c.Tree = c parse "_root_.nominal.lib.Roll"
 
   // ====================== //
   // FROM SCALA TO DATATYPE //
