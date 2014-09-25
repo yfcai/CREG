@@ -111,14 +111,17 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
     val typeMap = mkTypeMap(c, n) { params => tq"$variantName[..$params]" }
     val defTraverse = mkDefTraverse(c, n) {
       case (g, fs, as, bs) =>
-        val caseDefs =
-          fs.zip(datatype.cases).map {
-            case (f, record) =>
+        val caseDefs: Many[CaseDef] =
+          (fs, as, datatype.cases).zipped.map({
+            case (f, a, record) =>
               recordCaseDef(c)(record.asInstanceOf[Record]) {
                 case (rcd, _) =>
-                  q"$f($rcd).asInstanceOf[${getFunctorMapOnObjects(c)(g)}[${getThisMapOnObjects(c)}[..$bs]]]"
+                  q"""
+                    $f($rcd.asInstanceOf[$a]).
+                      asInstanceOf[${getFunctorMapOnObjects(c)(g)}[${getThisMapOnObjects(c)}[..$bs]]]
+                  """
               }
-          }
+          })(collection.breakOut)
         val x = TermName(c freshName "x")
         q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", caseDefs.toList) } }"
     }
