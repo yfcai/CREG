@@ -42,6 +42,9 @@ trait Traverse extends Paths {
   }
 
   def mkTypeMap(c: Context, n: Int)(mapping: Many[c.TypeName] => c.Tree): c.Tree = {
+    if (n < 1)
+      sys error s"mkTypeMap called with n = $n"
+
     import c.universe._
     val tA: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "A"))(collection.breakOut)
     q"type ${TypeName(mappingOnObjects)}[..${mkCovariantTypeDefs(c)(tA)}] = ${mapping(tA)}"
@@ -67,6 +70,9 @@ trait Traverse extends Paths {
   }
 
   def mkCovariantTypeDefs(c: Context)(params: Many[c.TypeName]): Many[c.universe.TypeDef] = {
+    if (params.isEmpty)
+      sys error "mkCovariantTypeDefs called with empty params"
+
     import c.universe._
     val traitIn = TypeName(c freshName "Trait")
     val q"class $traitOut[..$typeDef] { ..$bodyOut }" =
@@ -91,4 +97,36 @@ trait Traverse extends Paths {
 
   def mkValDefs(c: Context)(names: Many[c.TermName], types: Many[c.Tree]): Many[c.universe.ValDef] =
     (names, types).zipped.map { case (name, tpe) => mkValDef(c)(name, tpe) }
+
+  def mkCallTree(c: Context)(applicative: c.TermName, leaves: Many[c.Tree]): c.Tree = {
+    import c.universe._
+    leaves.reduceLeft[c.Tree]({
+      case (callTree, nextArg) =>
+        q"$applicative.call($callTree, $nextArg)"
+    })
+  }
+
+  def mkPureCurriedFunction(c: Context)(
+    applicative: c.TermName,
+    termName: c.TermName,
+    typeName: c.TypeName,
+    typeParams: Many[c.TypeName]
+  ): c.Tree = {
+    import c.universe._
+
+    val typeBody = tq"$typeName[..$typeParams]"
+    val curriedType = typeParams.foldRight(typeBody) {
+      case (param, body) =>
+        tq"$param => $body"
+    }
+
+    val termParams = typeParams.map(_ => TermName(c freshName "x"))
+    val termBody = q"$termName(..$termParams)"
+    val curriedTerm = termParams.foldRight(termBody) {
+      case (param, body) =>
+        Function(List(mkValDef(c)(param, TypeTree())), body)
+    }
+
+    q"$applicative.pure[$curriedType]($curriedTerm)"
+  }
 }

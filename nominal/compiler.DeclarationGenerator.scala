@@ -130,7 +130,27 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
 
   def generateRecordPrototype(c: Context)(record: Record): c.Tree = {
     import c.universe._
-    q"();" // STUB: generate product traversable functor
+    if (record.fields.isEmpty)
+      q"();" // EmptyTree does not work
+    else {
+      val n = record.fields.length
+      val termName = TermName(record.name)
+      val typeName = TypeName(record.name)
+      val traversableN = getTraversableN(c, n)
+      val typeMap = mkTypeMap(c, n) { params => tq"$typeName[..$params]" }
+      val defTraverse = mkDefTraverse(c, n) {
+        case (g, fs, as, bs) =>
+          val caseDef = recordCaseDef(c)(record) {
+            case (_, fieldNames) =>
+              mkCallTree(c)(g,
+                mkPureCurriedFunction(c)(g, termName, typeName, bs) +:
+                  fs.zip(fieldNames).map({ case (f, x) => q"$f($x)" }))
+          }
+          val x = TermName(c freshName "x")
+          q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", List(caseDef)) } }"
+      }
+      q"object $termName extends $traversableN { $typeMap ; $defTraverse }"
+    }
   }
 }
 

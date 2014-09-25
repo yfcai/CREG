@@ -281,14 +281,6 @@ trait TraversableGenerator extends SynonymGenerator with util.Traverse {
     }
   }
 
-  def mkCallTree(c: Context)(applicative: c.TermName, leaves: Many[c.Tree]): c.Tree = {
-    import c.universe._
-    leaves.reduceLeft[c.Tree]({
-      case (callTree, nextArg) =>
-        q"$applicative.call($callTree, $nextArg)"
-    })
-  }
-
   def mkPureConstructor(c: Context)(
     record: Record, // mangled already
     applicative: c.TermName):

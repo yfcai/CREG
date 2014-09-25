@@ -23,6 +23,18 @@ class DeclarationGeneratorSpec extends FlatSpec {
     F(t).traverse(Applicative.Const[String]("", _ + _))(err(1), _.toString, err(3), err(4))
   }
 
+  // cargo code
+  // http://stackoverflow.com/a/16256935/3968633
+  implicit class Regex(sc: StringContext) {
+    def r = new scala.util.matching.Regex(sc.parts.mkString, sc.parts.tail.map(_ => "x"): _*)
+  }
+
+  def show3(F: Traversable3)(record: F.Map[Any, Any, Any]): String = {
+    val head = record.toString match { case r"([^\(]+)$head.*" => head }
+    val body = F(record).traverse(Applicative.Const[String]("", _ + " " + _))(_.toString, _.toString, _.toString)
+    s"$head($body)"
+  }
+
   it should "generate case object for variant without arguments" in {
     @caseObject trait Variant { Singleton }
     val singleton: VariantT[Singleton] = Singleton
@@ -89,6 +101,11 @@ class DeclarationGeneratorSpec extends FlatSpec {
     implicitly[Famine[Int] <:< Record]
     implicitly[Death <:< Record]
 
+    // prototype variant functor
     assert(show2(Horseman)(war) == "War(3,5,true)")
+
+    // prototype record functors
+    assert(show3(Conquest)(Conquest(1, 2, 3)) == "Conquest( 1 2 3)")
+    assert(show3(War)(War(3, 5, true)) == "War( 3 5 true)")
   }
 }
