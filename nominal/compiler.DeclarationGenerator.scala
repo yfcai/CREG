@@ -29,7 +29,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
   }
 
   /** create the name of the template trait by appending T */
-  def mkTemplate(c: Context)(name: String): c.TypeName = c.universe.TypeName(name)
+  def mkTemplate(c: Context)(name: String): c.TypeName = c.universe.TypeName(name + "T")
 
   /** @param cases a bunch of named variants
     * @return their names as TypeName
@@ -145,7 +145,7 @@ object DeclarationGenerator {
         val actual = generateDeclaration(c)(
           Variant(TypeVar(name.toString), Many.empty)
         )
-        val expected = q"sealed trait ${TypeName(name.toString)} extends ${getVariant(c)}"
+        val expected = q"sealed trait ${TypeName(name.toString + "T")} extends ${getVariant(c)}"
         assertHasPrefixBlock(c)(expected, actual)
       }
     }
@@ -160,7 +160,7 @@ object DeclarationGenerator {
             Record(singletonBody.toString, Many.empty)
           ))
         )
-        val template = TypeName(variant.toString)
+        val template = TypeName(variant.toString + "T")
         val singleton = TermName(singletonBody.toString)
         val singletonType = TypeName(singleton.toString)
         val expected = q"""
@@ -185,7 +185,7 @@ object DeclarationGenerator {
             Record(case4.toString, Many.empty)
           ))
         )
-        val template = TypeName(variant.toString)
+        val template = TypeName(variant.toString + "T")
         val c1 = TypeName(case1.toString)
         val c2 = TypeName(case2.toString)
         val c3 = TypeName(case3.toString)
@@ -210,16 +210,8 @@ object DeclarationGenerator {
       def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
         import c.universe._
 
-        val q"""
-          trait HorsemanT {
-             Conquest(A, A, A)
-             War(A, A, B)
-             Famine(B)
-             Death
-          }""" = annottees.head.tree
-
         val actual = generateDeclaration(c)(
-          Variant(TypeVar("HorsemanT"), Many(
+          Variant(TypeVar("Horseman"), Many(
             Record("Conquest", Many(
               Field("_1", TypeVar("A")),
               Field("_2", TypeVar("A")),

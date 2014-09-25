@@ -13,7 +13,7 @@ trait Preprocessor extends util.AbortWithError {
   def digestForDeclarationGenerator(c: Context)(input: c.Tree, parseTree: DataConstructor): Iterator[Variant] = {
     // check that parseTree starts with a variant
     val variant = topLevelVariant(c)(input, parseTree)
-    extractVariants(appendLetterT(variant))
+    extractVariants(variant)
   }
 
   /** @param input the trait
@@ -28,7 +28,7 @@ trait Preprocessor extends util.AbortWithError {
       // not recursive
       case None =>
         SynonymGeneratorFood(
-        (name, DataConstructor(parseTree.params, appendLetterT(variant))),
+        (name, DataConstructor(parseTree.params, variant)),
         None)
 
       // recursive
@@ -50,7 +50,7 @@ trait Preprocessor extends util.AbortWithError {
     *          constant functor.
     */
   def pointlessify(variant: Variant, genericParams: Many[Param]): FixedPoint = variant match {
-    case Variant(TypeVar(name), body) => FixedPoint(name, appendLetterT(variant))
+    case Variant(TypeVar(name), body) => FixedPoint(name, variant)
   }
 
 
@@ -98,16 +98,7 @@ trait Preprocessor extends util.AbortWithError {
   private[this] def exists(data: Datatype)(predicate: PartialFunction[Datatype, Unit]): Boolean =
     ! data.everywhereQ(predicate).isEmpty
 
-  /** @return datatype with 'T' appended to every variant header
-    *         TypeVars are otherwise left alone
-    */
-  def appendLetterT(datatype: Datatype): Datatype = datatype everywhere {
-    case Variant(header, body) =>
-      Variant(appendT(header), body)
-  }
-
-  // append 'T' to a TypeVar
-  private[this] def appendT(header: TypeVar): TypeVar = TypeVar(header.name + "T")
+  // append 'F' to a TypeVar
   private[this] def appendF(name: Name): Name = name + "F"
 
   /** @return all variants nested in this datatype declaration
