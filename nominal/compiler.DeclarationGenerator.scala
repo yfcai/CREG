@@ -28,9 +28,6 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
       )
   }
 
-  /** create the name of the template trait by appending T */
-  def mkTemplate(c: Context)(name: String): c.TypeName = c.universe.TypeName(name + "T")
-
   /** @param cases a bunch of named variants
     * @return their names as TypeName
     */

@@ -48,7 +48,7 @@ extends Parser
       // import language features needed for generated code
       val imports = scalaLanguageFeatureImports(c).iterator
 
-      var result = imports ++ declarations ++ synonyms
+      val result = imports ++ declarations ++ synonyms
 
       c.Expr(q"..${result.toSeq}")
 

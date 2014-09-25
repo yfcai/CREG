@@ -108,4 +108,8 @@ class DeclarationGeneratorSpec extends FlatSpec {
     assert(show3(Conquest)(Conquest(1, 2, 3)) == "Conquest( 1 2 3)")
     assert(show3(War)(War(3, 5, true)) == "War( 3 5 true)")
   }
+
+  // test that synonym generation doesn't conflict with declaration generation
+  import functors.datatype
+  @datatype trait List[A] { Nil ; Cons(A, List[A]) }
 }

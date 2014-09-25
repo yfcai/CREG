@@ -77,13 +77,13 @@ object SynonymGenerator {
         val personT = "PersonT"
 
         val datatype =
-          Variant(TypeVar(personT), Many(
+          Variant(TypeVar(person), Many(
             Record("Boss", Many.empty),
             Record("Manager", Many(Field("dept", TypeVar("Int")))),
             Record("Employee", Many(Field("name", TypeVar("String")), Field("dept", TypeVar("Int"))))))
 
         val declaration = generateDeclaration(c)(datatype)
-        val synonym = generateConcreteSynonym(c)(person, datatype)
+        val synonym = generateConcreteSynonym(c)(person, templatify(datatype))
         val expected = q"type Person = PersonT[Boss, Manager[Int], Employee[String, Int]]"
         assertEqual(c)(expected, synonym)
 
@@ -103,7 +103,7 @@ object SynonymGenerator {
         val intListF = "IntListF"
 
         val datatypeBody =
-          Variant(TypeVar(intListT), Many(
+          Variant(TypeVar(intList), Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
               Field("_1", TypeVar("Int")),
@@ -113,14 +113,14 @@ object SynonymGenerator {
 
         val declaration = generateDeclaration(c)(datatypeBody)
 
-        val synonym = generateConcreteSynonym(c)(intList, fixedPoint)
+        val synonym = generateConcreteSynonym(c)(intList, templatify(fixedPoint))
         val q"""
           type IntList = _root_.nominal.lib.Fix[({
             type $innerTypeL[+IntList] = IntListT[Nil, Cons[Int, IntList]]
           })#$innerTypeR]""" = synonym
         assert(innerTypeL == innerTypeR)
 
-        val patternF = generateConcretePatternFunctor(c)(intListF, fixedPoint)
+        val patternF = generateConcretePatternFunctor(c)(intListF, templatify(fixedPoint).asInstanceOf[FixedPoint])
         val expectedPatternF = q"""
           type IntListF[+IntList] = IntListT[Nil, Cons[Int, IntList]]
         """
@@ -142,7 +142,7 @@ object SynonymGenerator {
         val gListF = "GListF"
 
         val datatypeBody =
-          Variant(TypeVar(gListT), Many(
+          Variant(TypeVar(gList), Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
               Field("_1", TypeVar("A")),
@@ -154,14 +154,14 @@ object SynonymGenerator {
 
         val declaration = generateDeclaration(c)(datatypeBody)
 
-        val synonym = generateSynonym(c)(gList, genericDatatype)
+        val synonym = generateSynonym(c)(gList, templatify(genericDatatype))
         val q"""
           type GList[+A] = _root_.nominal.lib.Fix[({
             type $innerTypeL[+GList] = GListT[Nil, Cons[A, GList]]
           })#$innerTypeR]""" = synonym
         assert(innerTypeL == innerTypeR)
 
-        val patternF = generatePatternFunctorSynonym(c)(gListF, genericDatatype)
+        val patternF = generatePatternFunctorSynonym(c)(gListF, templatify(genericDatatype))
         val expectedPatternF = q"""
           type GListF[+A, +GList] = GListT[Nil, Cons[A, GList]]
         """

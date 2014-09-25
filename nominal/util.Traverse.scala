@@ -129,4 +129,21 @@ trait Traverse extends Paths {
 
     q"$applicative.pure[$curriedType]($curriedTerm)"
   }
+
+  /** create the name of the template trait by appending T */
+  def mkTemplate(c: Context)(name: String): c.TypeName = c.universe.TypeName(mkTemplateName(name))
+
+  def mkTemplateName(name: String): String = name + "T"
+
+  /** @return datatype with 'T' appended to every variant header
+    *         TypeVars are otherwise left alone
+    */
+  import compiler.DatatypeRepresentation.{Datatype, Variant, TypeVar, DataConstructor}
+  def templatify(datatype: Datatype): Datatype = datatype everywhere {
+    case Variant(TypeVar(name), body) =>
+      Variant(TypeVar(mkTemplateName(name)), body)
+  }
+
+  def templatify(cons: DataConstructor): DataConstructor =
+    DataConstructor(cons.params, templatify(cons.body))
 }

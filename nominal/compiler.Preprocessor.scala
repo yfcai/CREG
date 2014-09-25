@@ -4,7 +4,7 @@ package compiler
 import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
-trait Preprocessor extends util.AbortWithError {
+trait Preprocessor extends util.AbortWithError with util.Traverse {
 
   sealed case class PreprocessorException(message: String) extends Exception(message)
 
@@ -28,7 +28,7 @@ trait Preprocessor extends util.AbortWithError {
       // not recursive
       case None =>
         SynonymGeneratorFood(
-        (name, DataConstructor(parseTree.params, variant)),
+        (name, DataConstructor(parseTree.params, templatify(variant))),
         None)
 
       // recursive
@@ -50,7 +50,7 @@ trait Preprocessor extends util.AbortWithError {
     *          constant functor.
     */
   def pointlessify(variant: Variant, genericParams: Many[Param]): FixedPoint = variant match {
-    case Variant(TypeVar(name), body) => FixedPoint(name, variant)
+    case Variant(TypeVar(name), body) => FixedPoint(name, templatify(variant))
   }
 
 
