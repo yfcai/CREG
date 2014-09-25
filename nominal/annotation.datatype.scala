@@ -9,7 +9,7 @@ import compiler._
 import DatatypeRepresentation._
 
 object datatype
-extends Parser
+extends ParserOfDatatypeRep
    with Preprocessor
    with DeclarationGenerator
    with SynonymGenerator

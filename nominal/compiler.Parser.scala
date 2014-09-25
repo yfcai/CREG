@@ -3,11 +3,13 @@ package compiler
 
 import scala.reflect.macros.blackbox.Context
 
-import DatatypeRepresentation._
 import contextReaderParser._
 
-trait Parser extends util.AbortWithError with util.TupleIndex {
-
+trait ParserOfDatatypeRep extends util.AbortWithError with util.TupleIndex {
+  // ====================================
+  // GRAMMARS FOR DATATYPE REPRESENTATION
+  // ====================================
+  //
   // Grammar: Datatype
   // =================
   //
@@ -57,7 +59,8 @@ trait Parser extends util.AbortWithError with util.TupleIndex {
   // =>:  (term-level name of reader constructor)
   // WITH (term-level name of keyword `with`)
   // _\d+ (tuple components _1, _2, _3, ...; _i must be the (i - 1)th field)
-  //
+
+  import DatatypeRepresentation._
 
   // shadow trait Parser by Parser[A]
   private[this] type Parser[A] = contextReaderParser.Parser[A]
@@ -199,7 +202,7 @@ trait Parser extends util.AbortWithError with util.TupleIndex {
             }
             yield Record(
               name,
-              Many(possiblyAnonymousFields: _*).zipWithIndex.map {
+              possiblyAnonymousFields.zipWithIndex.map {
                 case (AnonymousField(data), i) =>
                   val label = s"_${i + 1}" // "_1", "_2", "_3" etc; scala will make sure named follows anonymous
                   Field(label, data)
@@ -326,11 +329,136 @@ trait Parser extends util.AbortWithError with util.TupleIndex {
   }
 }
 
+trait ParserOfFunctorRep extends util.AbortWithError with util.TupleIndex {
+  // ============================================================================
+  // GRAMMAR FOR FUNCTOR REPRESENTATION (NOT TO BE CONFUSED WITH DATACONSTRUCTOR)
+  // ============================================================================
+  //
+  // decl := params => body
+  //
+  // params := typevar
+  //         | (typevar, typevar, ..., typevar)
+  //
+  // body := typevar
+  //       | fixed-point
+  //       | application
+  //       | constant
+  //
+  // fixed-point := Fix(typevar => body)
+  //
+  // application := scala-functor(body, body, ..., body)
+  //
+  // scala-functor := code
+  //
+  // constant := code
+  //
+  // code := a scala identifier
+
+  import nominal.compiler.Functor._
+  private[this] type Parser[A] = contextReaderParser.Parser[A]
+
+  lazy val DeclP: Parser[Decl] = new Parser[Decl] {
+    def parse(c: Context)(input: c.Tree): Result[Decl, c.Position] = {
+      import c.universe._
+      input match {
+        case Function(valDefs, bodyCode) =>
+          for { body <- BodyP.parse(c)(bodyCode) }
+          yield Decl(valDefs map { case ValDef(_, TermName(name), _, _) => name }, body)
+      }
+    }
+  }
+
+  // sadly, constants and type variables are indistinguishable bottom-up
+  lazy val BodyP: Parser[Body] = TypeVarP <+ FixedPointP <+ ApplicationP
+
+  lazy val FixedPointP: Parser[FixedPoint] = new Parser[FixedPoint] {
+    def parse(c: Context)(input: c.Tree): Result[FixedPoint, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$fixCode($paramCode => $bodyCode)" =>
+          for {
+            _ <- FixP.parse(c)(fixCode)
+            param <- OneParamP.parse(c)(paramCode)
+            body <- BodyP.parse(c)(bodyCode)
+          }
+          yield FixedPoint(param, body)
+
+        case _ =>
+          Failure(input.pos, "expect Fix(param => body)")
+      }
+    }
+  }
+
+  // parse the identifier "Fix" and nothing else
+  lazy val FixP: Parser[Unit] = new Parser[Unit] {
+    val expected = "Fix"
+
+    def parse(c: Context)(input: c.Tree): Result[Unit, c.Position] =
+      CodeP.parse(c)(input) flatMap { identifier =>
+          if (identifier != expected)
+            Failure(input.pos, s"expect the identifier `$expected` ")
+          else
+            Success(())
+      }
+  }
+
+  // parse one parameter
+  lazy val OneParamP: Parser[Name] = new Parser[Name] {
+    def parse(c: Context)(input: c.Tree): Result[Name, c.Position] = {
+      import c.universe._
+      input match {
+        case ValDef(modifiers, TermName(name), TypeTree(), EmptyTree) =>
+          Success(name)
+
+        case _ =>
+          Failure(input.pos, s"expect ONE closure parameter, got ${showRaw(input)}")
+      }
+    }
+  }
+
+  lazy val ApplicationP: Parser[Application] = new Parser[Application] {
+    // ArgsP has to be lazy coz it's a part of the recursion cycle
+    // if it weren't, then it will force a cycle, ending up throwing StackOverflowError
+    lazy val ArgsP: MultiParser[Body] = ZeroOrMore(BodyP)
+
+    def parse(c: Context)(input: c.Tree): Result[Application, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$functorCode(..$argsCode)" =>
+          for {
+            functor <- CodeP.parse(c)(functorCode)
+            args <- ArgsP.parse(c)(argsCode)
+          }
+          yield Application(functor, args)
+
+        case _ =>
+          Failure(input.pos, "expect functor application")
+      }
+    }
+  }
+
+  lazy val TypeVarP: Parser[TypeVar] = CodeP map TypeVar
+
+  lazy val CodeP: Parser[Code] = new Parser[Code] {
+    def parse(c: Context)(input: c.Tree): Result[Code, c.Position] = {
+      import c.universe._
+      input match {
+        case Ident(name) =>
+          Success(name.toString)
+
+        case _ =>
+          Failure(input.pos, "expect identifier")
+      }
+    }
+  }
+}
+
 
 object Parser {
-  object Tests extends Parser with util.AssertEqual with util.Persist {
+  object Tests extends ParserOfDatatypeRep with util.AssertEqual with util.Persist {
     import scala.language.experimental.macros
     import scala.annotation.StaticAnnotation
+    import DatatypeRepresentation._
 
     class record extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro record.impl }
     object record {
@@ -431,6 +559,7 @@ object Parser {
       }
     }
 
+    // parse functors to data constructors
     class functor extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro functorImpl }
     def functorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
       import c.universe._
@@ -440,5 +569,17 @@ object Parser {
       }
     }
 
+    // parse functors to Functor.Decl
+    // BEWARE: duplicates class functor
+    class fun extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro funImpl }
+    object ParseFunctorRep extends ParserOfFunctorRep
+    def funImpl(c: Context)(annottees: c.Tree*): c.Tree = {
+      import ParseFunctorRep._
+      import c.universe._
+      annottees match {
+        case Seq(ValDef(mods, name, tpe @ TypeTree(), tree)) =>
+          ValDef(mods, name, tpe, persist(c)(parseOrAbort(c)(ParseFunctorRep.DeclP, tree)))
+      }
+    }
   }
 }

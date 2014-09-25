@@ -58,6 +58,11 @@ trait Parser[+A] {
     def parse(c: Context)(input: c.Tree): Result[B, c.Position] =
       self.parse(c)(input) orElse that.parse(c)(input)
   }
+
+  def map[B](f: A => B): Parser[B] = new Parser[B] {
+    def parse(c: Context)(input: c.Tree): Result[B, c.Position] =
+      self.parse(c)(input) map f
+  }
 }
 
 trait MultiParser[+A] {

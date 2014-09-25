@@ -616,7 +616,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
 }
 
 object UniverseConstruction {
-  object Tests extends UniverseConstruction with Parser with util.AssertEqual with util.Persist {
+  object Tests extends UniverseConstruction with ParserOfDatatypeRep with util.AssertEqual with util.Persist {
     import language.experimental.macros
     import scala.annotation.StaticAnnotation
 

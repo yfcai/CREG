@@ -15,7 +15,7 @@ import compiler._
   * @functor val someFunctor = TypeParams => ResultDatatype
   */
 
-object functor extends Parser with TraversableGenerator with util.AbortWithError {
+object functor extends ParserOfDatatypeRep with TraversableGenerator with util.AbortWithError {
   private[this] def classLevelSignal(c: Context)(name: c.TermName): Boolean =
     name.toString == c.universe.termNames.WILDCARD.toString
 
