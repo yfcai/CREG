@@ -16,18 +16,18 @@ extends Parser
    with TraversableGenerator
    with InterfaceHelperGenerator
 {
-  object Flag extends Enumeration {
-    type Flag = Value
-    val ImplicitConstructor = Value
-  }
-
-  def vanillaImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
-    expandData(c)(annottees, Set())
-
-  def expandData(c: Context)(annottees: Seq[c.Expr[Any]], options: Set[Flag.Flag]): c.Expr[Any] = {
+  def expandData(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
     val (input, companion) = extractInput(c)(annottees)
+
+    // we can't support companion objects any more,
+    // because they have to be traversable functors.
+    companion match {
+      case None => () // no companion object defined, this is good
+      case Some(companion) =>
+        abortWithError(c)(companion.pos, "datatypes may not have companion objects")
+    }
 
     try {
       // parser parses DSL
@@ -48,13 +48,7 @@ extends Parser
       // import language features needed for generated code
       val imports = scalaLanguageFeatureImports(c).iterator
 
-      // companion object
-      val updatedCompanion: c.Tree = injectIntoObject(c)(companion, Seq.empty) // nothing to inject for now
-
-      var result = imports ++ declarations ++ synonyms ++ Some(updatedCompanion)
-
-      if (options(this.Flag.ImplicitConstructor))
-        result = result ++ generateAutoroll(c)(synonymFood)
+      var result = imports ++ declarations ++ synonyms
 
       c.Expr(q"..${result.toSeq}")
 
@@ -69,7 +63,7 @@ extends Parser
     *
     * annoying operation; duplicates parser...
     */
-  def extractInput(c: Context)(annottees: Seq[c.Expr[Any]]): (c.Tree, c.Tree) = {
+  def extractInput(c: Context)(annottees: Seq[c.Expr[Any]]): (c.Tree, Option[c.Tree]) = {
     import c.universe._
     def giveUp: Nothing =
       abortWithError(c)(annottees.head.tree.pos,
@@ -82,13 +76,13 @@ extends Parser
 
       case 1 =>
         val input = annottees.head.tree
-        getNameOfTrait(c)(input).fold[(c.Tree, c.Tree)](giveUp)(name => (input, q"object ${TermName(name)}"))
+        getNameOfTrait(c)(input).fold[(c.Tree, Option[c.Tree])](giveUp)(name => (input, None))
 
       case 2 =>
         val (fst, snd) = (annottees.head.tree, annottees.last.tree)
         (getNameOfTrait(c)(fst), getNameOfTrait(c)(snd)) match {
-          case (Some(_), None) => (fst, snd)
-          case (None, Some(_)) => (snd, fst)
+          case (Some(_), None) => (fst, Some(snd))
+          case (None, Some(_)) => (snd, Some(fst))
           case _ => giveUp
         }
     }
@@ -107,8 +101,4 @@ extends Parser
         abortWithError(c)(obj.pos, "malformed companion object")
     }
   }
-}
-
-class datatype extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro datatype.vanillaImpl
 }
