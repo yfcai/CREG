@@ -128,8 +128,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     }
   }
 
-  def nameOfAny: String = "_root_.scala.Any"
-
   def mkTypeDefs(c: Context)(params: Many[Param]): Many[c.universe.TypeDef] = mkBoundedTypeDefs(c)(params, Map.empty)
 
   def mkBoundedTypeDefs(c: Context)(params: Many[Param], bounds: Map[Name, Datatype]): Many[c.universe.TypeDef] =
@@ -146,9 +144,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
 
     implicit val defaultFlags: Flags = Set.empty
   }
-
-  def nothingType: String = "_root_.scala.Nothing"
-  def anyType: String = "_root_.scala.Any"
 
   /** flesh out parsed datatype with some cases/fields omitted */
   def fleshOut(c: Context)(raw: DataConstructor)(implicit flags: UC.Flags): DataConstructor = {

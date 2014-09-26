@@ -28,19 +28,38 @@ trait Traverse extends Paths {
     *
     * @return q"new TraversableN { def traverse[...](...) = body(...) }"
     */
-  def newTraversableN(c: Context, n: Int)
+  def newTraversableEndofunctor(c: Context, n: Int)
     (mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree =
-    newTraversableWith(c, n)(Many.empty, mapping)(body)
+    newTraversableEndofunctorWith(c, n)(Many.empty, mapping)(body)
 
-  def newTraversableWith(c: Context, n: Int)
+  def newTraversableEndofunctorWith(c: Context, n: Int)
     (valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
+    (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
+      c.Tree =
+    newTraversableTrait(c, n)(getTraversableEndofunctor(c, n), valDefs, mapping)(body)
+
+  def newBoundedTraversableWith(c: Context, n: Int)
+    (bounds: Many[c.Tree], valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
+    (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
+      c.Tree = {
+    import c.universe._
+    val n = bounds.length
+    val cats = bounds.zipWithIndex.map {
+      case (bound, i) =>
+        q"type ${typeNameCat(c, i, n)} = $bound"
+    }
+    newTraversableTrait(c, n)(getBoundedTraversable(c, n), cats ++ valDefs, mapping)(body)
+  }
+
+  def newTraversableTrait(c: Context, n: Int)
+    (theTrait: c.Tree, valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree): c.Tree =
   {
     import c.universe._
     q"""
-      new ${getTraversableEndofunctor(c, n)} {
+      new $theTrait {
         ..$valDefs
         ${mkTypeMap(c, n)(mapping)}
         ${mkDefTraverse(c, n)(body)}
@@ -70,7 +89,10 @@ trait Traverse extends Paths {
     val explicitParams = mkValDefs(c)(fs, fTypes)
     val resultType = tq"${mkTraverseIn(c)(tA)} => ${mkTraverseOut(c)(G, tB)}"
     val theBody = body(G, fs, tA, tB)
-    val tAB = mkInvariantTypeDefs(c)(tA ++ tB)
+
+    val cats = (0 until n).map(i => getThisCat(c, i, n))
+    val tAB = mkInvariantTypeDefs(c)(tA ++ tB, cats ++ cats)
+
     q"""
       def traverse[..$tAB]($G : ${getApplicative(c)})(..$explicitParams): $resultType = $theBody
     """
@@ -105,11 +127,16 @@ trait Traverse extends Paths {
     typeDef
   }
 
-  def mkInvariantTypeDefs(c: Context)(params: Many[c.TypeName]): Many[c.universe.TypeDef] = {
+  def mkInvariantTypeDefs(c: Context)(params: Many[c.TypeName], bounds: Many[c.Tree]): Many[c.universe.TypeDef] = {
     import c.universe._
     val traitIn = TypeName(c freshName "Trait")
+
+    val boundedParams = params zip bounds map {
+      case (param, bound) => s"$param <: ${showCode(bound)}"
+    }
+
     val q"class $traitOut[..$typeDef] { ..$bodyOut }" =
-      c parse s"class $traitIn[" + (params mkString ", ") + "]"
+      c parse s"class $traitIn[" + (boundedParams mkString ", ") + "]"
     typeDef
   }
 

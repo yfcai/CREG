@@ -24,7 +24,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
     else
       q"sealed trait $template [..${generateCaseNames(c)(datatype.cases)}] extends ${getVariant(c)}" +: (
         generateCases(c)(template, datatype.cases) ++
-          generateKIRV(c)(datatype)
+          generateKIRVPrimitives(c)(datatype)
       )
   }
 
@@ -94,7 +94,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
     Many.tabulate(size)(i => if (i == index) param else nothing)
   }
 
-  def generateKIRV(c: Context)(datatype: Variant): Many[c.Tree] = {
+  def generateKIRVPrimitives(c: Context)(datatype: Variant): Many[c.Tree] = {
     generateVariantPrototype(c)(datatype) +:
       datatype.cases.map(x => generateRecordPrototype(c)(x.asInstanceOf[Record]))
   }
@@ -104,7 +104,27 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
     val n = datatype.cases.length
     val objName = TermName(datatype.header.name)
     val variantName = mkTemplate(c)(datatype.header.name)
-    val traversableN = getTraversableEndofunctor(c, n) // TODO: REINTRODUCE BOUNDS
+    val records = datatype.cases.asInstanceOf[Many[Record]]
+
+    // compute bounds
+    val bounds = records map {
+      case Record(recordName, fields) =>
+        val typeName = TypeName(recordName)
+        val theAny = getAnyType(c)
+        val typeArgs = fields map (_ => theAny)
+        tq"$typeName[..$typeArgs]"
+    }
+
+    // trait to extend
+    val traversableN = getBoundedTraversable(c, n)
+
+    // subcategory bounds
+    val cats = bounds.zipWithIndex map {
+      case (bound, i) =>
+        val cat = typeNameCat(c, i, n)
+        q"type $cat = $bound"
+    }
+
     val typeMap = mkTypeMap(c, n) { params => tq"$variantName[..$params]" }
     val defTraverse = mkDefTraverse(c, n) {
       case (g, fs, as, bs) =>
@@ -122,7 +142,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
         val x = TermName(c freshName "x")
         q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", caseDefs.toList) } }"
     }
-    q"object $objName extends $traversableN { $typeMap ; $defTraverse }"
+    q"object $objName extends $traversableN { ..$cats ; $typeMap ; $defTraverse }"
   }
 
   def generateRecordPrototype(c: Context)(record: Record): c.Tree = {

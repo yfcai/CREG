@@ -22,10 +22,17 @@ trait Paths {
     tq"_root_.nominal.lib.Fix.Record"
   }
 
-  def getTraversableEndofunctor(c: Context, n: Int): c.Tree = {
+  def getTraversableEndofunctor(c: Context, n: Int): c.Tree =
+    getSomeTraversableTrait(c, n, traversableEndofunctorTrait)
+
+  def getBoundedTraversable(c: Context, n: Int): c.Tree =
+    getSomeTraversableTrait(c, n, boundedTraversableTrait)
+
+  private[this]
+  def getSomeTraversableTrait(c: Context, n: Int, traitName: String): c.Tree = {
     import c.universe._
-    val q"new $traversableN" =
-      c parse "new " + traversableEndofunctorTrait + (if (n == 1) "" else n.toString)
+    val q"??? : $traversableN" =
+      c parse "??? : " + traitName + (if (n == 1) "" else n.toString)
     traversableN
   }
 
@@ -35,6 +42,7 @@ trait Paths {
   }
 
   def traversableEndofunctorTrait: String = "_root_.nominal.lib.Traversable.EndofunctorTrait"
+  def boundedTraversableTrait: String = "_root_.nominal.lib.Traversable"
 
   def mappingOnObjects: String = "Map"
 
@@ -48,6 +56,21 @@ trait Paths {
     tq"this.Map"
   }
 
+  def getFunctorCat(c: Context, i: Int, n: Int)(functor: c.TermName): c.Tree = {
+    import c.universe._
+    tq"$functor.${typeNameCat(c, i, n)}"
+  }
+
+  def getThisCat(c: Context, i: Int, n: Int): c.Tree = {
+    import c.universe._
+    tq"this.${typeNameCat(c, i, n)}"
+  }
+
+  def typeNameCat(c: Context, i: Int, n: Int): c.TypeName = {
+    import c.universe._
+    TypeName("Cat" + (if (n == 1) "" else (i + 1).toString))
+  }
+
   def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
 
   def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
@@ -55,4 +78,13 @@ trait Paths {
     val q"??? : $tpe" = q"??? : _root_.nominal.lib.Applicative.Endofunctor[$f]"
     tpe
   }
+
+  def getAnyType(c: Context): c.Tree = {
+    import c.universe._
+    tq"_root_.scala.Any"
+  }
+
+  def nothingType: String = "_root_.scala.Nothing"
+  def anyType: String = "_root_.scala.Any"
+
 }

@@ -48,8 +48,6 @@ class DeclarationGeneratorSpec extends FlatSpec {
     // traversable functor generated for variant
     implicitly[Variant.type <:< Traversable]
     implicitly[Variant.Map[Int] =:= VariantT[Int]]
-
-    assert(show(Variant)(singleton) == "Singleton")
   }
 
   it should "generate multiple variants without arguments" in {
@@ -70,8 +68,6 @@ class DeclarationGeneratorSpec extends FlatSpec {
 
     implicitly[Horseman.type <:< Traversable4]
     implicitly[Horseman.Map[Int, Boolean, String, Double] =:= HorsemanT[Int, Boolean, String, Double]]
-
-    assert(show2(Horseman)(war) == "War")
   }
 
   it should "generate case classes for variants with flat arguments" in {
@@ -100,9 +96,6 @@ class DeclarationGeneratorSpec extends FlatSpec {
     implicitly[War[Int, Int, Int] <:< Record]
     implicitly[Famine[Int] <:< Record]
     implicitly[Death <:< Record]
-
-    // prototype variant functor
-    assert(show2(Horseman)(war) == "War(3,5,true)")
 
     // prototype record functors
     assert(show3(Conquest)(Conquest(1, 2, 3)) == "Conquest( 1 2 3)")

@@ -11,7 +11,7 @@ trait KIRV extends util.Traverse {
   /** n-nary traversable functor mapping everything to tau */
   def constF(c: Context, n: Int)(tau: Code): c.Tree = {
     import c.universe._
-    newTraversableN(c, n)(_ => tq"${TypeName(tau)}") {
+    newTraversableEndofunctor(c, n)(_ => tq"${TypeName(tau)}") {
       case (applicative, fs, as, bs) =>
         etaExpand(c)(q"$applicative.pure")
     }
@@ -20,7 +20,7 @@ trait KIRV extends util.Traverse {
   /** n-nary traversable functor returning its i-th argument */
   def projectF(c: Context, n: Int)(i: Int): c.Tree = {
     import c.universe._
-    newTraversableN(c, n)(params => tq"${params(i)}") {
+    newTraversableEndofunctor(c, n)(params => tq"${params(i)}") {
       case (applicative, fs, as, bs) =>
         q"${fs(i)}"
     }
@@ -33,7 +33,8 @@ trait KIRV extends util.Traverse {
     val recordName = TermName(c freshName "rcd")
     val rcdDef = q"val $recordName = $record"
     val valDefs = ((names zip fieldFs) map { case (name, functor) => q"val $name = $functor" })
-    newTraversableWith(c, n)(
+
+    newTraversableEndofunctorWith(c, n)(
       rcdDef +: valDefs,
       as => composeFunctorMaps(c)(recordName, names, as)
     ) {
