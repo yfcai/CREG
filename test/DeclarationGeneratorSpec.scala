@@ -15,10 +15,10 @@ class DeclarationGeneratorSpec extends FlatSpec {
     implicitly[Empty1T <:< Variant]
   }
 
-  def show(F: Traversable)(t: F.Map[Any]): String =
+  def show(F: Traversable.Endofunctor)(t: F.Map[Any]): String =
     F(t).mapReduce(_.toString)("", _ + _)
 
-  def show2(F: Traversable4)(t: F.Map[Any, Any, Any, Any]): String = {
+  def show2(F: Traversable.Endofunctor4)(t: F.Map[Any, Any, Any, Any]): String = {
     def err(i: Int): Any => Nothing = _ => fail(s"position 2 expected, position $i triggered")
     F(t).traverse(Applicative.Const[String]("", _ + _))(err(1), _.toString, err(3), err(4))
   }
@@ -29,7 +29,7 @@ class DeclarationGeneratorSpec extends FlatSpec {
     def r = new scala.util.matching.Regex(sc.parts.mkString, sc.parts.tail.map(_ => "x"): _*)
   }
 
-  def show3(F: Traversable3)(record: F.Map[Any, Any, Any]): String = {
+  def show3(F: Traversable.Endofunctor3)(record: F.Map[Any, Any, Any]): String = {
     val head = record.toString match { case r"([^\(]+)$head.*" => head }
     val body = F(record).traverse(Applicative.Const[String]("", _ + " " + _))(_.toString, _.toString, _.toString)
     s"$head($body)"

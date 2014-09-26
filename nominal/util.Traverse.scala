@@ -40,7 +40,7 @@ trait Traverse extends Paths {
   {
     import c.universe._
     q"""
-      new ${getTraversableN(c, n)} {
+      new ${getTraversableEndofunctor(c, n)} {
         ..$valDefs
         ${mkTypeMap(c, n)(mapping)}
         ${mkDefTraverse(c, n)(body)}

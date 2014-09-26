@@ -50,7 +50,7 @@ trait TraversableGenerator extends SynonymGenerator with util.Traverse {
   def newTraversable(c: Context)(arity: Int, body: Many[c.Tree]): c.Tree = {
     import c.universe._
     require(arity >= 1 /* && arity <= max N such that TraversableN exists */)
-    val q"new $traversableN" = c.parse(s"new $fullyQualifiedTraversableTrait${if (arity == 1) "" else arity.toString }")
+    val q"new $traversableN" = c.parse(s"new $traversableEndofunctorTrait${if (arity == 1) "" else arity.toString }")
     q"new $traversableN { ..$body }"
   }
 

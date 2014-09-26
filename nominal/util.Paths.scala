@@ -22,10 +22,10 @@ trait Paths {
     tq"_root_.nominal.lib.Fix.Record"
   }
 
-  def getTraversableN(c: Context, n: Int): c.Tree = {
+  def getTraversableEndofunctor(c: Context, n: Int): c.Tree = {
     import c.universe._
     val q"new $traversableN" =
-      c parse "new " + fullyQualifiedTraversableTrait + (if (n == 1) "" else n.toString)
+      c parse "new " + traversableEndofunctorTrait + (if (n == 1) "" else n.toString)
     traversableN
   }
 
@@ -34,7 +34,7 @@ trait Paths {
     tq"_root_.nominal.lib.Applicative"
   }
 
-  def fullyQualifiedTraversableTrait: String = "_root_.nominal.lib.Traversable"
+  def traversableEndofunctorTrait: String = "_root_.nominal.lib.Traversable.EndofunctorTrait"
 
   def mappingOnObjects: String = "Map"
 

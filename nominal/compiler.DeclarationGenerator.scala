@@ -104,7 +104,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
     val n = datatype.cases.length
     val objName = TermName(datatype.header.name)
     val variantName = mkTemplate(c)(datatype.header.name)
-    val traversableN = getTraversableN(c, n)
+    val traversableN = getTraversableEndofunctor(c, n) // TODO: REINTRODUCE BOUNDS
     val typeMap = mkTypeMap(c, n) { params => tq"$variantName[..$params]" }
     val defTraverse = mkDefTraverse(c, n) {
       case (g, fs, as, bs) =>
@@ -133,7 +133,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
       val n = record.fields.length
       val termName = TermName(record.name)
       val typeName = TypeName(record.name)
-      val traversableN = getTraversableN(c, n)
+      val traversableN = getTraversableEndofunctor(c, n)
       val typeMap = mkTypeMap(c, n) { params => tq"$typeName[..$params]" }
       val defTraverse = mkDefTraverse(c, n) {
         case (g, fs, as, bs) =>
