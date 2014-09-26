@@ -1,3 +1,5 @@
+// TODO: delete this file after obsolescence
+
 package nominal
 package compiler
 

@@ -30,11 +30,18 @@ trait Traverse extends Paths {
     */
   def newTraversableN(c: Context, n: Int)
     (mapping: Many[c.TypeName] => c.Tree)
+    (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
+      c.Tree =
+    newTraversableWith(c, n)(Many.empty, mapping)(body)
+
+  def newTraversableWith(c: Context, n: Int)
+    (valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree): c.Tree =
   {
     import c.universe._
     q"""
       new ${getTraversableN(c, n)} {
+        ..$valDefs
         ${mkTypeMap(c, n)(mapping)}
         ${mkDefTraverse(c, n)(body)}
       }
@@ -61,12 +68,30 @@ trait Traverse extends Paths {
     val tG = getFunctorMapOnObjects(c)(G)
     val fTypes: Many[Tree] = (tA, tB).zipped.map { case (a, b) => tq"$a => $tG[$b]" }
     val explicitParams = mkValDefs(c)(fs, fTypes)
-    val resultType = tq"${getThisMapOnObjects(c)}[..$tA] => $tG[${getThisMapOnObjects(c)}[..$tB]]"
+    val resultType = tq"${mkTraverseIn(c)(tA)} => ${mkTraverseOut(c)(G, tB)}"
     val theBody = body(G, fs, tA, tB)
     val tAB = mkInvariantTypeDefs(c)(tA ++ tB)
     q"""
       def traverse[..$tAB]($G : ${getApplicative(c)})(..$explicitParams): $resultType = $theBody
     """
+  }
+
+  def mkTraverseIn(c: Context)(as: Many[c.TypeName]): c.Tree = {
+    import c.universe._
+    tq"${getThisMapOnObjects(c)}[..$as]"
+  }
+
+  def mkTraverseOut(c: Context)(G: c.TermName, bs: Many[c.TypeName]): c.Tree = {
+    import c.universe._
+    val tG = getFunctorMapOnObjects(c)(G)
+    tq"$tG[${getThisMapOnObjects(c)}[..$bs]]"
+  }
+
+  def composeFunctorMaps(c: Context)(parent: c.TermName, functors: Many[c.TermName], params: Many[c.TypeName]):
+      c.Tree = {
+    import c.universe._
+    val insides = functors map { f => tq"${getFunctorMapOnObjects(c)(f)}[..$params]" }
+    tq"${getFunctorMapOnObjects(c)(parent)}[..$insides]"
   }
 
   def mkCovariantTypeDefs(c: Context)(params: Many[c.TypeName]): Many[c.universe.TypeDef] = {
@@ -146,4 +171,10 @@ trait Traverse extends Paths {
 
   def templatify(cons: DataConstructor): DataConstructor =
     DataConstructor(cons.params, templatify(cons.body))
+
+  def etaExpand(c: Context)(expr: c.Tree): c.Tree = {
+    import c.universe._
+    val x = TermName(c freshName "x")
+    Function(List(mkValDef(c)(x, TypeTree())), q"$expr($x)")
+  }
 }
