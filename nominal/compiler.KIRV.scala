@@ -7,7 +7,7 @@ import scala.reflect.macros.blackbox.Context
 
 import Functor._
 
-trait KIRV extends util.Traverse {
+trait KIRV extends util.Traverse with util.AbortWithError {
   // specification of whether something is a projection or not
   abstract class KIRV[Tree] { def get: Tree }
   // projections choose an argument as the result
@@ -60,9 +60,44 @@ trait KIRV extends util.Traverse {
 
   /** composing functors with projections in mind */
   def compositeK(c: Context, n: Int)(parent: c.Tree, children: Many[KIRV[c.Tree]]): KIRV[c.Tree] = {
-    // TODO: rectangular multiplicative multiplexing of subcategory constraints
-    ???
+    import c.universe._
+
+    val parentName = TermName(c freshName "parent")
+    val parentDef  = q"val $parentName = $parent"
+
+    val childNames = children map (_ => TermName(c freshName "child"))
+    val childDefs  = (childNames zip children) map { case (name, child) => q"val $name = ${child.get}" }
+
+    // figure out categorical bounds
+    val cats = multiplexSubcatBounds(c, n)(parentName, children)
+
+    ??? // TODO
   }
+
+  def multiplexSubcatBounds(c: Context, n: Int)(parentName: c.TermName, children: Many[KIRV[c.Tree]]): Many[c.Tree] =
+    (0 until n) map {
+      case i =>
+        import c.universe._
+
+        // type is `Set` so that duplicate bounds are removed automatically
+        val bounds: Set[Int] = children.zipWithIndex.flatMap({
+          case (Project(j, n, _), k) if i == j => Some(k)
+          case _                          => None
+        })(collection.breakOut)
+
+        // inconsistent bounds (a variant never have repeated records; records w/ distinct names are distinct)
+        if (bounds.size > 1)
+          abortWithError(c)(EmptyTree.pos,
+            s"conflicting subcategorical bounds:\n\n${bounds mkString "\n"}\n")
+
+        // no bound
+        else if (bounds.size < 1)
+          getAnyType(c)
+
+        // one bound; time to multiplex
+        else
+          getFunctorCat(c, bounds.head, n)(parentName)
+    }
 }
 
 object KIRV extends KIRV {
