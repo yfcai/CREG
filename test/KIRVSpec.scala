@@ -31,24 +31,23 @@ class KIRVSpec extends FlatSpec {
   }
 
   it should "generate record functors" in {
-    val cons = composite(Cons, 3)(const3, const3)
+    val cons = composite(Cons, 3)(const3, const3)(3, 3)
     assert(cons[String, String, String](Cons(1, 2)).map(_ => fail, _ => fail, _ => fail) == Cons(1, 2))
 
-    val fst = composite(Cons, 3)(proj2, const3)
+    val fst = composite(Cons, 3)(proj2, const3)(2, 3)
     assert(fst[String, String, Int](Cons(1, 2)).map(_ => fail, _ => fail, _ + 1) == Cons(2, 2))
   }
 
   it should "generate variant functors" in {
-    val cl = composite(List, 3)(nil3, cons3) // this is okay
+    val cl = composite(List, 3)(nil3, cons3)(3, 3)
     assert(cl[String, String, String](Nil).map(_ => fail, _ => fail, _ => fail) == Nil)
 
-    // val il = composite(List, 3)(proj1, proj2) // projections inside variants needs special treatment
-    // triggers bug: result of mapping cannot be guaranteed...
-    // assert(il[String, Nil, Cons[Int, Int]](Nil).map(_ => fail, _ => 5, _ => fail) == 5)
-    // assert(il[String, Nil, Cons[Int, Int]](Nil).map(_ => fail, identity, _ => fail) == Nil)
+    val il = composite(List, 3)(proj1, proj2)(1, 2)
+    assert(il[String, Nil, Cons[Int, Int]](Nil).map(_ => fail, _ => Nil, _ => fail) == Nil)
+    assert(il[String, Nil, Cons[Int, Int]](Nil).map(_ => fail, identity, _ => fail) == Nil)
 
-    //assert(il[String, Nil, Cons[Int, Int]](Cons(3, 5)).map(
-    //  _ => fail, _ => fail, x => x.copy(x._1.toString, x._2.toString)) == Cons("3", "5"))
+    assert(il[String, Nil, Cons[Int, Int]](Cons(3, 5)).map(
+      _ => fail, _ => fail, x => x.copy(x._1.toString, x._2.toString)) == Cons("3", "5"))
   }
 
   it should "generate fixed point of functors" in pending

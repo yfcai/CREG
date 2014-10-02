@@ -11,7 +11,7 @@ trait KIRV extends util.Traverse with util.AbortWithError {
   // specification of whether something is a projection or not
   abstract class KIRV[Tree] { def get: Tree }
   // projections choose an argument as the result
-  case class Project[Tree](i: Int, n: Int, get: Tree) extends KIRV[Tree]
+  case class Proj[Tree](i: Int, n: Int, get: Tree) extends KIRV[Tree]
   // nestings put types under a constant heading
   case class Nest[Tree](get: Tree) extends KIRV[Tree]
 
@@ -35,7 +35,7 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     }
   }
 
-  def projectK(c: Context, i: Int, n: Int): KIRV[c.Tree] = Project(i, n, projectF(c, i, n))
+  def projectK(c: Context, i: Int, n: Int): KIRV[c.Tree] = Proj(i, n, projectF(c, i, n))
 
   /** composing functors in a record, each functor on a field */
   def compositeF(c: Context, n: Int)(record: c.Tree, fieldFs: Many[c.Tree]): c.Tree = {
@@ -68,10 +68,24 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     val childNames = children map (_ => TermName(c freshName "child"))
     val childDefs  = (childNames zip children) map { case (name, child) => q"val $name = ${child.get}" }
 
-    // figure out categorical bounds
+    // subcategory bounds
     val cats = multiplexSubcatBounds(c, n)(parentName, children)
 
-    ??? // TODO
+    // all the val defs
+    val valDefs = parentDef +: childDefs
+
+    // RHS of the mapping on objects
+    val mapping: Many[TypeName] => c.Tree =
+      params => composeFunctorMaps(c)(parentName, childNames, params)
+
+    Nest(newBoundedTraversableWith(c, n)(cats, parentDef +: childDefs, mapping) {
+      case (applicative, fs, as, bs) =>
+        val travParams =
+          ( childNames.map(f => tq"${getFunctorMapOnObjects(c)(f)}[..$as]") ++
+            childNames.map(f => tq"${getFunctorMapOnObjects(c)(f)}[..$bs]") )
+        val traversals = childNames map (f => q"$f.traverse($applicative)(..$fs)")
+        q"$parentName.traverse[..$travParams]($applicative)(..$traversals)"
+    })
   }
 
   def multiplexSubcatBounds(c: Context, n: Int)(parentName: c.TermName, children: Many[KIRV[c.Tree]]): Many[c.Tree] =
@@ -81,7 +95,7 @@ trait KIRV extends util.Traverse with util.AbortWithError {
 
         // type is `Set` so that duplicate bounds are removed automatically
         val bounds: Set[Int] = children.zipWithIndex.flatMap({
-          case (Project(j, n, _), k) if i == j => Some(k)
+          case (Proj(j, n, _), k) if i == j => Some(k)
           case _                          => None
         })(collection.breakOut)
 
@@ -120,7 +134,17 @@ object KIRV extends KIRV {
   def projImpl(c: WhiteContext)(i: c.Expr[Int], n: c.Expr[Int]): c.Expr[Any] =
     c.Expr(projectF(c, c eval i, c eval n))
 
-  def composite(record: Any, n: Int)(fields: Any*): Any = macro compositeImpl
-  def compositeImpl(c: WhiteContext)(record: c.Tree, n: c.Tree)(fields: c.Tree*): c.Tree =
-    compositeF(c, c eval c.Expr[Int](n))(record, fields)
+  def composite(record: Any, n: Int)(fields: Any*)(areProj: Int*): Any = macro compositeImpl
+  def compositeImpl(c: WhiteContext)(record: c.Tree, n: c.Tree)(fields: c.Tree*)(areProj: c.Tree*):
+      c.Tree = {
+    val nVal = c eval c.Expr[Int](n)
+    val areProjEvaluated = areProj map (m => c eval c.Expr[Int](m))
+    val children = fields.zip(areProjEvaluated) map {
+      case (field, i) if i >= 0 & i < nVal =>
+        Proj(i, nVal, field)
+      case (field, i) =>
+        Nest(field)
+    }
+    compositeK(c, nVal)(record, children).get
+  }
 }
