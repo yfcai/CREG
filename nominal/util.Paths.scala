@@ -46,6 +46,11 @@ trait Paths {
 
   def mappingOnObjects: String = "Map"
 
+  def getPure(c: Context)(applicative: c.TermName): c.Tree = {
+    import c.universe._
+    q"$applicative.pure"
+  }
+
   def getFunctorMapOnObjects(c: Context)(applicative: c.TermName): c.Tree = {
     import c.universe._
     tq"$applicative.Map"
@@ -54,6 +59,11 @@ trait Paths {
   def getThisMapOnObjects(c: Context): c.Tree = {
     import c.universe._
     tq"this.Map"
+  }
+
+  def getMapOnObjects(c: Context): c.Tree = {
+    import c.universe._
+    tq"Map"
   }
 
   def getFunctorCat(c: Context, i: Int, n: Int)(functor: c.TermName): c.Tree = {

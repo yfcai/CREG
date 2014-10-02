@@ -33,6 +33,32 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     }
   })
 
+  def multiplexSubcatBounds(c: Context, n: Int)(parentName: c.TermName, children: Many[KIRV[c.Tree]]):
+      Many[c.Tree] =
+    (0 until n) map {
+      case i =>
+        import c.universe._
+
+        // type is `Set` so that duplicate bounds are removed automatically
+        val bounds: Set[Int] = children.zipWithIndex.flatMap({
+          case (Proj(j, n, _), k) if i == j => Some(k)
+          case _                          => None
+        })(collection.breakOut)
+
+        // inconsistent bounds (a variant never have repeated records; records w/ distinct names are distinct)
+        if (bounds.size > 1)
+          abortWithError(c)(EmptyTree.pos,
+            s"conflicting subcategorical bounds:\n\n${bounds mkString "\n"}\n")
+
+        // no bound
+        else if (bounds.size < 1)
+          getAnyType(c)
+
+        // one bound; time to multiplex
+        else
+          getFunctorCat(c, bounds.head, n)(parentName)
+    }
+
   /** composing functors in a record, each functor on a field */
   def compositeK(c: Context, n: Int)(parent: c.Tree, children: Many[KIRV[c.Tree]]): KIRV[c.Tree] = {
     import c.universe._
@@ -63,30 +89,62 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     })
   }
 
-  def multiplexSubcatBounds(c: Context, n: Int)(parentName: c.TermName, children: Many[KIRV[c.Tree]]): Many[c.Tree] =
-    (0 until n) map {
-      case i =>
-        import c.universe._
+  def fixK(c: Context, n: Int)(functorKIRV: KIRV[c.Tree]): KIRV[c.Tree] = {
+    import c.universe._
 
-        // type is `Set` so that duplicate bounds are removed automatically
-        val bounds: Set[Int] = children.zipWithIndex.flatMap({
-          case (Proj(j, n, _), k) if i == j => Some(k)
-          case _                          => None
-        })(collection.breakOut)
+    val functorObj = functorKIRV.get
+    val functor    = TermName(c freshName "fun")
+    val functorDef = q"val $functor = $functorObj"
 
-        // inconsistent bounds (a variant never have repeated records; records w/ distinct names are distinct)
-        if (bounds.size > 1)
-          abortWithError(c)(EmptyTree.pos,
-            s"conflicting subcategorical bounds:\n\n${bounds mkString "\n"}\n")
+    val m = n + 1
 
-        // no bound
-        else if (bounds.size < 1)
-          getAnyType(c)
+    // POSSIBLE FUTURE VERIFICATION FOR ERROR MESSAGE IMPROVEMENT
+    // 1. assert `functor` is an m-nary functor
+    // 2. assert `functor.Cat1` is equal to `Any`
 
-        // one bound; time to multiplex
-        else
-          getFunctorCat(c, bounds.head, n)(parentName)
+    // subcategory bounds are inherited from `functor`
+    // `getFunctorCat` creates functor.Cat2 when i == 1,
+    // thus we skip the bound `functor.Cat1`.
+    val cats: Many[c.Tree] = (1 to n).map { i => getFunctorCat(c, i, m)(functor) }
+
+    // create mapping on objects
+    val lambda = TypeName(c freshName "lambda")
+    val patternF: Many[TypeName] => c.Tree = params => {
+      val x = TypeName(c freshName "x")
+      val xdef = mkCovariantTypeDef(c)(x)
+      val rhs = tq"${getFunctorMapOnObjects(c)(functor)}[..${x +: params}]"
+      tq"({ type $lambda[$xdef] = $rhs })#$lambda"
     }
+    val mapping: Many[TypeName] => c.Tree =
+      params => tq"${getFix(c)}[${patternF(params)}]"
+
+    Nest(newBoundedTraversableWith(c, n)(cats, Many(functorDef), mapping) {
+      case (applicative, fs, as, bs) =>
+        val x        = TermName(c freshName "x")
+        val loop     = TermName(c freshName "loop")
+        val mMap     = getMapOnObjects(c)
+        val gMap     = getFunctorMapOnObjects(c)(applicative)
+        val MA       = tq"$mMap[..$as]"
+        val MB       = tq"$mMap[..$bs]"
+        val GMB      = tq"$gMap[$MB]"
+        val mbs      = MB +: bs.map(tau => tq"$tau")
+        val unrolled = tq"${getFunctorMapOnObjects(c)(functor)}[..$mbs]"
+        val pfbs     = patternF(bs)
+        val rolled   = tq"${getFix(c)}[$pfbs]"
+        val pureBody = etaExpand(c)(q"${getRoll(c)}[$pfbs]")
+        val pureRoll = q"${getPure(c)(applicative)}[$unrolled => $rolled]($pureBody)"
+        val args     = q"this" +: fs.map(f => q"$f")
+        val body     = q"$functor.traverse($applicative)(..$args)($x.unroll)"
+        val loopBody = mkCallTree(c)(applicative, Many(pureRoll, body))
+        q"""
+          object $loop extends ($MA => $GMB) {
+            def apply($x : $MA): $GMB = $loopBody
+          }
+
+          $loop
+        """
+    })
+  }
 }
 
 object KIRV extends KIRV {
@@ -122,4 +180,8 @@ object KIRV extends KIRV {
     }
     compositeK(c, nVal)(record, children).get
   }
+
+  def fix(functor: Any, n: Int): Any = macro fixImpl
+  def fixImpl(c: WhiteContext)(functor: c.Tree, n: c.Tree): c.Tree =
+    fixK(c, c eval c.Expr[Int](n))(Nest(functor)).get
 }

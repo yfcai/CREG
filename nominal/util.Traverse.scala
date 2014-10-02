@@ -116,6 +116,12 @@ trait Traverse extends Paths {
     tq"${getFunctorMapOnObjects(c)(parent)}[..$insides]"
   }
 
+  def mkCovariantTypeDef(c: Context)(param: c.TypeName): c.universe.TypeDef = {
+    val defs = mkCovariantTypeDefs(c)(Many(param))
+    assert(defs.length == 1)
+    defs.head
+  }
+
   def mkCovariantTypeDefs(c: Context)(params: Many[c.TypeName]): Many[c.universe.TypeDef] = {
     if (params.isEmpty)
       sys error "mkCovariantTypeDefs called with empty params"
@@ -158,6 +164,15 @@ trait Traverse extends Paths {
     })
   }
 
+  /** @param applicative the applicative to call `pure` on
+    *
+    * @param termName the name of the uncurried function
+    *
+    * @param typeName the name of the type constructor of the result type
+    *
+    * @param typeParams the arguments of the type constructor in the result type
+    *                   they also serve as argument types btw
+    */
   def mkPureCurriedFunction(c: Context)(
     applicative: c.TermName,
     termName: c.TermName,
@@ -179,7 +194,7 @@ trait Traverse extends Paths {
         Function(List(mkValDef(c)(param, TypeTree())), body)
     }
 
-    q"$applicative.pure[$curriedType]($curriedTerm)"
+    q"${getPure(c)(applicative)}[$curriedType]($curriedTerm)"
   }
 
   /** create the name of the template trait by appending T */

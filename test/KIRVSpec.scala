@@ -13,6 +13,16 @@ class KIRVSpec extends FlatSpec {
   val proj1  = proj(1, 3)
   val proj2  = proj(2, 3)
 
+  import scala.language.existentials
+
+  val listF2 =
+    composite(List, 2)(
+      const[Nil](2),
+      composite(Cons, 2)(proj(1, 2), proj(0, 2))(1, 0)
+    )(2, 2)
+
+  val elemF  = fix(listF2, 1)
+
   val xs: List[Int] = coerce { Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) }
 
   "KIRV" should "generate constant functors" in {
@@ -50,5 +60,10 @@ class KIRVSpec extends FlatSpec {
       _ => fail, _ => fail, x => x.copy(x._1.toString, x._2.toString)) == Cons("3", "5"))
   }
 
-  it should "generate fixed point of functors" in pending
+  it should "generate fixed point of functors" in {
+    val xs2: List[Int] = coerce {
+      Cons(2, Cons(4, Cons(6, Cons(8, Nil))))
+    }
+    assert(elemF(xs).map(_ * 2) == xs2)
+  }
 }
