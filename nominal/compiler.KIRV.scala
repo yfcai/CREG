@@ -45,18 +45,10 @@ trait KIRV extends util.Traverse with util.AbortWithError {
           case _                          => None
         })(collection.breakOut)
 
-        // inconsistent bounds (a variant never have repeated records; records w/ distinct names are distinct)
-        if (bounds.size > 1)
-          abortWithError(c)(EmptyTree.pos,
-            s"conflicting subcategorical bounds:\n\n${bounds mkString "\n"}\n")
-
-        // no bound
-        else if (bounds.size < 1)
-          getAnyType(c)
-
-        // one bound; time to multiplex
-        else
-          getFunctorCat(c, bounds.head)(parentName)
+        // this works even if bounds.isEmpty.
+        // the intersection of nothing is Any.
+        mkIntersectionType(c)(
+          bounds.map(bound => getFunctorCat(c, bound)(parentName))(collection.breakOut))
     }
 
   /** composing functors in a record, each functor on a field */

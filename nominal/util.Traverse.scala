@@ -219,4 +219,15 @@ trait Traverse extends Paths {
     val x = TermName(c freshName "x")
     Function(List(mkValDef(c)(x, TypeTree())), q"$expr($x)")
   }
+
+  def mkIntersectionType(c: Context)(types: Many[c.Tree]): c.Tree = {
+    import c.universe._
+    if (types.isEmpty)
+      getAnyType(c)
+    else {
+      val intersectionTypeCode = types map (x => s"(${showCode(x)})") mkString " with "
+      val q"??? : $intersectionType" = c parse s"??? : ($intersectionTypeCode)"
+      intersectionType
+    }
+  }
 }
