@@ -5,7 +5,15 @@ import scala.reflect.macros.blackbox.Context
 
 import contextReaderParser._
 
-trait ParserOfDatatypeRep extends util.AbortWithError with util.TupleIndex {
+trait ParserBase extends util.AbortWithError {
+  def parseOrAbort[A](c: Context)(parser: contextReaderParser.Parser[A], input: c.Tree): A =
+    parser.parse(c)(input) match {
+      case Success(a) => a
+      case Failure(pos, message) => abortWithError(c)(pos, message)
+    }
+}
+
+trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex {
   // ====================================
   // GRAMMARS FOR DATATYPE REPRESENTATION
   // ====================================
@@ -64,12 +72,6 @@ trait ParserOfDatatypeRep extends util.AbortWithError with util.TupleIndex {
 
   // shadow trait Parser by Parser[A]
   private[this] type Parser[A] = contextReaderParser.Parser[A]
-
-  def parseOrAbort[A](c: Context)(parser: Parser[A], input: c.Tree): A =
-    parser.parse(c)(input) match {
-      case Success(a) => a
-      case Failure(pos, message) => abortWithError(c)(pos, message)
-    }
 
   lazy val FunctorP: Parser[DataConstructor] = new Parser[DataConstructor] {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
@@ -329,7 +331,7 @@ trait ParserOfDatatypeRep extends util.AbortWithError with util.TupleIndex {
   }
 }
 
-trait ParserOfFunctorRep extends util.AbortWithError with util.TupleIndex {
+trait ParserOfFunctorRep extends ParserBase {
   // ============================================================================
   // GRAMMAR FOR FUNCTOR REPRESENTATION (NOT TO BE CONFUSED WITH DATACONSTRUCTOR)
   // ============================================================================
@@ -574,11 +576,11 @@ object Parser {
     class fun extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro funImpl }
     object ParseFunctorRep extends ParserOfFunctorRep
     def funImpl(c: Context)(annottees: c.Tree*): c.Tree = {
-      import ParseFunctorRep._
       import c.universe._
       annottees match {
         case Seq(ValDef(mods, name, tpe @ TypeTree(), tree)) =>
-          ValDef(mods, name, tpe, persist(c)(parseOrAbort(c)(ParseFunctorRep.DeclP, tree)))
+          ValDef(mods, name, tpe, persist(c)(
+            ParseFunctorRep.parseOrAbort(c)(ParseFunctorRep.DeclP, tree)))
       }
     }
   }
