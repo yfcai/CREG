@@ -56,7 +56,7 @@ trait KIRV extends util.Traverse with util.AbortWithError {
 
         // one bound; time to multiplex
         else
-          getFunctorCat(c, bounds.head, n)(parentName)
+          getFunctorCat(c, bounds.head)(parentName)
     }
 
   /** composing functors in a record, each functor on a field */
@@ -108,7 +108,7 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     // subcategory bounds are inherited from `functor`
     // `getFunctorCat` creates functor.Cat2 when i == 1,
     // thus we skip the bound `functor.Cat1`.
-    val cats: Many[c.Tree] = (1 to n).map { i => getFunctorCat(c, i, m)(functor) }
+    val cats: Many[c.Tree] = (1 to n).map { i => getFunctorCat(c, i)(functor) }
 
     // create mapping on objects
     val lambda = TypeName(c freshName "lambda")

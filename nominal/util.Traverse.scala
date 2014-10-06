@@ -48,7 +48,7 @@ trait Traverse extends Paths {
     val n = bounds.length
     val cats = bounds.zipWithIndex.map {
       case (bound, i) =>
-        q"type ${typeNameCat(c, i, n)} = $bound"
+        q"type ${typeNameCat(c, i)} = $bound"
     }
     newTraversableTrait(c, n)(getBoundedTraversable(c, n), cats ++ valDefs, mapping)(body)
   }
@@ -90,7 +90,7 @@ trait Traverse extends Paths {
     val resultType = tq"${mkTraverseIn(c)(tA)} => ${mkTraverseOut(c)(G, tB)}"
     val theBody = body(G, fs, tA, tB)
 
-    val cats = (0 until n).map(i => getThisCat(c, i, n))
+    val cats = (0 until n).map(i => getThisCat(c, i))
     val tAB = mkInvariantTypeDefs(c)(tA ++ tB, cats ++ cats)
 
     q"""

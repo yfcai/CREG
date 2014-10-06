@@ -121,7 +121,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse {
     // subcategory bounds
     val cats = bounds.zipWithIndex map {
       case (bound, i) =>
-        val cat = typeNameCat(c, i, n)
+        val cat = typeNameCat(c, i)
         q"type $cat = $bound"
     }
 

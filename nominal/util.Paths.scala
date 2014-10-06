@@ -66,19 +66,19 @@ trait Paths {
     tq"Map"
   }
 
-  def getFunctorCat(c: Context, i: Int, n: Int)(functor: c.TermName): c.Tree = {
+  def getFunctorCat(c: Context, i: Int)(functor: c.TermName): c.Tree = {
     import c.universe._
-    tq"$functor.${typeNameCat(c, i, n)}"
+    tq"$functor.${typeNameCat(c, i)}"
   }
 
-  def getThisCat(c: Context, i: Int, n: Int): c.Tree = {
+  def getThisCat(c: Context, i: Int): c.Tree = {
     import c.universe._
-    tq"this.${typeNameCat(c, i, n)}"
+    tq"this.${typeNameCat(c, i)}"
   }
 
-  def typeNameCat(c: Context, i: Int, n: Int): c.TypeName = {
+  def typeNameCat(c: Context, i: Int): c.TypeName = {
     import c.universe._
-    TypeName("Cat" + (if (n == 1) "" else (i + 1).toString))
+    TypeName("Cat" + i)
   }
 
   def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
