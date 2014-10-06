@@ -89,6 +89,9 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     })
   }
 
+  /** @param n arity of the functor after taking the fixed point, not before.
+    *          the body of the functor should have arity n + 1.
+    */
   def fixK(c: Context, n: Int)(functorKIRV: KIRV[c.Tree]): KIRV[c.Tree] = {
     import c.universe._
 
