@@ -12,8 +12,7 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
     */
   def digestForDeclarationGenerator(c: Context)(input: c.Tree, parseTree: DataConstructor): Iterator[Variant] = {
     // check that parseTree starts with a variant
-    val variant = topLevelVariant(c)(input, parseTree)
-    extractVariants(variant)
+    Iterator(topLevelVariant(c)(input, parseTree))
   }
 
   /** @param input the trait
@@ -78,7 +77,7 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
   def renameRecursiveVariant(c: Context)(input: c.Tree, variant: Variant): Option[Variant] = {
     val dangerMarker = variant.header.name + "["
     val expectedName = getFullNameOfTrait(c)(input).get
-    val isRecursive = exists(variant) {
+    val isRecursive = variant.exists {
       case TypeVar(name) if name == expectedName => ()
 
       case TypeVar(name) if name != expectedName & name == variant.header.name =>
@@ -94,9 +93,6 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
     else
       None
   }
-
-  private[this] def exists(data: Datatype)(predicate: PartialFunction[Datatype, Unit]): Boolean =
-    ! data.everywhereQ(predicate).isEmpty
 
   // append 'F' to a TypeVar
   private[this] def appendF(name: Name): Name = name + "F"

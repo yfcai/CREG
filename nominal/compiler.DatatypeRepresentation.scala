@@ -25,6 +25,10 @@ object DatatypeRepresentation {
     def everywhereQ[T](f: PartialFunction[Datatype, T]): Iterator[T] =
       (f lift this).fold[Iterator[T]](Iterator.empty)(x => Iterator(x)) ++ children.flatMap(_ everywhereQ f)
 
+
+    def exists(predicate: PartialFunction[Datatype, Unit]): Boolean =
+      ! everywhereQ(predicate).isEmpty
+
     def subst(x: Name, xdef: Datatype): Datatype = this match {
       case TypeVar(y) if x == y =>
         xdef
@@ -206,4 +210,5 @@ object DatatypeRepresentation {
     def contravariant(name: Name): Param = Param(name, Variance.Contravariant)
   }
 
+  case class DataFamily(name: Name, params: Many[Name], members: Many[Variant])
 }

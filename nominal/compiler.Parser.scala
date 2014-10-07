@@ -13,15 +13,6 @@ trait ParserBase extends util.AbortWithError {
     }
 }
 
-object ParserOfDatatypeRep {
-  import DatatypeRepresentation._
-
-  // put everything we want to serialize in an object
-  // if it's an inner class of some trait, then it includes a back pointer
-  // to the trait, which probably have nonserializable members.
-  case class DataFamily(name: Name, params: Many[Name], members: Many[Variant])
-}
-
 trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Traits {
   // ====================================
   // GRAMMARS FOR DATATYPE REPRESENTATION
@@ -55,7 +46,6 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
   // _\d+ (tuple components _1, _2, _3, ...; _i must be the (i - 1)th field)
 
   import DatatypeRepresentation._
-  import ParserOfDatatypeRep._
 
   // shadow trait Parser by Parser[A]
   private[this] type Parser[A] = contextReaderParser.Parser[A]
