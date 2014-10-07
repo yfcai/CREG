@@ -13,7 +13,7 @@ trait ParserBase extends util.AbortWithError {
     }
 }
 
-trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex {
+trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Traits {
   // ====================================
   // GRAMMARS FOR DATATYPE REPRESENTATION
   // ====================================
@@ -24,9 +24,9 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex {
   //      Start := DataDecl
   //             | FamilyDecl
   //
-  //   DataDecl := trait VariantName [ GenericTypeParam* ] { Case* }   -- annotated @datatype
+  //   DataDecl := trait VariantName [ GenericTypeParam* ] extends Supertraits { Case* }
   //
-  // FamilyDecl := trait FamilyName [ GenericTypeParam* ] { Variant* } -- annotated @datafamily
+  // FamilyDecl := trait FamilyName [ GenericTypeParam* ] extends Supertraits { Variant* }
   //
   //    Variant := TypeVar { Case* } -- entry point from scala types
   //
@@ -53,36 +53,21 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex {
   lazy val DataDeclP: Parser[DataConstructor] = new Parser[DataConstructor] {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
       import c.universe._
-      input match {
-        // this quasiquote matches all decls with nonempty cases
-        // and possibly empty genericTypeParams
-        case q"trait $variantName [ ..$params ] extends ..$supers { ..$cases }" =>
+      nameParamsSupersMembers(c)(input) match {
+        case Some((variantName, params, supers, cases)) =>
           for { cases <- CasesP.parse(c)(cases) }
           yield
             DataConstructor(
               mkGenericTypeParams(c)(params),
               Variant(
-                mkVariantHeader(c)(variantName),
+                TypeVar(variantName.toString),
                 Many(cases: _*)))
-
-        // matches decls with empty cases & trailing braces
-        case q"trait $variantName [ ..$params ] extends ..$supers {}" =>
-          Success(mkEmptyVariant(c)(variantName, params))
-
-        // matches decls with neither cases nor trailing braces
-        case q"trait $variantName [ ..$params ] extends ..$supers" =>
-          Success(mkEmptyVariant(c)(variantName, params))
 
         case _ =>
           Failure(input.pos, "expect trait Variant { Record* }")
       }
     }
   }
-
-  def mkVariantHeader(c: Context)(name: c.TypeName): TypeVar = TypeVar(name.toString)
-
-  def mkEmptyVariant(c: Context)(name: c.TypeName, params: List[c.Tree]): DataConstructor =
-    DataConstructor(mkGenericTypeParams(c)(params), Variant(mkVariantHeader(c)(name), Many.empty))
 
   def mkGenericTypeParams(c: Context)(params: List[c.Tree]): Many[Param] = {
     import c.universe._
@@ -376,21 +361,7 @@ object Parser {
         val q"trait $tag { $input }" = annottees.head.tree
         val actual = RecordP.parse(c)(input).get
 
-        val expected = tag.toString match {
-          case "WithoutFields" =>
-            Record("SomeRecord", Many.empty)
-
-          case "WithFields" =>
-            Record("SomeRecord", Many(
-              Field("_1", TypeVar("Field1")),
-              Field("_2", TypeVar("Field2")),
-              Field("field3", TypeVar("Field3")),
-              Field("field4", TypeVar("Field4")),
-              Field("_5", TypeVar("Field5"))))
-        }
-
-        assertEqualObjects(expected, actual)
-        c.Expr(q"")
+        c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
       }
     }
 
@@ -402,31 +373,7 @@ object Parser {
         val actual = parseOrAbort(c)(DataDeclP, annottees.head.tree)
         val DataConstructor(_, Variant(TypeVar(tag), _)) = actual
 
-        val expected = tag.toString match {
-          case "Empty1" | "Empty2" =>
-            DataConstructor(Many.empty, Variant(TypeVar(tag), Many.empty))
-
-          case "Empty3" | "Empty4" =>
-            DataConstructor(
-              Many(
-                Param.invariant("W"),
-                Param.invariant("X"),
-                Param.covariant("Y"),
-                Param.contravariant("Z")),
-              Variant(TypeVar(tag), Many.empty))
-
-          case "IntList" =>
-            DataConstructor(
-              Many.empty,
-              Variant(TypeVar("IntList"), Many(
-                Record("Nil", Many.empty),
-                Record("Cons", Many(
-                  Field("_1", TypeVar("Int")),
-                  Field("_2", TypeVar("IntList")))))))
-        }
-
-        assertEqualObjects(expected, actual)
-        c.Expr(q"")
+        c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
       }
     }
   }
