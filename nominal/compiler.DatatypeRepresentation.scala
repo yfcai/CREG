@@ -210,5 +210,5 @@ object DatatypeRepresentation {
     def contravariant(name: Name): Param = Param(name, Variance.Contravariant)
   }
 
-  case class DataFamily(name: Name, params: Many[Name], members: Many[Variant])
+  case class DataFamily(name: Name, params: Many[Param], members: Many[Variant])
 }

@@ -61,7 +61,7 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
           yield
             DataFamily(
               familyName.toString,
-              getNamesOfTypeDefs(c)(params),
+              mkGenericTypeParams(c)(params),
               variants)
 
         case _ =>

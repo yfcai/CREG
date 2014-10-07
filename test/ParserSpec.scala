@@ -1,7 +1,6 @@
 import org.scalatest._
 import nominal.compiler._
 import nominal.compiler.DatatypeRepresentation._
-import nominal.compiler.ParserOfDatatypeRep._
 
 class ParserSpec extends FlatSpec {
   import Parser.Tests._
@@ -73,7 +72,7 @@ class ParserSpec extends FlatSpec {
     assert(Company ==
       DataFamily(
         "Company",
-        Many("P"),
+        Many(Param invariant "P"),
         Many(
           Variant(TypeVar("Dept"), Many(
             Record("D", Many(Field("units", TypeVar("List[Subunit]")))))),
