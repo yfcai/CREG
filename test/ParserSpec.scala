@@ -1,6 +1,7 @@
 import org.scalatest._
 import nominal.compiler._
 import nominal.compiler.DatatypeRepresentation._
+import nominal.compiler.ParserOfDatatypeRep._
 
 class ParserSpec extends FlatSpec {
   import Parser.Tests._
@@ -62,4 +63,24 @@ class ParserSpec extends FlatSpec {
             Field("_1", TypeVar("Int")),
             Field("_2", TypeVar("IntList"))))))))
   }
+
+  it should "parse families of datatypes" in {
+    @familydecl trait Company[P] {
+      Dept { D(units = List[Subunit]) }
+      Subunit { DU(dept = Dept) ; PU(person = P) }
+    }
+
+    assert(Company ==
+      DataFamily(
+        "Company",
+        Many("P"),
+        Many(
+          Variant(TypeVar("Dept"), Many(
+            Record("D", Many(Field("units", TypeVar("List[Subunit]")))))),
+          Variant(TypeVar("Subunit"), Many(
+            Record("DU", Many(Field("dept", TypeVar("Dept")))),
+            Record("PU", Many(Field("person", TypeVar("P")))))))))
+  }
+
+  // TODO: test ParserOfFunctorRep.
 }

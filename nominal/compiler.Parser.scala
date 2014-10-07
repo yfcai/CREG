@@ -13,6 +13,15 @@ trait ParserBase extends util.AbortWithError {
     }
 }
 
+object ParserOfDatatypeRep {
+  import DatatypeRepresentation._
+
+  // put everything we want to serialize in an object
+  // if it's an inner class of some trait, then it includes a back pointer
+  // to the trait, which probably have nonserializable members.
+  case class DataFamily(name: Name, params: Many[Name], members: Many[Variant])
+}
+
 trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Traits {
   // ====================================
   // GRAMMARS FOR DATATYPE REPRESENTATION
@@ -46,9 +55,30 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
   // _\d+ (tuple components _1, _2, _3, ...; _i must be the (i - 1)th field)
 
   import DatatypeRepresentation._
+  import ParserOfDatatypeRep._
 
   // shadow trait Parser by Parser[A]
   private[this] type Parser[A] = contextReaderParser.Parser[A]
+
+  lazy val FamilyDeclP: Parser[DataFamily] = new Parser[DataFamily] {
+    val VariantsP: MultiParser[Variant] = ZeroOrMore(VariantP)
+
+    def parse(c: Context)(input: c.Tree): Result[DataFamily, c.Position] = {
+      import c.universe._
+      nameParamsSupersMembers(c)(input) match {
+        case Some((familyName, params, supers, members)) =>
+          for { variants <- VariantsP.parse(c)(members) }
+          yield
+            DataFamily(
+              familyName.toString,
+              getNamesOfTypeDefs(c)(params),
+              variants)
+
+        case _ =>
+          Failure(input.pos, "expect trait Family { Variant* }")
+      }
+    }
+  }
 
   lazy val DataDeclP: Parser[DataConstructor] = new Parser[DataConstructor] {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
@@ -353,28 +383,41 @@ object Parser {
     import scala.annotation.StaticAnnotation
     import DatatypeRepresentation._
 
-    class record extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro record.impl }
-    object record {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
-
-        val q"trait $tag { $input }" = annottees.head.tree
-        val actual = RecordP.parse(c)(input).get
-
-        c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
-      }
+    class record extends StaticAnnotation {
+      def macroTransform(annottees: Any*): Any = macro recordImpl
     }
 
-    class datadecl extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro datadecl.impl }
-    object datadecl {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
+    def recordImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+      import c.universe._
 
-        val actual = parseOrAbort(c)(DataDeclP, annottees.head.tree)
-        val DataConstructor(_, Variant(TypeVar(tag), _)) = actual
+      val q"trait $tag { $input }" = annottees.head.tree
+      val actual = RecordP.parse(c)(input).get
 
-        c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
-      }
+      c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
+    }
+
+    class datadecl extends StaticAnnotation {
+      def macroTransform(annottees: Any*): Any = macro datadeclImpl
+    }
+
+    def datadeclImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+      import c.universe._
+
+      val actual = parseOrAbort(c)(DataDeclP, annottees.head.tree)
+      val DataConstructor(_, Variant(TypeVar(tag), _)) = actual
+
+      c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
+    }
+
+    class familydecl extends StaticAnnotation {
+      def macroTransform(annottees: Any*): Any =
+        macro familydeclImpl
+    }
+
+    def familydeclImpl(c: Context)(annottees: c.Tree*): c.Tree = {
+      import c.universe._
+      val actual = parseOrAbort(c)(FamilyDeclP, annottees.head)
+      q"val ${TermName(actual.name)} = ${persist(c)(actual)}"
     }
   }
 }
