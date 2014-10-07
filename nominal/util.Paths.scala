@@ -94,6 +94,11 @@ trait Paths {
     tq"_root_.scala.Any"
   }
 
+  def getNothingType(c: Context): c.Tree = {
+    import c.universe._
+    tq"_root_.scala.Nothing"
+  }
+
   def nothingType: String = "_root_.scala.Nothing"
   def anyType: String = "_root_.scala.Any"
 
