@@ -676,16 +676,5 @@ object UniverseConstruction {
           c.Expr(ValDef(mods, name, tt, persist(c)(data)))
       }
     }
-
-    class functor extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro functorImpl }
-    def functorImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-      import c.universe._
-      annottees.head.tree match {
-        case ValDef(mods, name, emptyType @ TypeTree(), tree) =>
-          val input   = parseOrAbort(c)(FunctorP, tree)
-          val functor = fleshOut(c)(input)
-          c.Expr(ValDef(mods, name, emptyType, persist(c)(functor)))
-      }
-    }
   }
 }
