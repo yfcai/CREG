@@ -99,7 +99,7 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex {
       input match {
         // this quasiquote matches all decls with nonempty cases
         // and possibly empty genericTypeParams
-        case q"trait $variantName [ ..$params ] { ..$cases }" =>
+        case q"trait $variantName [ ..$params ] extends ..$supers { ..$cases }" =>
           for { cases <- CasesP.parse(c)(cases) }
           yield
             DataConstructor(
@@ -109,11 +109,11 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex {
                 Many(cases: _*)))
 
         // matches decls with empty cases & trailing braces
-        case q"trait $variantName [ ..$params ] {}" =>
+        case q"trait $variantName [ ..$params ] extends ..$supers {}" =>
           Success(mkEmptyVariant(c)(variantName, params))
 
         // matches decls with neither cases nor trailing braces
-        case q"trait $variantName [ ..$params ]" =>
+        case q"trait $variantName [ ..$params ] extends ..$supers" =>
           Success(mkEmptyVariant(c)(variantName, params))
 
         case _ =>

@@ -4,7 +4,7 @@ package compiler
 import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
-trait Preprocessor extends util.AbortWithError with util.Traverse {
+trait Preprocessor extends util.AbortWithError with util.Traverse with util.Traits {
 
   sealed case class PreprocessorException(message: String) extends Exception(message)
 
@@ -105,39 +105,5 @@ trait Preprocessor extends util.AbortWithError with util.Traverse {
     */
   def extractVariants(datatype: Datatype): Iterator[Variant] = datatype everywhereQ {
     case variant @ Variant(_, _) => variant
-  }
-
-  def getNameOfTrait(c: Context)(tree: c.Tree): Option[String] = {
-    import c.universe._
-    tree match {
-      case q"trait $name [..$params]" => Some(name.toString)
-      case q"trait $name [..$params] {}" => Some(name.toString)
-      case q"trait $name [..$params] { ..$body }" => Some(name.toString)
-      case _ => None
-    }
-  }
-
-  def getFullNameOfTrait(c: Context)(tree: c.Tree): Option[String] = {
-    import c.universe._
-
-    def mkName(name: c.TypeName, params: List[c.universe.TypeDef]): String = {
-      //
-      val paramNames = params map {
-        case TypeDef(modifiers, typeName, typeParams, rhs) =>
-          typeName.toString
-      }
-
-      if (paramNames.isEmpty)
-        name.toString
-      else
-        s"$name[${paramNames mkString ", "}]"
-    }
-
-    tree match {
-      case q"trait $name [..$params]" => Some(mkName(name, params))
-      case q"trait $name [..$params] {}" => Some(mkName(name, params))
-      case q"trait $name [..$params] { ..$body }" => Some(mkName(name, params))
-      case _ => None
-    }
   }
 }

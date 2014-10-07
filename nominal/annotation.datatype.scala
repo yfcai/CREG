@@ -35,7 +35,7 @@ extends ParserOfDatatypeRep
 
       // generate variants
       val forDeclarations: Iterator[Variant] = digestForDeclarationGenerator(c)(input, parseTree)
-      val declarations: Iterator[Tree] = forDeclarations flatMap (variant => generateDeclaration(c)(variant))
+      val declarations: Iterator[Tree] = forDeclarations flatMap (variant => generateDeclaration(c)(variant, input))
 
       val synonymFood: SynonymGeneratorFood = digestForSynonymGenerator(c)(input, parseTree)
       val synonyms: Iterator[Tree] =

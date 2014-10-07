@@ -3,6 +3,22 @@ import nominal.functors.datatype
 import nominal.lib._
 
 class DataSpec extends FlatSpec with Coercion {
+  "@datatype macro" should "preserve supertypes" in {
+    import java.io.Serializable
+
+    @datatype trait SomeData[Type1] extends Serializable {
+      SomeEmptyRecord
+      SomeNonemptyRecord(field1 = Type1, field2 = Int)
+    }
+
+    assert(SomeEmptyRecord.isInstanceOf[Serializable])
+    assert(SomeNonemptyRecord("hello", 5).isInstanceOf[Serializable])
+  }
+
+  ///////////////////////////////////////////
+  // TEST THAT THE OLD CASE STUDY COMPILES //
+  ///////////////////////////////////////////
+
   import language.implicitConversions
   import language.higherKinds
 
@@ -73,7 +89,7 @@ class DataSpec extends FlatSpec with Coercion {
 
 
 
-  "data macro" should "generate enough scala types for the case study" in {
+  it should "generate enough scala types for the case study" in {
     @datatype trait Term {
       Void
       Var(String)
