@@ -82,7 +82,7 @@ object SynonymGenerator {
             Record("Manager", Many(Field("dept", TypeVar("Int")))),
             Record("Employee", Many(Field("name", TypeVar("String")), Field("dept", TypeVar("Int"))))))
 
-        val declaration = generateDeclaration(c)(datatype, annottees.head.tree)
+        val declaration = generateDeclaration(c)(datatype, Many.empty)
         val synonym = generateConcreteSynonym(c)(person, templatify(datatype))
         val expected = q"type Person = PersonT[Boss, Manager[Int], Employee[String, Int]]"
         assertEqual(c)(expected, synonym)
@@ -111,7 +111,7 @@ object SynonymGenerator {
 
         val fixedPoint = FixedPoint(intList, datatypeBody)
 
-        val declaration = generateDeclaration(c)(datatypeBody, annottees.head.tree)
+        val declaration = generateDeclaration(c)(datatypeBody, Many.empty)
 
         val synonym = generateConcreteSynonym(c)(intList, templatify(fixedPoint))
         val q"""
@@ -152,7 +152,7 @@ object SynonymGenerator {
 
         val genericDatatype = DataConstructor(Many(Param.covariant("A")), fixedPoint)
 
-        val declaration = generateDeclaration(c)(datatypeBody, annottees.head.tree)
+        val declaration = generateDeclaration(c)(datatypeBody, Many.empty)
 
         val synonym = generateSynonym(c)(gList, templatify(genericDatatype))
         val q"""

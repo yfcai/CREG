@@ -14,11 +14,13 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     * without sacrificing the functor instance inside Fix[+F[+_]], which
     * is necessary to obtain covariance in something like List[+A].
     */
-  def generateDeclaration(c: Context)(datatype: Variant, input: c.Tree): Many[c.Tree] = {
+  def generateDeclaration(c: Context)(datatype: Variant, declaredSupers: Many[c.Tree]):
+      Many[c.Tree] =
+  {
     import c.universe._
 
     val template = mkTemplate(c)(datatype.header.name)
-    val supers   = getSupersOfTrait(c)(input) :+ getVariant(c)
+    val supers   = declaredSupers :+ getVariant(c)
 
     if (datatype.cases.isEmpty)
       Many(q"sealed trait $template extends ..$supers")
