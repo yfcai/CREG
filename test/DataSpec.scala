@@ -92,7 +92,7 @@ class DataSpec extends FlatSpec {
   it should "generate enough scala types for the case study" in {
     @datatype trait Term {
       Void
-      Var(String)
+      Var(name = String)
       Abs(param = String, body = Term)
       App(Term, Term)
     }
@@ -423,5 +423,32 @@ class DataSpec extends FlatSpec {
 
     assert(theSum == 100)
     info("The sum of the first nine primes is " + theSum)
+  }
+
+  @datatype trait V {
+    V1 {
+      V11 { R11 }
+      V12 { R12 }
+    }
+
+    V2 { R2 }
+  }
+
+  it should "permit variants of variants" in {
+    //@functor val r11F = r11 => V1(V1(V11(r11), V12(R12)), V2(R2))
+
+    //def isR11(x: V): Boolean = r11F(x).mapReduce(_ => true)(false, _ || _)
+
+    //assert(  isR11(R11))
+    //assert(! isR11(R12))
+    //assert(! isR11(R2 ))
+    // TODO:
+    // 0. debug r11F: uncomment; test:clean; ~test:compile
+    //    amounts to figuring out how to set subcat bounds in nested variants
+    // 1. generate synonyms for subvariants.
+    //    beware mutual recursion.
+    // 2. @family has become redundant. remove it.
+    // 3. disallow anonymous record field names. otherwise they're indistinguishable from variants.
+    // 4. after (3), try to parse records before variants.
   }
 }

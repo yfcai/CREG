@@ -268,12 +268,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     overrider: Option[Datatype])
     (implicit flags: UC.Flags): DoICare =
   {
-    //DEBUG
-    if (overrider.nonEmpty) {
-      println(s"\ncarePackage with overrider:\n  $overrider")
-      sys error "gone"
-    }
-
     // dealiasing is not recursive. do it here.
     val tpe = (overrider flatMap (x => startingType(c)(x, care)) getOrElse tpe0).dealias
 

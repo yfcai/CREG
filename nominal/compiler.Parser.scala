@@ -31,7 +31,7 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
   //    Variant := TypeVar { Case* } -- entry point from scala types
   //
   //       Case := Record
-  //             | Name = TypeVar
+  //             | Variant
   //
   //     Record := Name              -- record without fields, a single case object
   //             | Name ( Field+ )   -- record with fields
@@ -119,7 +119,7 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
 
   lazy val CasesP: MultiParser[VariantCase] = ZeroOrMore(CaseP)
 
-  lazy val CaseP: Parser[VariantCase] = RecordP orElse VariantP
+  lazy val CaseP: Parser[VariantCase] = VariantP orElse RecordP
 
   lazy val RecordP: Parser[Record] = RecordWithoutFieldsP orElse RecordWithFieldsP
 
