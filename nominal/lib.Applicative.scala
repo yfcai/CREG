@@ -42,4 +42,14 @@ object Applicative {
       def pure[X](x: X): A = default
       def call[X, Y](f: A, x: A): A = combine(f, x)
     }
+
+  def Maybe[A]: Applicative { type Map[+X] = Option[X] } =
+    new Applicative {
+      type Map[+A] = Option[A]
+      def pure[A](x: A): Option[A] = Some(x)
+      def call[A, B](f: Option[A => B], x: Option[A]): Option[B] = (f, x) match {
+        case (Some(f), Some(x)) => Some(f(x))
+        case _ => None
+      }
+    }
 }

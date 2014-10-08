@@ -23,14 +23,10 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         result
 
       case Record(name, fields) =>
-        val q"??? : $result" =
-          q"??? : ${TypeName(name)}[..${fields.map(field => meaning(c)(field.get))}]"
-        result
+        tq"${TypeName(name)}[..${fields.map(field => meaning(c)(field.get))}]"
 
       case Variant(typeVar, records) =>
-        val q"??? : $result" =
-          q"??? : ${meaning(c)(typeVar)}[..${records.map(record => meaningOfNominal(c)(record))}]"
-        result
+        tq"${meaning(c)(TypeVar(typeVar))}[..${records.map(record => meaning(c)(record))}]"
 
       case FixedPoint(paramName, body) =>
         // to take the fixed point, the data constructor must be unary
@@ -38,25 +34,11 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         val innerType = mkInnerType(c)
         val typeDef = covariantTypeDef(c)(paramName)
 
-        val q"??? : $result" =
-          q"""
-            ??? : $fix[({
-              type $innerType[$typeDef] = ${meaning(c)(body)}
-            })#$innerType]
-          """
-        result
-
-      case Reader(domain, range) =>
-        val domainType = meaning(c)(domain)
-        val rangeType = meaning(c)(range)
-        val q"??? : $result" = q"??? : ($domainType => $rangeType)"
-        result
-
-      case Intersect(lhs, rhs) =>
-        val lhsType = meaning(c)(lhs)
-        val rhsType = meaning(c)(rhs)
-        val q"??? : $result" = q"??? : ($lhsType with $rhsType)"
-        result
+        tq"""
+          $fix[({
+            type $innerType[$typeDef] = ${meaning(c)(body)}
+          })#$innerType]
+        """
     }
   }
 
@@ -73,13 +55,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
   }
 
   def mkInnerType(c: Context): c.TypeName = c.universe.TypeName(c freshName "innerType")
-
-  def meaningOfNominal(c: Context)(rep: Nominal): c.Tree = rep match {
-    case Field(name, body)            => meaning(c)(body)
-    case RecordAssignment(_, typeVar) => meaning(c)(typeVar)
-    case data: Datatype               => meaning(c)(data)
-  }
-
 
   /** @param name name of type parameter
     * @return covariant type parameter of that name
@@ -133,9 +108,13 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
   def mkBoundedTypeDefs(c: Context)(params: Many[Param], bounds: Map[Name, Datatype]): Many[c.universe.TypeDef] =
     params.map(param => mkBoundedTypeDef(c)(param, bounds))
 
+
+
   // ====================== //
   // FROM SCALA TO DATATYPE //
   // ====================== //
+
+  // TODO: rethink use case and rewrite everything here.
 
   object UC extends Enumeration {
     type Flag = Value
@@ -155,7 +134,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         fullyApplyToNothing(c)(typeVar, care)
 
       case Variant(header, _) =>
-        fullyApplyToNothing(c)(header, care)
+        fullyApplyToNothing(c)(TypeVar(header), care)
 
       case _ =>
         treeToType(c)(c.universe.TypeTree())
@@ -173,14 +152,10 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
   def startingType(c: Context)(body: Datatype, care: Set[Name]): Option[c.Type] = 
     body match {
       case Variant(header, fields) =>
-        Some(fullyApplyToNothing(c)(header, care))
+        Some(fullyApplyToNothing(c)(TypeVar(header), care))
 
       case Record(_, _) | TypeVar(_) =>
         None
-
-      case Intersect(_, _) | Reader(_, _) =>
-        // not supported yet
-        ???
 
       case _ =>
         abortWithError(c)(
@@ -268,7 +243,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         }
       })(collection.breakOut)
 
-      Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases)
+      Variant(typeToCode(c)(tpe.typeConstructor), cases)
     }
     else { // ! symbol.isAbstract
       // CASE record
@@ -293,6 +268,12 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     overrider: Option[Datatype])
     (implicit flags: UC.Flags): DoICare =
   {
+    //DEBUG
+    if (overrider.nonEmpty) {
+      println(s"\ncarePackage with overrider:\n  $overrider")
+      sys error "gone"
+    }
+
     // dealiasing is not recursive. do it here.
     val tpe = (overrider flatMap (x => startingType(c)(x, care)) getOrElse tpe0).dealias
 
@@ -333,25 +314,18 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
           // adjust overrider
           // it has to be a variant whose typeVar reflects the overriders
           def adjustOverrider(overrider: Option[Datatype]): Option[Datatype] = overrider match {
-            case Some(Variant(TypeVar(fixedPointDataTag), nominals)) =>
+            case Some(Variant(fixedPointDataTag, nominals)) =>
 
               Some(Variant(
                 // e. g., replace "List" by "ListT[..., ...]"
-                TypeVar(typeToCode(c)(unrolledTpe)),
+                typeToCode(c)(unrolledTpe),
 
                 // e. g., rename "List" to `fixedPointName`
-                nominals.map { nominal =>
-                  nominal.replaceBody(
-                    nominal.get everywhere {
-                      case TypeVar(name) if name == fixedPointDataTag =>
-                        TypeVar(fixedPointName)
-                    }
-                  )
-                }
+                nominals.map(_ rename Map(fixedPointDataTag -> fixedPointName))
               ))
 
             // convert `Term` to `Term {}`, coz the first case is tough to handle downstream
-            case Some(header @ TypeVar(_)) =>
+            case Some(TypeVar(header)) =>
               adjustOverrider(Some(Variant(header, Many.empty)))
 
             case otherwise =>
@@ -415,22 +389,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
             // if I do care about this type & it's a variant,
             // then children's IDontCare packages are useless.
             // they have to be records.
-            val cases: Many[Nominal] = (childCare, tpe.typeArgs, suboverriders).zipped.map({
-              // summand record is overridden by a functor parameter in type argument part
-              case (IDoCare(typeVar @ TypeVar(param)), actual, suboverrider)
-                  if care(param) =>
-                val record =
-                  representGeneratedRecord(c)(
-                    actual.etaExpand.resultType,
-                    actual.typeParams.map(_ => IDoCare(TypeVar(anyType))))
-
-                RecordAssignment(record, typeVar)
-
-              // summand record is overridden by a functor parameter in overrider part
-              case (IDoCare(record @ Record(_, _)), _, Some(typeVar @ TypeVar(param)))
-                  if care(param) =>
-                RecordAssignment(record, typeVar)
-
+            val cases: Many[VariantCase] = (childCare, tpe.typeArgs, suboverriders).zipped.map({
               // normal record
               case (IDoCare(record @ Record(_, _)), _, suboverrider) =>
                 record
@@ -450,7 +409,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
                       carePackage(c)(tpe, care, overrider)(flags)
                   })
             })(collection.breakOut)
-            IDoCare(Variant(TypeVar(typeToCode(c)(tpe.typeConstructor)), cases))
+            IDoCare(Variant(typeToCode(c)(tpe.typeConstructor), cases))
           }
           else { // ! symbol.isAbstract
             // this is the record case
@@ -535,14 +494,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         //   @functor val badF = XX => Term {}
         //
         ???
-
-      case Some(Reader(domain, range)) =>
-        // what answer makes sense?
-        ???
-
-      case Some(Intersect(_, _)) =>
-        // not sure what to do here
-        ???
     }
   }
 
@@ -554,9 +505,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     val params = tpe.typeConstructor.typeParams.map(symbol => symbol.name.toString)
     val indexedOverriders: Map[Int, Option[Datatype]] =
       overriders.map({
-        case FixedPoint(_, _) =>
-          sys error s"500 internal error: found fixed point as a case of a variant!?"
-
         case overrider =>
           var i = params.indexOf(overrider.name)
           // if overrider did not provide a name,
@@ -630,7 +578,7 @@ object UniverseConstruction {
         // duplicate test.UniverseConstructionSpec
         val datatype: Datatype =
           FixedPoint("L",
-            Variant(TypeVar("ListT"), Many(
+            Variant("ListT", Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
                 Field("head", TypeVar("Int")),
@@ -656,7 +604,7 @@ object UniverseConstruction {
         // duplicate test.UniverseConstructionSpec
         val datatype: Datatype =
           FixedPoint("L",
-            Variant(TypeVar("ListT"), Many(
+            Variant("ListT", Many(
               Record("Nil", Many.empty),
               Record("Cons", Many(
                 Field("head", TypeVar("A")), // should be bound by my[A]

@@ -54,7 +54,7 @@ trait Parser[+A] {
 
   // deterministic choice <+
   // featuring use-site variance
-  def <+ [B >: A] (that: Parser[B]): Parser[B] = new Parser[B] {
+  def orElse [B >: A] (that: Parser[B]): Parser[B] = new Parser[B] {
     def parse(c: Context)(input: c.Tree): Result[B, c.Position] =
       self.parse(c)(input) orElse that.parse(c)(input)
   }

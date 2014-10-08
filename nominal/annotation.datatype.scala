@@ -13,8 +13,6 @@ extends ParserOfDatatypeRep
    with Preprocessor
    with DeclarationGenerator
    with SynonymGenerator
-   with TraversableGenerator
-   with InterfaceHelperGenerator
 {
   def expandData(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._

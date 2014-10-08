@@ -2,6 +2,7 @@ package nominal
 package util
 
 import scala.reflect.macros.blackbox.Context
+import compiler.DatatypeRepresentation.Many
 
 trait Paths {
   // location of the Fix[_[_]] trait
@@ -102,4 +103,10 @@ trait Paths {
   def nothingType: String = "_root_.scala.Nothing"
   def anyType: String = "_root_.scala.Any"
 
+  def scalaLanguageFeatureImports(c: Context): Many[c.Tree] = {
+    import c.universe._
+    Many(
+      q"import _root_.scala.language.higherKinds",
+      q"import _root_.scala.language.implicitConversions")
+  }
 }

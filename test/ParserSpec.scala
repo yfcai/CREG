@@ -28,23 +28,23 @@ class ParserSpec extends FlatSpec {
     @datadecl trait Empty3 [W, X, +Y, -Z]
     @datadecl trait Empty4 [W, X, +Y, -Z] {}
 
-    assert(Empty1 == DataConstructor(Many.empty, Variant(TypeVar("Empty1"), Many.empty)))
+    assert(Empty1 == DataConstructor(Many.empty, Variant("Empty1", Many.empty)))
 
-    assert(Empty2 == DataConstructor(Many.empty, Variant(TypeVar("Empty2"), Many.empty)))
+    assert(Empty2 == DataConstructor(Many.empty, Variant("Empty2", Many.empty)))
 
     assert(Empty3 ==
       DataConstructor(
         Many(
           Param.invariant("W"), Param.invariant("X"),
           Param.covariant("Y"), Param.contravariant("Z")),
-        Variant(TypeVar("Empty3"), Many.empty)))
+        Variant("Empty3", Many.empty)))
 
     assert(Empty4 ==
       DataConstructor(
         Many(
           Param.invariant("W"), Param.invariant("X"),
           Param.covariant("Y"), Param.contravariant("Z")),
-        Variant(TypeVar("Empty4"), Many.empty)))
+        Variant("Empty4", Many.empty)))
   }
 
   it should "parse nonempty data declarations" in {
@@ -56,7 +56,7 @@ class ParserSpec extends FlatSpec {
     assert(IntList ==
       DataConstructor(
         Many.empty,
-        Variant(TypeVar("IntList"), Many(
+        Variant("IntList", Many(
           Record("Nil", Many.empty),
           Record("Cons", Many(
             Field("_1", TypeVar("Int")),
@@ -74,9 +74,9 @@ class ParserSpec extends FlatSpec {
         "Company",
         Many(Param invariant "P"),
         Many(
-          Variant(TypeVar("Dept"), Many(
+          Variant("Dept", Many(
             Record("D", Many(Field("units", TypeVar("List[Subunit]")))))),
-          Variant(TypeVar("Subunit"), Many(
+          Variant("Subunit", Many(
             Record("DU", Many(Field("dept", TypeVar("Dept")))),
             Record("PU", Many(Field("person", TypeVar("P")))))))))
   }

@@ -77,7 +77,7 @@ object SynonymGenerator {
         val personT = "PersonT"
 
         val datatype =
-          Variant(TypeVar(person), Many(
+          Variant(person, Many(
             Record("Boss", Many.empty),
             Record("Manager", Many(Field("dept", TypeVar("Int")))),
             Record("Employee", Many(Field("name", TypeVar("String")), Field("dept", TypeVar("Int"))))))
@@ -103,7 +103,7 @@ object SynonymGenerator {
         val intListF = "IntListF"
 
         val datatypeBody =
-          Variant(TypeVar(intList), Many(
+          Variant(intList, Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
               Field("_1", TypeVar("Int")),
@@ -142,7 +142,7 @@ object SynonymGenerator {
         val gListF = "GListF"
 
         val datatypeBody =
-          Variant(TypeVar(gList), Many(
+          Variant(gList, Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
               Field("_1", TypeVar("A")),

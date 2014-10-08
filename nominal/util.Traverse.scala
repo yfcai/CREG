@@ -206,9 +206,9 @@ trait Traverse extends Paths {
     *         TypeVars are otherwise left alone
     */
   import compiler.DatatypeRepresentation.{Datatype, Variant, TypeVar, DataConstructor}
-  def templatify(datatype: Datatype): Datatype = datatype everywhere {
-    case Variant(TypeVar(name), body) =>
-      Variant(TypeVar(mkTemplateName(name)), body)
+  def templatify(datatype: Datatype): Datatype = datatype.everywhere {
+    case Variant(name, body) =>
+      Variant(mkTemplateName(name), body)
   }
 
   def templatify(cons: DataConstructor): DataConstructor =

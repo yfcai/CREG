@@ -80,7 +80,7 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
             DataConstructor(
               mkGenericTypeParams(c)(params),
               Variant(
-                TypeVar(variantName.toString),
+                variantName.toString,
                 Many(cases: _*)))
 
         case _ =>
@@ -108,11 +108,8 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
       import c.universe._
       input match {
         case q"$variantHeader { ..$cases }" =>
-          for {
-            typeVar <- TypeVarP.parse(c)(variantHeader)
-            cases <- CasesP.parse(c)(cases)
-          }
-          yield Variant(typeVar, Many(cases: _*))
+          for { cases <- CasesP.parse(c)(cases) }
+          yield Variant(showCode(variantHeader), Many(cases: _*))
 
         case _ =>
           Failure(input.pos, "expect Variant { Case* }")
@@ -120,26 +117,11 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
     }
   }
 
-  lazy val CasesP: MultiParser[Nominal] = ZeroOrMore(CaseP)
+  lazy val CasesP: MultiParser[VariantCase] = ZeroOrMore(CaseP)
 
-  lazy val CaseP: Parser[Nominal] = new Parser[Nominal] {
-    def parse(c: Context)(input: c.Tree): Result[Nominal, c.Position] = {
-      import c.universe._
-      input match {
-        case q"$lhs = $rhs" =>
-          for {
-            label <- IdentifierP.parse(c)(lhs)
-            data <- TypeVarP.parse(c)(rhs)
-          }
-          yield Field(label, data) // labelled data: Name = TypeVar
+  lazy val CaseP: Parser[VariantCase] = RecordP orElse VariantP
 
-        case _ =>
-          RecordP.parse(c)(input) // Record
-      }
-    }
-  }
-
-  lazy val RecordP: Parser[Record] = RecordWithoutFieldsP <+ RecordWithFieldsP
+  lazy val RecordP: Parser[Record] = RecordWithoutFieldsP orElse RecordWithFieldsP
 
   lazy val RecordWithoutFieldsP: Parser[Record] = new Parser[Record] {
     def parse(c: Context)(input: c.Tree): Result[Record, c.Position] =
@@ -282,7 +264,7 @@ trait ParserOfFunctorRep extends ParserBase {
   }
 
   // sadly, constants and type variables are indistinguishable bottom-up
-  lazy val BodyP: Parser[Body] = TypeVarP <+ FixedPointP <+ ApplicationP
+  lazy val BodyP: Parser[Body] = TypeVarP orElse FixedPointP orElse ApplicationP
 
   lazy val FixedPointP: Parser[FixedPoint] = new Parser[FixedPoint] {
     def parse(c: Context)(input: c.Tree): Result[FixedPoint, c.Position] = {
@@ -394,7 +376,7 @@ object Parser {
       import c.universe._
 
       val actual = parseOrAbort(c)(DataDeclP, annottees.head.tree)
-      val DataConstructor(_, Variant(TypeVar(tag), _)) = actual
+      val DataConstructor(_, Variant(tag, _)) = actual
 
       c.Expr(q"val ${TermName(tag.toString)} = ${persist(c)(actual)}")
     }

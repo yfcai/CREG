@@ -5,7 +5,7 @@ import nominal.functors._
 // maybe should include .lib in .functors?
 import nominal.lib._
 
-object Main extends App with Coercion {
+object Main extends App {
 
   @datatype trait Term {
     Void

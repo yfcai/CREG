@@ -21,7 +21,7 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
     */
   def digestForSynonymGenerator(c: Context)(input: c.Tree, parseTree: DataConstructor): SynonymGeneratorFood = {
     val variant = topLevelVariant(c)(input, parseTree)
-    val name = variant.header.name
+    val name = variant.name
 
     renameRecursiveVariant(c)(input, variant) match {
       // not recursive
@@ -49,7 +49,7 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
     *          constant functor.
     */
   def pointlessify(variant: Variant, genericParams: Many[Param]): FixedPoint = variant match {
-    case Variant(TypeVar(name), body) => FixedPoint(name, templatify(variant))
+    case Variant(name, body) => FixedPoint(name, templatify(variant))
   }
 
 
@@ -71,16 +71,16 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
   /** @param input the trait annotated by @datatype macro
     * @param variant parsed variant
     *
-    * @return renaming recursive positions to variant.header.name if variant is recursive
+    * @return renaming recursive positions to variant.name if variant is recursive
     *         nothing otherwise
     */
   def renameRecursiveVariant(c: Context)(input: c.Tree, variant: Variant): Option[Variant] = {
-    val dangerMarker = variant.header.name + "["
+    val dangerMarker = variant.name + "["
     val expectedName = getFullNameOfTrait(c)(input).get
-    val isRecursive = variant.exists {
+    val isRecursive = variant.exist {
       case TypeVar(name) if name == expectedName => ()
 
-      case TypeVar(name) if name != expectedName & name == variant.header.name =>
+      case TypeVar(name) if name != expectedName & name == variant.name =>
         throw new PreprocessorException(
           s"recursive position of $expectedName should not be marked by just $name")
 
@@ -89,17 +89,11 @@ trait Preprocessor extends util.AbortWithError with util.Traverse with util.Trai
           s"$name should not occur in the definition of $expectedName, because we don't support GADTs")
     }
     if (isRecursive)
-      Some(variant.rename(Map(expectedName -> variant.header.name)).asInstanceOf[Variant])
+      Some(variant.rename(Map(expectedName -> variant.name)).asInstanceOf[Variant])
     else
       None
   }
 
   // append 'F' to a TypeVar
   private[this] def appendF(name: Name): Name = name + "F"
-
-  /** @return all variants nested in this datatype declaration
-    */
-  def extractVariants(datatype: Datatype): Iterator[Variant] = datatype everywhereQ {
-    case variant @ Variant(_, _) => variant
-  }
 }

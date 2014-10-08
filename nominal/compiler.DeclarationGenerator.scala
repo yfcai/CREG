@@ -19,7 +19,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   {
     import c.universe._
 
-    val template = mkTemplate(c)(datatype.header.name)
+    val template = mkTemplate(c)(datatype.name)
     val supers   = declaredSupers :+ getVariant(c)
 
     if (datatype.cases.isEmpty)
@@ -34,14 +34,14 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   /** @param cases a bunch of named variants
     * @return their names as TypeName
     */
-  def generateCaseNames(c: Context)(cases: Many[Nominal]): Many[c.Tree] =
+  def generateCaseNames(c: Context)(cases: Many[VariantCase]): Many[c.Tree] =
     covariantTypeParams(c)(cases.map(_.name))
 
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
     * @return generated code for cases of the variant
     */
-  def generateCases(c: Context)(template: c.TypeName, cases: Many[Nominal]): Many[c.Tree] = {
+  def generateCases(c: Context)(template: c.TypeName, cases: Many[VariantCase]): Many[c.Tree] = {
     import c.universe._
     cases.zipWithIndex flatMap {
       case (Record(name, Many()), i) =>
@@ -105,8 +105,8 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   def generateVariantPrototype(c: Context)(datatype: Variant): c.Tree = {
     import c.universe._
     val n = datatype.cases.length
-    val objName = TermName(datatype.header.name)
-    val variantName = mkTemplate(c)(datatype.header.name)
+    val objName = TermName(datatype.name)
+    val variantName = mkTemplate(c)(datatype.name)
     val records = datatype.cases.asInstanceOf[Many[Record]]
 
     // compute bounds

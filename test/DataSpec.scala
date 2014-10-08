@@ -1,8 +1,8 @@
 import org.scalatest._
-import nominal.functors.datatype
+import nominal.functors._
 import nominal.lib._
 
-class DataSpec extends FlatSpec with Coercion {
+class DataSpec extends FlatSpec {
   "@datatype macro" should "preserve supertypes" in {
     import java.io.Serializable
 
