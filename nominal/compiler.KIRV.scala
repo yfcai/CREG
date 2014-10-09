@@ -33,22 +33,30 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     }
   })
 
-  def multiplexSubcatBounds(c: Context, n: Int)(parentName: c.TermName, children: Many[KIRV[c.Tree]]):
-      Many[c.Tree] =
+  def multiplexSubcatBounds(c: Context, n: Int)(
+    parentName: c.TermName,
+    children: Many[KIRV[c.Tree]],
+    childNames: Many[c.TermName]
+  ): Many[c.Tree] =
     (0 until n) map {
       case i =>
         import c.universe._
 
         // type is `Set` so that duplicate bounds are removed automatically
-        val bounds: Set[Int] = children.zipWithIndex.flatMap({
-          case (Proj(j, n, _), k) if i == j => Some(k)
+        val boundsByParent: Set[Int] = children.zipWithIndex.flatMap({
+          case (Proj(j, n, childK), k) if i == j => Some(k)
           case _                          => None
         })(collection.breakOut)
+
+        val boundsByChildren = children zip childNames map {
+          case (child, childName) => getFunctorCat(c, i)(childName)
+        }
 
         // this works even if bounds.isEmpty.
         // the intersection of nothing is Any.
         mkIntersectionType(c)(
-          bounds.map(bound => getFunctorCat(c, bound)(parentName))(collection.breakOut))
+          boundsByChildren ++
+          boundsByParent.map(bound => getFunctorCat(c, bound)(parentName))(collection.breakOut))
     }
 
   /** composing functors in a record, each functor on a field */
@@ -62,7 +70,7 @@ trait KIRV extends util.Traverse with util.AbortWithError {
     val childDefs  = (childNames zip children) map { case (name, child) => q"val $name = ${child.get}" }
 
     // subcategory bounds
-    val cats = multiplexSubcatBounds(c, n)(parentName, children)
+    val cats = multiplexSubcatBounds(c, n)(parentName, children, childNames)
 
     // all the val defs
     val valDefs = parentDef +: childDefs

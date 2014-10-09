@@ -48,9 +48,9 @@ extends ParserOfDatatypeRep
       // import language features needed for generated code
       val imports = scalaLanguageFeatureImports(c).iterator
 
-      val result = imports ++ declarations ++ synonyms
+      val result = (imports ++ declarations ++ synonyms).toSeq
 
-      c.Expr(q"..${result.toSeq}")
+      c.Expr(q"..$result")
 
     }
     catch {

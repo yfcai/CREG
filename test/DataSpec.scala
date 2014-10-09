@@ -427,24 +427,22 @@ class DataSpec extends FlatSpec {
 
   @datatype trait V {
     V1 {
-      V11 { R11 }
+      V11 { R11(get = Int) }
       V12 { R12 }
     }
 
-    V2 { R2 }
+    V2 { R2(get = String) }
   }
 
   it should "permit variants of variants" in {
-    //@functor val r11F = r11 => V1(V1(V11(r11), V12(R12)), V2(R2))
+    @functor val r11F = x => V(V1(V11(R11(x)), V12(R12)), V2(R2(String)))
 
-    //def isR11(x: V): Boolean = r11F(x).mapReduce(_ => true)(false, _ || _)
+    def isR11(x: V): Boolean = r11F(x).mapReduce(_ => true)(false, _ || _)
 
-    //assert(  isR11(R11))
-    //assert(! isR11(R12))
-    //assert(! isR11(R2 ))
+    assert(  isR11(R11(5)))
+    assert(! isR11(R12))
+    assert(! isR11(R2("hello")))
     // TODO:
-    // 0. debug r11F: uncomment; test:clean; ~test:compile
-    //    amounts to figuring out how to set subcat bounds in nested variants
     // 1. generate synonyms for subvariants.
     //    beware mutual recursion.
     // 2. @family has become redundant. remove it.
