@@ -82,6 +82,8 @@ trait Paths {
     TypeName("Cat" + i)
   }
 
+  def typeNameRange(c: Context): c.TypeName = c.universe.TypeName("Range")
+
   def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
 
   def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {

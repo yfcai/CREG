@@ -67,36 +67,41 @@ trait Traverse extends Paths {
     """
   }
 
-  def mkTypeMap(c: Context, n: Int)(mapping: Many[c.TypeName] => c.Tree): c.Tree = {
-    if (n < 1)
-      sys error s"mkTypeMap called with n = $n"
-
-    import c.universe._
-    val tA: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "A"))(collection.breakOut)
-    q"type ${TypeName(mappingOnObjects)}[..${mkCovariantTypeDefs(c)(tA)}] = ${mapping(tA)}"
-  }
+  def mkTypeMap(c: Context, n: Int)(mapping: Many[c.TypeName] => c.Tree): c.Tree =
+    if (n < 1) {
+      import c.universe._
+      q"type ${TypeName(mappingOnObjects)} = ${mapping(Many.empty)}"
+    }
+    else {
+      import c.universe._
+      val tA: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "A"))(collection.breakOut)
+      q"type ${TypeName(mappingOnObjects)}[..${mkCovariantTypeDefs(c)(tA)}] = ${mapping(tA)}"
+    }
 
   def mkDefTraverse(c: Context, n: Int)
-    (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree): c.Tree =
-  {
-    import c.universe._
-    val tA: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "A"))(collection.breakOut)
-    val tB: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "B"))(collection.breakOut)
-    val fs: Many[TermName] = (1 to n).map(_ => TermName(c freshName "F"))(collection.breakOut)
-    val G  = TermName(c freshName "G")
-    val tG = getFunctorMapOnObjects(c)(G)
-    val fTypes: Many[Tree] = (tA, tB).zipped.map { case (a, b) => tq"$a => $tG[$b]" }
-    val explicitParams = mkValDefs(c)(fs, fTypes)
-    val resultType = tq"${mkTraverseIn(c)(tA)} => ${mkTraverseOut(c)(G, tB)}"
-    val theBody = body(G, fs, tA, tB)
+    (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
+      c.Tree =
+    if (n <= 0)
+      c parse ""
+    else {
+      import c.universe._
+      val tA: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "A"))(collection.breakOut)
+      val tB: Many[TypeName] = (1 to n).map(_ => TypeName(c freshName "B"))(collection.breakOut)
+      val fs: Many[TermName] = (1 to n).map(_ => TermName(c freshName "F"))(collection.breakOut)
+      val G  = TermName(c freshName "G")
+      val tG = getFunctorMapOnObjects(c)(G)
+      val fTypes: Many[Tree] = (tA, tB).zipped.map { case (a, b) => tq"$a => $tG[$b]" }
+      val explicitParams = mkValDefs(c)(fs, fTypes)
+      val resultType = tq"${mkTraverseIn(c)(tA)} => ${mkTraverseOut(c)(G, tB)}"
+      val theBody = body(G, fs, tA, tB)
 
-    val cats = (0 until n).map(i => getThisCat(c, i))
-    val tAB = mkInvariantTypeDefs(c)(tA ++ tB, cats ++ cats)
+      val cats = (0 until n).map(i => getThisCat(c, i))
+      val tAB = mkInvariantTypeDefs(c)(tA ++ tB, cats ++ cats)
 
-    q"""
+      q"""
       def traverse[..$tAB]($G : ${getApplicative(c)})(..$explicitParams): $resultType = $theBody
     """
-  }
+    }
 
   def mkTraverseIn(c: Context)(as: Many[c.TypeName]): c.Tree = {
     import c.universe._

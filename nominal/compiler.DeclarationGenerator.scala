@@ -47,13 +47,13 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   def generateCases(c: Context)(template: c.TypeName, cases: Many[VariantCase]): Many[c.Tree] = {
     import c.universe._
     cases.zipWithIndex flatMap {
-      case (Record(name, Many()), i) =>
+      case (record @ Record(name, Many()), i) => // empty record
         val typeName = TypeName(name)
-        val termName = TermName(name)
         val params = namedParamsWithNothing(c)(typeName, i, cases.size)
+        val (termName, traversableN, typeMap, emptyDefTraverse) = recordPrototypeFragments(c)(record)
         Many(
           q"sealed trait $typeName extends $template[..$params] with ${getRecord(c)}",
-          q"case object $termName extends $typeName")
+          q"case object $termName extends $typeName with $traversableN { $typeMap }")
 
       case (Record(name, fields), i) =>
         // records are wholely free
@@ -119,11 +119,10 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   }
 
   def generateKIRVPrimitives(c: Context)(datatype: Variant): Many[c.Tree] = {
-    generateVariantPrototype(c)(datatype) +:
-      datatype.cases.flatMap {
+      datatype.cases.flatMap({
         case x: Record  => Many(generateRecordPrototype(c)(x))
         case x: Variant => generateKIRVPrimitives(c)(x)
-      }
+      }) :+ generateVariantPrototype(c)(datatype)
   }
 
   def generateVariantPrototype(c: Context)(datatype: Variant): c.Tree = {
@@ -134,17 +133,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
     // compute bounds
     val bounds = datatype.cases map {
-      case Record(recordName, fields) =>
-        val typeName = TypeName(recordName)
-        val theAny = getAnyType(c)
-        val typeArgs = fields map (_ => theAny)
-        tq"$typeName[..$typeArgs]"
-
-      case Variant(recordName, fields) =>
-        val typeName = mkTemplate(c)(recordName)
-        val theAny = getAnyType(c)
-        val typeArgs = fields map (_ => theAny)
-        tq"$typeName[..$typeArgs]"
+      child => tq"${TermName(child.name)}.${typeNameRange(c)}"
     }
 
     // trait to extend
@@ -197,28 +186,37 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     }
   }
 
-  def generateRecordPrototype(c: Context)(record: Record): c.Tree = {
-    import c.universe._
+  def generateRecordPrototype(c: Context)(record: Record): c.Tree =
     if (record.fields.isEmpty)
-      q"();" // EmptyTree does not work
+      c parse "" // already generated as a case object
     else {
-      val n = record.fields.length
-      val termName = TermName(record.name)
-      val typeName = TypeName(record.name)
-      val traversableN = getTraversableEndofunctor(c, n)
-      val typeMap = mkTypeMap(c, n) { params => tq"$typeName[..$params]" }
-      val defTraverse = mkDefTraverse(c, n) {
-        case (g, fs, as, bs) =>
-          val caseDef = recordCaseDef(c)(record) {
-            case (_, fieldNames) =>
-              mkCallTree(c)(g,
-                mkPureCurriedFunction(c)(g, termName, typeName, bs) +:
-                  fs.zip(fieldNames).map({ case (f, x) => q"$f($x)" }))
-          }
-          val x = TermName(c freshName "x")
-          q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", List(caseDef)) } }"
-      }
+      import c.universe._
+      val (termName, traversableN, typeMap, defTraverse) = recordPrototypeFragments(c)(record)
       q"object $termName extends $traversableN { $typeMap ; $defTraverse }"
     }
+
+ /** @return (name, supertrait, typeMap, traverse)
+   */
+  def recordPrototypeFragments(c: Context)(record: Record): (c.TermName, c.Tree, c.Tree, c.Tree) = {
+    import c.universe._
+    val n = record.fields.length
+    val termName = TermName(record.name)
+    val typeName = TypeName(record.name)
+    val traversableN = getTraversableEndofunctor(c, n)
+    val typeMap = mkTypeMap(c, n) { params =>
+      if (params.nonEmpty) tq"$typeName[..$params]" else tq"$typeName"
+    }
+    val defTraverse = mkDefTraverse(c, n) {
+      case (g, fs, as, bs) =>
+        val caseDef = recordCaseDef(c)(record) {
+          case (_, fieldNames) =>
+            mkCallTree(c)(g,
+              mkPureCurriedFunction(c)(g, termName, typeName, bs) +:
+                fs.zip(fieldNames).map({ case (f, x) => q"$f($x)" }))
+        }
+        val x = TermName(c freshName "x")
+        q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", List(caseDef)) } }"
+    }
+    (termName, traversableN, typeMap, defTraverse)
   }
 }

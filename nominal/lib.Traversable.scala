@@ -28,6 +28,8 @@ object Traversable {
     type Map[+A, +B, +C, +D]
   }
 
+  trait EndofunctorTrait0 extends Traversable0
+
   trait EndofunctorTrait extends Traversable {
     type Cat0 = Any
     type Map[+A]
@@ -49,10 +51,17 @@ object Traversable {
   }
 }
 
+trait Traversable0 {
+  type Map >: this.type
+  type Range = Map
+  def traverse(G: Applicative): G.Map[Map] = G pure (this: Map)
+}
+
 trait Traversable { thisFunctor =>
   // traversable functors can be defined on a subcategory
   type Cat0
   type Map[+A <: Cat0]
+  type Range = Map[Cat0]
 
   // McBride & Paterson's traverse
   def traverse[A <: Cat0, B <: Cat0](G: Applicative)(f: A => G.Map[B]): this.Map[A] => G.Map[this.Map[B]]
@@ -95,6 +104,7 @@ trait Traversable2 {
   type Cat0
   type Cat1
   type Map[+A <: Cat0, +B <: Cat1]
+  type Range = Map[Cat0, Cat1]
 
   def traverse[A <: Cat0, B <: Cat1, C <: Cat0, D <: Cat1]
               (G: Applicative)
@@ -124,6 +134,7 @@ trait Traversable3 {
   type Cat1
   type Cat2
   type Map[+A <: Cat0, +B <: Cat1, +C <: Cat2]
+  type Range = Map[Cat0, Cat1, Cat2]
 
   def traverse[A <: Cat0, B <: Cat1, W <: Cat2, C <: Cat0, D <: Cat1, Y <: Cat2]
               (G: Applicative)
@@ -148,6 +159,7 @@ trait Traversable4 {
   type Cat2
   type Cat3
   type Map[+A <: Cat0, +B <: Cat1, +C <: Cat2, +D <: Cat3]
+  type Range = Map[Cat0, Cat1, Cat2, Cat3]
 
   def traverse[A <: Cat0, B <: Cat1, W <: Cat2, X <: Cat3, C <: Cat0, D <: Cat1, Y <: Cat2, Z <: Cat3]
               (G: Applicative)
