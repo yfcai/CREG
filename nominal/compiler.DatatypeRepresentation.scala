@@ -123,7 +123,7 @@ object DatatypeRepresentation {
   }
 
   case class FixedPoint(name: Name, body: Datatype) extends Datatype with DatatypeLike[FixedPoint] {
-    def patternFunctor: DataConstructor = DataConstructor(Many(Param covariant name), body)
+    def patternFunctor: DataConstructor = DataConstructor(appendF(name), Many(Param covariant name), body)
     def replaceBody(body: Datatype): FixedPoint = copy(body = body)
     def unroll: Datatype = body subst (name, this)
 
@@ -131,10 +131,12 @@ object DatatypeRepresentation {
     final val construct = (xs: Iterator[Datatype]) => FixedPoint(name, xs.next)
   }
 
+  def appendF(name: Name): Name = name + "F"
+
 
   // datatype representation helpers
 
-  case class DataConstructor(params: Many[Param], body: Datatype) {
+  case class DataConstructor(name: Name, params: Many[Param], body: Datatype) {
     def arity: Int = params.size
   }
 

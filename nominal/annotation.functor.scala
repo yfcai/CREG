@@ -14,23 +14,16 @@
 
 package nominal
 package annotation
-package plain
 
 import scala.reflect.macros.blackbox.Context
 import compiler._
 
-object functor extends ParserOfFunctorRep with Denotation with util.AbortWithError {
+object functor extends Parsers with Denotation with util.AbortWithError {
   def impl(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
-    annottees match {
-      case Seq(ValDef(mods, name, emptyTree @ TypeTree(), tree)) =>
-        val input = parseOrAbort(c)(DeclP, tree)
-        val instance = evalFunctor(c)(input)
-        ValDef(mods, name, emptyTree, instance)
-
-      case _ =>
-        abortWithError(c)(annottees.head.pos,
-          s"expect: val functorName = typeParams => resultDataType, got: $annottees")
-    }
+    val input = parseOrAbort(c)(FunctorP, annottees.head)
+    val instance = evalFunctor(c)(input)
+    val name = TermName(input.name)
+    q"val $name = $instance"
   }
 }

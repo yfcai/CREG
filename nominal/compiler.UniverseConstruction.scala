@@ -141,7 +141,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     }
 
     val body = representation(c)(tpe, care, Some(raw.body))(flags)
-    DataConstructor(raw.params, body)
+    raw copy (body = body)
   }
 
   def representation(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype])
@@ -553,7 +553,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
 }
 
 object UniverseConstruction {
-  object Tests extends UniverseConstruction with ParserOfDatatypeRep with util.AssertEqual with util.Persist {
+  object Tests extends UniverseConstruction with Parsers with util.AssertEqual with util.Persist {
     import language.experimental.macros
     import scala.annotation.StaticAnnotation
 

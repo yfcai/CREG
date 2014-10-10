@@ -2,6 +2,7 @@ import org.scalatest._
 import nominal.compiler._
 
 class SynonymGeneratorSpec extends FlatSpec {
+  /*
   import SynonymGenerator.Tests._
   import nominal.lib._
 
@@ -52,4 +53,5 @@ class SynonymGeneratorSpec extends FlatSpec {
     val xs: GList[Int] = cons(1, cons(2, cons(3, cons(4, nil))))
     info(s"xs = $xs")
   }
+   */
 }

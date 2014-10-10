@@ -6,7 +6,7 @@ import nominal.functors._
 import nominal.lib._
 
 object Main extends App {
-
+/*
   @datatype trait Term {
     Void
     Var(name = String)
@@ -165,5 +165,5 @@ object Main extends App {
           show(s"subst($y, ${pretty{ysub}}, $name)", s1)
       }
       println()
-  }
+  }*/
 }

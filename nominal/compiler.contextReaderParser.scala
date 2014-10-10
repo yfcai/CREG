@@ -85,3 +85,22 @@ case class ZeroOrMore[+A](parser: Parser[A]) extends MultiParser[A] {
     }
   }
 }
+
+case class OneOrMore[A](things: String, parser: Parser[A]) extends MultiParser[A] {
+  val zeroOrMore = ZeroOrMore(parser)
+
+  def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
+    import c.universe._
+    inputs match {
+      case Nil =>
+        Failure(c.enclosingPosition, s"expect one or more $things, got zero of them")
+
+      case head :: tail =>
+        for {
+          a <- parser.parse(c)(head)
+          as <- zeroOrMore.parse(c)(tail)
+        }
+        yield a :: as
+    }
+  }
+}

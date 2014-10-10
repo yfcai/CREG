@@ -6,6 +6,7 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
 trait SynonymGenerator extends UniverseConstruction {
+  /*
   def generateSynonym(c: Context)(name: Name, genericDatatype: DataConstructor): c.Tree =
     generateBoundedSynonym(c)(name, genericDatatype, Map.empty)
 
@@ -172,4 +173,5 @@ object SynonymGenerator {
     }
 
   } // end of SynonymGenerator.Test
+   */
 } // end of SynonymGenerator

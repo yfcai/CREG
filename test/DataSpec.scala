@@ -3,18 +3,6 @@ import nominal.functors._
 import nominal.lib._
 
 class DataSpec extends FlatSpec {
-  "@datatype macro" should "preserve supertypes" in {
-    import java.io.Serializable
-
-    @datatype trait SomeData[Type1] extends Serializable {
-      SomeEmptyRecord
-      SomeNonemptyRecord(field1 = Type1, field2 = Int)
-    }
-
-    assert(SomeEmptyRecord.isInstanceOf[Serializable])
-    assert(SomeNonemptyRecord("hello", 5).isInstanceOf[Serializable])
-  }
-
   ///////////////////////////////////////////
   // TEST THAT THE OLD CASE STUDY COMPILES //
   ///////////////////////////////////////////
@@ -88,14 +76,17 @@ class DataSpec extends FlatSpec {
   }
 
 
-
   it should "generate enough scala types for the case study" in {
-    @datatype trait Term {
+    @data def Term = Fix(term => TermT {
       Void
       Var(name = String)
-      Abs(param = String, body = Term)
-      App(Term, Term)
-    }
+      Abs(param = String, body = term)
+      App(operator = term, operand = term)
+    })
+
+    // TODO: remove these scaffolds
+    type TermF[+term] = TermT[Void, Var[String], Abs[String, term], App[term, term]]
+    type Term = Fix[TermF]
 
     def void: Term = Roll[TermF](Void)
     implicit def _var(x: String): Term = Roll[TermF](Var(x))
@@ -381,9 +372,11 @@ class DataSpec extends FlatSpec {
   }
 
   it should "generate enough scala types for the list example" in {
-    // since GADT not surpported anyway, recursion is marked by name
+    @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
-    @datatype trait List[+A] { Nil ; Cons(A, tail = List[A]) }
+    // TODO: remove these scaffolds
+    type ListF[+A, +list] = ListT[Nil, Cons[A, list]]
+    type List[+A] = Fix[({ type λ[+list] = ListF[A, list] })#λ]
 
     def patternFunctor[Elem] = new RecursivePolynomialFunctor {
       type Map[+T] = ListF[Elem, T]
@@ -424,7 +417,7 @@ class DataSpec extends FlatSpec {
     assert(theSum == 100)
     info("The sum of the first nine primes is " + theSum)
   }
-
+/*
   @datatype trait V {
     V1 {
       V11 { R11(get = Int) }
@@ -449,4 +442,5 @@ class DataSpec extends FlatSpec {
     // 3. disallow anonymous record field names. otherwise they're indistinguishable from variants.
     // 4. after (3), try to parse records before variants.
   }
+   */
 }

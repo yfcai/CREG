@@ -8,55 +8,22 @@ import scala.annotation.StaticAnnotation
 import compiler._
 import DatatypeRepresentation._
 
-object datatype
-extends ParserOfDatatypeRep
-   with Preprocessor
+object data
+extends Parsers
    with DeclarationGenerator
    with SynonymGenerator
 {
-  def expandData(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+  def expandData(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
 
-    val (input, companion) = extractInput(c)(annottees)
+    val Seq(input)   = annottees
+    val datadecl     = parseOrAbort(c)(DataDeclP, input)
+    val imports      = scalaLanguageFeatureImports(c)
+    val declarations = generateDeclarations(c)(datadecl.body, Many.empty)
+    val synonyms     = Many.empty // TODO: still to do
+    val result       = imports ++ declarations ++ synonyms
 
-    // we can't support companion objects any more,
-    // because they have to be traversable functors.
-    companion match {
-      case None => () // no companion object defined, this is good
-      case Some(companion) =>
-        abortWithError(c)(companion.pos, "datatypes may not have companion objects")
-    }
-
-    try {
-      // parser parses DSL
-      val parseTree: DataConstructor = parseOrAbort(c)(DataDeclP, input)
-
-      // generate variants
-      val forDeclarations: Iterator[Variant] = digestForDeclarationGenerator(c)(input, parseTree)
-      val declarations: Iterator[Tree] = forDeclarations flatMap { variant =>
-        generateDeclaration(c)(variant, getSupersOfTrait(c)(input))
-      }
-
-      val synonymFood: SynonymGeneratorFood = digestForSynonymGenerator(c)(input, parseTree)
-      val synonyms: Iterator[Tree] =
-        (Iterator(generateSynonym(c)(synonymFood.dataSynonym._1, synonymFood.dataSynonym._2)) ++
-          synonymFood.patternFunctor.map({ case (name, data) => generatePatternFunctorSynonym(c)(name, data) }).iterator)
-      // preprocessor add Fix
-      // declaration generator generates template classes
-      // synonym generator generates synonyms
-
-      // import language features needed for generated code
-      val imports = scalaLanguageFeatureImports(c).iterator
-
-      val result = (imports ++ declarations ++ synonyms).toSeq
-
-      c.Expr(q"..$result")
-
-    }
-    catch {
-      case PreprocessorException(message) =>
-        abortWithError(c)(input.pos, message)
-    }
+    q"..$result"
   }
 
   /** @return (input-syntax-tree, companion-object)

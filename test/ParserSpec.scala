@@ -1,68 +1,64 @@
 import org.scalatest._
 import nominal.compiler._
-import nominal.compiler.DatatypeRepresentation._
 
 class ParserSpec extends FlatSpec {
-  import Parser.Tests._
+  import Parsers._
 
   "Parser" should "parse records with or without fields" in {
-    @record trait WithoutFields { SomeRecord }
+    import DatatypeRepresentation._
+
+    @record def WithoutFields = SomeRecord
+
     assert(WithoutFields == Record("SomeRecord", Many.empty))
 
-    @record trait WithFields {
-      SomeRecord(Field1, Field2, field3 = Field3, field4 = Field4, Field5)
-    }
+    @record def WithFields =
+      SomeRecord(_1 = Field1, _2 = Field2, _3 = Field3, _4 = Field4, _5 = Field5)
+
     assert(WithFields ==
       Record("SomeRecord", Many(
         Field("_1", TypeVar("Field1")),
         Field("_2", TypeVar("Field2")),
-        Field("field3", TypeVar("Field3")),
-        Field("field4", TypeVar("Field4")),
+        Field("_3", TypeVar("Field3")),
+        Field("_4", TypeVar("Field4")),
         Field("_5", TypeVar("Field5")))))
 
   }
 
-  it should "parse empty data declarations" in {
-    @datadecl trait Empty1
-    @datadecl trait Empty2 {}
-    @datadecl trait Empty3 [W, X, +Y, -Z]
-    @datadecl trait Empty4 [W, X, +Y, -Z] {}
-
-    assert(Empty1 == DataConstructor(Many.empty, Variant("Empty1", Many.empty)))
-
-    assert(Empty2 == DataConstructor(Many.empty, Variant("Empty2", Many.empty)))
-
-    assert(Empty3 ==
-      DataConstructor(
-        Many(
-          Param.invariant("W"), Param.invariant("X"),
-          Param.covariant("Y"), Param.contravariant("Z")),
-        Variant("Empty3", Many.empty)))
-
-    assert(Empty4 ==
-      DataConstructor(
-        Many(
-          Param.invariant("W"), Param.invariant("X"),
-          Param.covariant("Y"), Param.contravariant("Z")),
-        Variant("Empty4", Many.empty)))
-  }
-
   it should "parse nonempty data declarations" in {
-    @datadecl trait IntList {
-      Nil
-      Cons(Int, IntList) // CAUTION: recursion! to be handled by preprocessor.
-    }
+    import DatatypeRepresentation._
+
+    @data def IntList =
+      Fix(intList =>
+        IntListT {
+          Nil
+          Cons(head = Int, tail = intList)
+        })
 
     assert(IntList ==
       DataConstructor(
+        "IntList",
         Many.empty,
-        Variant("IntList", Many(
-          Record("Nil", Many.empty),
-          Record("Cons", Many(
-            Field("_1", TypeVar("Int")),
-            Field("_2", TypeVar("IntList"))))))))
-  }
+        FixedPoint("intList",
+          Variant("IntListT", Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("head", TypeVar("Int")),
+              Field("tail", TypeVar("intList")))))))))
 
+    @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
+
+    assert(List ==
+      DataConstructor(
+        "List",
+        Many(Param covariant "A"),
+        FixedPoint("list",
+          Variant("ListT", Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("head", TypeVar("A")),
+              Field("tail", TypeVar("list")))))))))
+  }
+/*
   it should "parse families of datatypes" in {
     @familydecl trait Company[P] {
       Dept { D(units = List[Subunit]) }
@@ -82,4 +78,5 @@ class ParserSpec extends FlatSpec {
   }
 
   // TODO: test ParserOfFunctorRep.
+   */
 }

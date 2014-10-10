@@ -7,10 +7,11 @@ import nominal.functors._
 // should post StackOverflow question.
 
 class FunctorSpec extends FlatSpec {
-  @datatype trait List[+A] {
-    Nil
-    Cons(head = A, tail = List[A])
-  }
+  @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
+
+  // TODO: DELETE THESE SCAFFOLDS
+  type ListF[+A, +list] = ListT[Nil, Cons[A, list]]
+  type List[+A] = Fix[({ type λ[+list] = ListF[A, list] })#λ]
 
   def list[T](elems: T*): List[T] =
     if (elems.isEmpty)
@@ -18,18 +19,15 @@ class FunctorSpec extends FlatSpec {
     else
       coerce(Cons(elems.head, list(elems.tail: _*)))
 
+  def listF[A] = {
+    @functor def listF[list] = ListT { Nil ; Cons(head = A, tail = list) }
+    listF
+  }
+
   // this should be generated
   implicit class ListIsFoldable[A](xs: List[A]) extends Foldable[({ type λ[+L] = ListF[A, L] })#λ](xs)(listF)
 
-  val elemF = {
-    @functor val elemF = A => Fix(list => List(Nil, Cons(A, list)))
-    elemF
-  }
-
-  def listF[A] = {
-    @functor val listF = L => List(Nil, Cons(A, L))
-    listF
-  }
+  @functor def elemF[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
   def length[A](xs: List[A]): Int = xs.fold[Int] {
     case Nil => 0
@@ -50,7 +48,7 @@ class FunctorSpec extends FlatSpec {
   }
 
   it should "handle summand positions" in {
-    @functor val consF = C => List(Nil, C)
+    @functor def consF[C] = ListT { Nil ; C }
     assert(consF(x14.unroll).map(c => c.copy(tail = length(c.tail))) == Cons(1, 3))
   }
 }

@@ -19,7 +19,7 @@ object Functor {
   type Many[T] = DatatypeRepresentation.Many[T]
   val Many = DatatypeRepresentation.Many
 
-  case class Decl(params: Many[Name], body: Body)
+  case class Decl(name: Name, params: Many[Name], body: Body)
 
   sealed trait Body
   case class TypeVar(name: Name) extends Body

@@ -4,7 +4,7 @@ import nominal.compiler.KIRV._
 import nominal.lib.Applicative._
 
 class KIRVSpec extends FlatSpec {
-
+/*
   @datatype trait List[+A] { Nil ; Cons(A, List[A]) }
 
   val const3 = const[Int](3)
@@ -66,4 +66,5 @@ class KIRVSpec extends FlatSpec {
     }
     assert(elemF(xs).map(_ * 2) == xs2)
   }
+ */
 }

@@ -6,24 +6,31 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
 trait DeclarationGenerator extends UniverseConstruction with util.Traverse with util.Traits {
-  /** @param datatype Representation of data type
-    * @return AST of generated traits and case classes
-    *
-    * Caution: Classes involved in datatypes must *all* be uninheritable.
-    * If this is the case, then we can make the fixed point type covariant
-    * without sacrificing the functor instance inside Fix[+F[+_]], which
-    * is necessary to obtain covariance in something like List[+A].
-    */
-  def generateDeclaration(c: Context)(datatype: Variant, declaredSupers: Many[c.Tree]):
+  def generateDeclarations(c: Context)(data: Datatype, declaredSupers: Many[c.Tree]):
       Many[c.Tree] =
-    generateVariants(c)(datatype, declaredSupers) ++ generateKIRVPrimitives(c)(datatype)
+    generateClasses(c)(data, declaredSupers) ++ generatePrimitives(c)(data)
+
+  def generateClasses(c: Context)(data: Datatype, supers: Many[c.Tree]): Many[c.Tree] =
+    data match {
+      case r: Record =>
+        generateStandaloneRecord(c)(r, supers)
+
+      case v: Variant =>
+        generateVariants(c)(v, supers)
+
+      case FixedPoint(name, body) =>
+        generateClasses(c)(body, supers)
+
+      case TypeVar(_) =>
+        Many.empty
+    }
 
   def generateVariants(c: Context)(datatype: Variant, declaredSupers: Many[c.Tree]):
       Many[c.Tree] =
   {
     import c.universe._
 
-    val template = mkTemplate(c)(datatype.name)
+    val template = TypeName(datatype.name)
     val supers   = declaredSupers :+ getVariant(c)
 
     if (datatype.cases.isEmpty)
@@ -40,6 +47,24 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   def generateCaseNames(c: Context)(cases: Many[VariantCase]): Many[c.Tree] =
     covariantTypeParams(c)(cases.map(_.name))
 
+  /** generate a record that's not a case of some variant */
+  def generateStandaloneRecord(c: Context)(record: Record, supers: Many[c.Tree]): Many[c.Tree] = {
+    import c.universe._
+    val typeName = TypeName(record.name)
+    if (record.fields.isEmpty) {
+      val (termName, traversable0, typeMap, emptyDefTraverse) = recordPrototypeFragments(c)(record)
+      Many(
+        q"sealed trait $typeName extends ..$supers",
+        q"case object $termName extends $typeName with $traversable0 { $typeMap }")
+    }
+    else {
+      val fieldNames = record.fields map (_.name)
+      val caseParams = covariantTypeParams(c)(fieldNames)
+      val decls = generateFreeDecls(c)(fieldNames)
+      Many(q"sealed case class $typeName[..$caseParams](..$decls) extends ..$supers")
+    }
+  }
+
   /** @param template TypeName of the template trait of the variant
     * @param cases cases of the variant
     * @return generated code for cases of the variant
@@ -50,10 +75,10 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
       case (record @ Record(name, Many()), i) => // empty record
         val typeName = TypeName(name)
         val params = namedParamsWithNothing(c)(typeName, i, cases.size)
-        val (termName, traversableN, typeMap, emptyDefTraverse) = recordPrototypeFragments(c)(record)
+        val (termName, traversable0, typeMap, emptyDefTraverse) = recordPrototypeFragments(c)(record)
         Many(
           q"sealed trait $typeName extends $template[..$params] with ${getRecord(c)}",
-          q"case object $termName extends $typeName with $traversableN { $typeMap }")
+          q"case object $termName extends $typeName with $traversable0 { $typeMap }")
 
       case (Record(name, fields), i) =>
         // records are wholely free
@@ -68,7 +93,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
       // copy-paste for variants
       case (variant @ Variant(name, Many()), i) =>
-        val typeName = mkTemplate(c)(name)
+        val typeName = TypeName(name)
         val termName = TermName(name)
         val params = namedParamsWithNothing(c)(typeName, i, cases.size)
         val newSuper = tq"$template[..$params]"
@@ -76,7 +101,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
       case (variant @ Variant(name, fields), i) =>
         // records are wholely free
-        val typeName = mkTemplate(c)(name)
+        val typeName = TypeName(name)
         val fieldNames = fields.map(_.name)
         val caseParams = covariantTypeParams(c)(fieldNames)
         val myType = tq"$typeName[..${fieldNames.map(name => TypeName(name))}]"
@@ -118,10 +143,25 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     Many.tabulate(size)(i => if (i == index) param else nothing)
   }
 
-  def generateKIRVPrimitives(c: Context)(datatype: Variant): Many[c.Tree] = {
+  def generatePrimitives(c: Context)(datatype: Datatype): Many[c.Tree] =
+    datatype match {
+      case r: Record =>
+        Many(generateRecordPrototype(c)(r))
+
+      case v: Variant =>
+        generateVariantPrimitives(c)(v)
+
+      case FixedPoint(name, body) =>
+        generatePrimitives(c)(body)
+
+      case TypeVar(_) =>
+        Many.empty
+    }
+
+  def generateVariantPrimitives(c: Context)(datatype: Variant): Many[c.Tree] = {
       datatype.cases.flatMap({
         case x: Record  => Many(generateRecordPrototype(c)(x))
-        case x: Variant => generateKIRVPrimitives(c)(x)
+        case x: Variant => generateVariantPrimitives(c)(x)
       }) :+ generateVariantPrototype(c)(datatype)
   }
 
@@ -129,7 +169,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     import c.universe._
     val n = datatype.cases.length
     val objName = TermName(datatype.name)
-    val variantName = mkTemplate(c)(datatype.name)
+    val variantName = TypeName(datatype.name)
 
     // compute bounds
     val bounds = datatype.cases map {
