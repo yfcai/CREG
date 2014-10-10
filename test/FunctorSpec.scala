@@ -9,10 +9,6 @@ import nominal.functors._
 class FunctorSpec extends FlatSpec {
   @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
-  // TODO: DELETE THESE SCAFFOLDS
-  type ListF[+A, +list] = ListT[Nil, Cons[A, list]]
-  type List[+A] = Fix[({ type λ[+list] = ListF[A, list] })#λ]
-
   def list[T](elems: T*): List[T] =
     if (elems.isEmpty)
       coerce(Nil)

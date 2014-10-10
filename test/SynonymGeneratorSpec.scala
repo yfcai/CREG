@@ -1,16 +1,14 @@
 import org.scalatest._
-import nominal.compiler._
+import nominal.functors._
 
 class SynonymGeneratorSpec extends FlatSpec {
-  /*
-  import SynonymGenerator.Tests._
   import nominal.lib._
 
   "SynonymGenerator" should "generate a synonym for flat datatypes" in {
-    @flat trait Person {
+    @data def Person = PersonT {
       Boss
-      Manager(dept: Int)
-      Employee(name: String, dept: Int)
+      Manager(dept = Int)
+      Employee(name = String, dept = Int)
     }
 
     val boss     : Person = Boss
@@ -19,10 +17,10 @@ class SynonymGeneratorSpec extends FlatSpec {
   }
 
   it should "generate synonyms for recursive datatypes" in {
-    @recursive trait IntList {
+    @data def IntList = Fix(intList => IntListT {
       Nil
-      Cons(Int, IntList)
-    }
+      Cons(head = Int, tail = intList)
+    })
 
     val nil: IntList = Roll[IntListF](Nil)
     def cons(x: Int, xs: IntList): IntList = Roll[IntListF](Cons(x, xs))
@@ -32,10 +30,10 @@ class SynonymGeneratorSpec extends FlatSpec {
   }
 
   it should "generate synonyms for generic recursive datatypes" in {
-    @generic trait GList[A] {
+    @data def GList[A] = Fix(gList => GListT {
       Nil
-      Cons(A, GList[A])
-    }
+      Cons(head = A, tail = gList)
+    })
 
     object InnerModuleForTechnicalReasons {
       private[this] type GF[+A] = {
@@ -53,5 +51,4 @@ class SynonymGeneratorSpec extends FlatSpec {
     val xs: GList[Int] = cons(1, cons(2, cons(3, cons(4, nil))))
     info(s"xs = $xs")
   }
-   */
 }

@@ -84,10 +84,6 @@ class DataSpec extends FlatSpec {
       App(operator = term, operand = term)
     })
 
-    // TODO: remove these scaffolds
-    type TermF[+term] = TermT[Void, Var[String], Abs[String, term], App[term, term]]
-    type Term = Fix[TermF]
-
     def void: Term = Roll[TermF](Void)
     implicit def _var(x: String): Term = Roll[TermF](Var(x))
     def abs(x: String, body: Term): Term = Roll[TermF](Abs(x, body))
@@ -373,10 +369,6 @@ class DataSpec extends FlatSpec {
 
   it should "generate enough scala types for the list example" in {
     @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
-
-    // TODO: remove these scaffolds
-    type ListF[+A, +list] = ListT[Nil, Cons[A, list]]
-    type List[+A] = Fix[({ type λ[+list] = ListF[A, list] })#λ]
 
     def patternFunctor[Elem] = new RecursivePolynomialFunctor {
       type Map[+T] = ListF[Elem, T]

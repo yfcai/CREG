@@ -20,7 +20,7 @@ extends Parsers
     val datadecl     = parseOrAbort(c)(DataDeclP, input)
     val imports      = scalaLanguageFeatureImports(c)
     val declarations = generateDeclarations(c)(datadecl.body, Many.empty)
-    val synonyms     = Many.empty // TODO: still to do
+    val synonyms     = generateSynonyms(c)(datadecl)
     val result       = imports ++ declarations ++ synonyms
 
     q"..$result"
