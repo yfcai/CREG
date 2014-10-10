@@ -224,6 +224,23 @@ trait ParserOfDatatypeRep extends ParserBase with util.TupleIndex with util.Trai
   }
 }
 
+trait Parsers extends util.AbortWithError {
+  /** GRAMMAR FOR DATATYPE DECL WITH EXPLICIT FIXED POINTS
+    *
+    * EXAMPLE:
+    *
+    *
+    *
+    */
+
+  def parseOrAbort[A](c: Context)(parser: contextReaderParser.Parser[A], input: c.Tree): A =
+    parser.parse(c)(input) match {
+      case Success(a) => a
+      case Failure(pos, message) => abortWithError(c)(pos, message)
+    }
+
+}
+
 trait ParserOfFunctorRep extends ParserBase {
   // ============================================================================
   // GRAMMAR FOR FUNCTOR REPRESENTATION (NOT TO BE CONFUSED WITH DATACONSTRUCTOR)
