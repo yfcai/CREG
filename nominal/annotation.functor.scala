@@ -21,9 +21,12 @@ import compiler._
 object functor extends Parsers with Denotation with util.AbortWithError {
   def impl(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
-    val input = parseOrAbort(c)(FunctorP, annottees.head)
-    val instance = evalFunctor(c)(input)
-    val name = TermName(input.name)
-    q"val $name = $instance"
+    annottees match {
+      case Seq(DefDef(mods, name, params, args, returnType, body)) =>
+        val input = parseOrAbort(c)(FunctorP, annottees.head)
+        val instance = evalFunctor(c)(input)
+        val name = TermName(input.name)
+        ValDef(mods, name, returnType, instance)
+    }
   }
 }

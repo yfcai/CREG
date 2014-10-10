@@ -49,7 +49,7 @@ trait Parsers extends util.AbortWithError {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
       import c.universe._
       input match {
-        case q"def $name[..$params] = $body" =>
+        case DefDef(mods, name, params, args, returnType, body) =>
           for { datatype <- DatatypeP.parse(c)(body) }
           yield DataConstructor(name.toString, mkGenericTypeParams(c)(params), datatype)
 
