@@ -6,30 +6,33 @@ import nominal.functors._
 import nominal.lib._
 
 object Main extends App {
-/*
-  @datatype trait Term {
+  @data def Term = Fix(term => TermT {
     Void
     Var(name = String)
-    Abs(param = String, body = Term)
-    App(operator = Term, operand = Term)
-  }
+    Abs(param = String, body = term)
+    App(operator = term, operand = term)
+  })
 
-  // @functor only works in block scope >_<
-  implicit val termF = {
-    @functor implicit val termF = x => Term(
-      Void,
-      Var(String),
-      Abs(String, x),
-      App(x, x)
-    )
-    termF
-  }
+  /* PROBLEM: Scalac gets confused with all the path-dependencies.
+   *          We'll have to help it by generating functors without forgetting who
+   *          are variants and who are records.
+
+  @functor def termF[term]: Traversable {
+    type Cat0 = Any with Any with Any with Any with Any with Any with Any with Any with Any
+    type Map[+A] = Main.TermT[Main.Void,Main.Var[String],Main.Abs[String,A],Main.App[A,A]]
+  } =
+    TermT {
+      Void
+      Var(name = String)
+      Abs(param = String, body = term)
+      App(operator = term, operand = term)
+    }
 
   // implicits
   implicit def _var(x: String): Term = coerce(Var(x))
 
   // 2nd argument `termF` of `Foldable` provided implicitly
-  implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)
+  implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)(termF)
 
   val t: Term = coerce(Void)
 
