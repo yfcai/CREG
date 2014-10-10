@@ -1,11 +1,41 @@
 import org.scalatest._
-import nominal.experiment.hello
+import nominal.experiment._
 
 import scala.language.experimental.macros
 
-class HelloSpec extends FlatSpec {
-  "Hello macro" should "insert method `hello`" in {
+class Experiments extends FlatSpec {
+  "@hello" should "insert method `hello`" in {
     @hello object X
     info(X.hello)
+  }
+
+  "@defData" should "consume definitions that are ill-typed in Scala" in {
+    @defData def IntList =
+      Fix(intList =>
+        ListT {
+          Nil
+          Cons(head = Int, tail = intList)
+        })
+
+    assert(IntList ==
+      """|
+         |def IntList = Fix(((intList) => ListT({
+         |  Nil;
+         |  Cons(head = Int, tail = intList)
+         |})))""".stripMargin)
+
+    @defData def List[A] =
+      Fix(list =>
+        ListT {
+          Nil
+          Cons(head = A, tail = list)
+        })
+
+    assert(List ==
+      """|
+         |def List[A] = Fix(((list) => ListT({
+         |  Nil;
+         |  Cons(head = A, tail = list)
+         |})))""".stripMargin)
   }
 }
