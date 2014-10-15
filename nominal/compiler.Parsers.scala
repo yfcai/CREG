@@ -23,28 +23,6 @@ trait Parsers extends util.AbortWithError with util.Paths {
       case Failure(pos, message) => abortWithError(c)(pos, message)
     }
 
-  lazy val FunctorP: Parser[Functor.Decl] = DataDeclP map {
-    case DataConstructor(name, params, body) =>
-      Functor.Decl(name, params map (_.name), forgetRecordsVariants(body))
-  }
-
-  def forgetRecordsVariants(data: Datatype): Functor.Body =
-    data match {
-      case Variant(name, cases) if cases.nonEmpty =>
-        Functor.Application(name, cases map forgetRecordsVariants)
-
-      case Record(name, fields) if fields.nonEmpty =>
-        Functor.Application(name, fields map (x => forgetRecordsVariants(x.get)))
-
-      case noMembers: VariantCase =>
-        Functor.TypeVar(noMembers.name)
-
-      case FixedPoint(x, body) =>
-        Functor.FixedPoint(x, forgetRecordsVariants(body))
-
-      case TypeVar(x) => Functor.TypeVar(x)
-    }
-
   lazy val DataDeclP: Parser[DataConstructor] = new Parser[DataConstructor] {
     def parse(c: Context)(input: c.Tree): Result[DataConstructor, c.Position] = {
       import c.universe._

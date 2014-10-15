@@ -76,7 +76,5 @@ class ParserSpec extends FlatSpec {
             Record("DU", Many(Field("dept", TypeVar("Dept")))),
             Record("PU", Many(Field("person", TypeVar("P")))))))))
   }
-
-  // TODO: test ParserOfFunctorRep.
    */
 }
