@@ -45,7 +45,6 @@ trait Traverse extends Paths {
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree = {
     import c.universe._
-    val n = bounds.length
     val cats = bounds.zipWithIndex.map {
       case (bound, i) =>
         q"type ${typeNameCat(c, i)} = $bound"
@@ -60,9 +59,9 @@ trait Traverse extends Paths {
     import c.universe._
     q"""
       new $theTrait {
-        ..$valDefs
         ${mkTypeMap(c, n)(mapping)}
         ${mkDefTraverse(c, n)(body)}
+        ..$valDefs
       }
     """
   }

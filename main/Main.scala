@@ -13,14 +13,7 @@ object Main extends App {
     App(operator = term, operand = term)
   })
 
-  /* PROBLEM: Scalac gets confused with all the path-dependencies.
-   *          We'll have to help it by generating functors without forgetting who
-   *          are variants and who are records.
-
-  @functor def termF[term]: Traversable {
-    type Cat0 = Any with Any with Any with Any with Any with Any with Any with Any with Any
-    type Map[+A] = Main.TermT[Main.Void,Main.Var[String],Main.Abs[String,A],Main.App[A,A]]
-  } =
+  @functor implicit def termF[term] =
     TermT {
       Void
       Var(name = String)
@@ -32,7 +25,7 @@ object Main extends App {
   implicit def _var(x: String): Term = coerce(Var(x))
 
   // 2nd argument `termF` of `Foldable` provided implicitly
-  implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)(termF)
+  implicit class TermIsFoldable(t: Term) extends Foldable[TermF](t)
 
   val t: Term = coerce(Void)
 
@@ -74,28 +67,24 @@ object Main extends App {
 
   // USAGE: PREPEND UNDERSCORE
 
-  def prependUnderscore(t: Term): Term = {
-    @functor val namesF = name => Fix(term => Term(
-      Void,
-      Var(name),
-      Abs(name, term),
-      App(term, term)
-    ))
-    namesF(t) map ("_" + _)
-  }
+  @functor def namesF[name] = Fix(term => TermT {
+    Void
+    Var(name = name)
+    Abs(param = name, body = term)
+    App(operator = term, operand = term)
+  })
+
+  def prependUnderscore(t: Term): Term = namesF(t) map ("_" + _)
 
 
   // USAGE: CAPTURE-AVOIDING SUBSTITUTION
 
-  val avoidF = {
-    @functor val avoidF = (bound, binding) => Fix(term => Term(
-      Void,
-      Var(bound),
-      binding,
-      App(term, term)
-    ))
-    avoidF
-  }
+  @functor def avoidF[bound, binding] = Fix(term => TermT {
+    Void
+    Var(name = bound)
+    Abs(param, body) = binding
+    App(operator = term, operand = term)
+  })
 
   def fresh(default: String, avoid: Set[String]): String = {
     var index = -1
@@ -168,5 +157,5 @@ object Main extends App {
           show(s"subst($y, ${pretty{ysub}}, $name)", s1)
       }
       println()
-  }*/
+  }
 }

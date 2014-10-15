@@ -5,7 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import contextReaderParser._
 
-trait Parsers extends util.AbortWithError {
+trait Parsers extends util.AbortWithError with util.Paths {
   /** GRAMMAR FOR DATATYPE DECL WITH EXPLICIT FIXED POINTS
     *
     * EXAMPLE:
@@ -134,7 +134,7 @@ trait Parsers extends util.AbortWithError {
     }
   }
 
-  lazy val CaseP: Parser[VariantCase] = RecordP orElse VariantP
+  lazy val CaseP: Parser[VariantCase] = RecordP orElse VariantP orElse AssignmentP
 
   lazy val RecordP = RecordWithoutFieldsP orElse RecordWithFieldsP
 
@@ -162,6 +162,38 @@ trait Parsers extends util.AbortWithError {
 
         case _ =>
           Failure(input.pos, "expect record with fields")
+      }
+    }
+  }
+
+  lazy val AssignmentP: Parser[RecordAssignment] = new Parser[RecordAssignment] {
+    def parse(c: Context)(input: c.Tree): Result[RecordAssignment, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$recordIdent(..$fieldIdents) = $typeVarIdent" =>
+
+          def failure[T](r: Result[T, c.Position]): Boolean = r match {
+            case Failure(_, _) => true
+            case Success(_)    => false
+          }
+
+          for {
+            rcdName <- IdentifierP.parse(c)(recordIdent)
+            typeVar <- IdentifierP.parse(c)(typeVarIdent)
+            fieldNames = fieldIdents map (ident => IdentifierP.parse(c)(ident))
+            result <- {
+              if (fieldNames exists failure)
+                fieldNames.view.filter(failure).head.map(_ => sys error "IS_CAST")
+              else
+                Success(RecordAssignment(
+                  Record(rcdName, fieldNames.map(r => Field(r.get, TypeVar(anyType)))),
+                  TypeVar(typeVar)))
+            }
+
+          } yield result
+
+        case _ =>
+          Failure(input.pos, "expect record assignment like Cons(head, tail) = tau")
       }
     }
   }

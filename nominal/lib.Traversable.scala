@@ -54,7 +54,7 @@ object Traversable {
 trait Traversable0 {
   type Map >: this.type
   type Range = Map
-  def traverse(G: Applicative): G.Map[Map] = G pure (this: Map)
+  def traverse(G: Applicative)(): Map => G.Map[Map] = G pure _
 }
 
 trait Traversable { thisFunctor =>

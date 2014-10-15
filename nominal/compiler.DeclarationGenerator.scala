@@ -23,6 +23,9 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
       case TypeVar(_) =>
         Many.empty
+
+      case other =>
+        noRecognition(other)
     }
 
   def generateVariants(c: Context)(datatype: Variant, declaredSupers: Many[c.Tree]):
@@ -156,12 +159,16 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
       case TypeVar(_) =>
         Many.empty
+
+      case other =>
+        noRecognition(other)
     }
 
   def generateVariantPrimitives(c: Context)(datatype: Variant): Many[c.Tree] = {
       datatype.cases.flatMap({
         case x: Record  => Many(generateRecordPrototype(c)(x))
         case x: Variant => generateVariantPrimitives(c)(x)
+        case other      => noRecognition(other)
       }) :+ generateVariantPrototype(c)(datatype)
   }
 
@@ -198,8 +205,12 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
               def loop(v: Variant): Many[CaseDef] = v.cases.flatMap {
                 case record : Record  => Many(generateRecordTraversal(c)(record, g, f, a, bs))
                 case variant: Variant => loop(variant)
+                case other            => noRecognition(other)
               }
               loop(variant)
+
+            case (_, _, other) =>
+              noRecognition(other)
           }
         val x = TermName(c freshName "x")
         q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", caseDefs.toList) } }"

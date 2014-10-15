@@ -39,8 +39,14 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
             type $innerType[$typeDef] = ${meaning(c)(body)}
           })#$innerType]
         """
+
+      case RecordAssignment(rcd, tvar) =>
+        meaning(c)(tvar)
     }
   }
+
+  def noRecognition(data: Datatype): Nothing =
+    sys error s"unrecognized datatype:\n\n    $data"
 
   /** @param rep datatype representation
     *
@@ -488,6 +494,9 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         //   @functor val badF = XX => Term {}
         //
         ???
+
+      case Some(other) =>
+        noRecognition(other)
     }
   }
 

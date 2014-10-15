@@ -44,7 +44,7 @@ class FunctorSpec extends FlatSpec {
   }
 
   it should "handle summand positions" in {
-    @functor def consF[C] = ListT { Nil ; C }
+    @functor def consF[C] = ListT { Nil ; Cons(head, tail) = C }
     assert(consF(x14.unroll).map(c => c.copy(tail = length(c.tail))) == Cons(1, 3))
   }
 }
