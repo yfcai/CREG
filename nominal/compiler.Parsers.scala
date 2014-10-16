@@ -122,7 +122,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
   }
 
   lazy val RecordWithFieldsP: Parser[Record] = new Parser[Record] {
-    val FieldsP: MultiParser[Field] = ZeroOrMore(FieldP)
+    val FieldsP: MultiParser[Field] = OneOrMore("fields", FieldP)
 
     def parse(c: Context)(input: c.Tree): Result[Record, c.Position] = {
       import c.universe._
@@ -183,7 +183,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
         case q"$lhs = $rhs" =>
           for {
             label <- IdentifierP.parse(c)(lhs)
-            body <- TypeVarP.parse(c)(rhs)
+            body <- FieldBodyP.parse(c)(rhs)
           }
           yield Field(label, body)
 
@@ -192,6 +192,11 @@ trait Parsers extends util.AbortWithError with util.Paths {
       }
     }
   }
+
+  // basically DatatypeP, but instead of 0-nary records we have type variables
+  // think about context-sensitive parsing.
+  // an unknown name is a nullary record; known names are type variables.
+  lazy val FieldBodyP: Parser[Datatype] = FixedPointP orElse VariantP orElse RecordWithFieldsP orElse TypeVarP
 
   // TypeVarP succeeds on everything.
   lazy val TypeVarP: Parser[TypeVar] = new Parser[TypeVar] {
