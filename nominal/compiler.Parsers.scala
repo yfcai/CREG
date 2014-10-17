@@ -255,17 +255,4 @@ object Parsers extends util.Persist with Parsers {
     val actual = parseOrAbort(c)(DataDeclP, annottees.head)
     q"val ${TermName(actual.name)} = ${persist(c)(actual)}"
   }
-
-  /* TODO: restore testing macro for data families
-    class familydecl extends StaticAnnotation {
-      def macroTransform(annottees: Any*): Any =
-        macro familydeclImpl
-    }
-
-    def familydeclImpl(c: Context)(annottees: c.Tree*): c.Tree = {
-      import c.universe._
-      val actual = parseOrAbort(c)(FamilyDeclP, annottees.head)
-      q"val ${TermName(actual.name)} = ${persist(c)(actual)}"
-    }
-  */
 }
