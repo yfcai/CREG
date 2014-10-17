@@ -43,34 +43,32 @@ sealed trait Result[+A, +Pos] {
   }
 }
 
-trait Parser[+A] {
+trait Parser[Gamma, +A] {
   self =>
 
-  // parse, or conventionally, runM
-  // unfortunately return type is path-dependent & cannot be a synonym.
-  def parse(c: Context)(input: c.Tree): Result[A, c.Position]
+  private[this] type ParserG[B] = Parser[Gamma, B]
 
-  // sequencing <* does not make sense for tree parsers
+  def parse(c: Context, gamma: Gamma)(input: c.Tree): Result[A, c.Position]
 
-  // deterministic choice <+
-  // featuring use-site variance
-  def orElse [B >: A] (that: Parser[B]): Parser[B] = new Parser[B] {
-    def parse(c: Context)(input: c.Tree): Result[B, c.Position] =
-      self.parse(c)(input) orElse that.parse(c)(input)
+  def orElse[B >: A](that: ParserG[B]): ParserG[B] = new Parser[Gamma, B] {
+    def parse(c: Context, gamma: Gamma)(input: c.Tree): Result[B, c.Position] =
+      self.parse(c, gamma)(input) orElse that.parse(c, gamma)(input)
   }
 
-  def map[B](f: A => B): Parser[B] = new Parser[B] {
-    def parse(c: Context)(input: c.Tree): Result[B, c.Position] =
-      self.parse(c)(input) map f
+  def map[B](f: A => B): ParserG[B] = new Parser[Gamma, B] {
+    def parse(c: Context, gamma: Gamma)(input: c.Tree): Result[B, c.Position] =
+      self.parse(c, gamma)(input) map f
   }
 }
 
-trait MultiParser[+A] {
-  def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position]
+trait MultiParser[Gamma, +A] {
+  def parse(c: Context, gamma: Gamma)(inputs: List[c.Tree]): Result[List[A], c.Position]
 }
 
-case class ZeroOrMore[+A](parser: Parser[A]) extends MultiParser[A] {
-  def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
+case class ZeroOrMore[Gamma, +A](parser: Parser[Gamma, A])
+    extends MultiParser[Gamma, A]
+{
+  def parse(c: Context, gamma: Gamma)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
     import c.universe._
     inputs match {
       case Nil =>
@@ -78,18 +76,20 @@ case class ZeroOrMore[+A](parser: Parser[A]) extends MultiParser[A] {
 
       case head :: tail =>
         for {
-          a <- parser.parse(c)(head)
-          as <- this.parse(c)(tail)
+          a <- parser.parse(c, gamma)(head)
+          as <- this.parse(c, gamma)(tail)
         }
         yield a :: as
     }
   }
 }
 
-case class OneOrMore[A](things: String, parser: Parser[A]) extends MultiParser[A] {
+case class OneOrMore[Gamma, A](things: String, parser: Parser[Gamma, A])
+    extends MultiParser[Gamma, A]
+{
   val zeroOrMore = ZeroOrMore(parser)
 
-  def parse(c: Context)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
+  def parse(c: Context, gamma: Gamma)(inputs: List[c.Tree]): Result[List[A], c.Position] = {
     import c.universe._
     inputs match {
       case Nil =>
@@ -97,8 +97,8 @@ case class OneOrMore[A](things: String, parser: Parser[A]) extends MultiParser[A
 
       case head :: tail =>
         for {
-          a <- parser.parse(c)(head)
-          as <- zeroOrMore.parse(c)(tail)
+          a <- parser.parse(c, gamma)(head)
+          as <- zeroOrMore.parse(c, gamma)(tail)
         }
         yield a :: as
     }

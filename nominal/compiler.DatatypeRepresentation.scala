@@ -108,7 +108,7 @@ object DatatypeRepresentation {
   case class RecordAssignment(lhs: Record, rhs: TypeVar) extends VariantCase with DatatypeLike[RecordAssignment] {
     def name = lhs.name
     def children = Iterator(rhs)
-    val construct: Iterator[Datatype] => RecordAssignment =
+    final val construct: Iterator[Datatype] => RecordAssignment =
       children => {
         val rhs = children.next.asInstanceOf[TypeVar]
         children.dropWhile(_ => true) // set iterator to empty
@@ -117,6 +117,11 @@ object DatatypeRepresentation {
   }
 
   case class TypeVar(name: Name) extends Datatype with DatatypeLike[TypeVar] {
+    def children = Iterator.empty
+    final val construct = (x: Iterator[Datatype]) => this
+  }
+
+  case class TypeConst(code: Name) extends Datatype with DatatypeLike[TypeConst] {
     def children = Iterator.empty
     final val construct = (x: Iterator[Datatype]) => this
   }

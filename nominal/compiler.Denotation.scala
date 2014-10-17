@@ -49,6 +49,9 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     case typeVar: TypeVar =>
       evalTypeVar(c)(typeVar)
 
+    case typeConst: TypeConst =>
+      evalTypeConst(c)(typeConst)
+
     case fixedpoint: FixedPoint =>
       evalFixedPoint(c)(fixedpoint)
 
@@ -67,10 +70,17 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     val x = typeVar.name
     val n = env.length
     val i = env indexOf x
-    if (i < 0)
-      evalConst(c, x, n)
-    else
-      evalProj(c, i, n)
+    require(i >= 0)
+    evalProj(c, i, n)
+  }
+
+  def evalTypeConst(c: Context)(typeConst: TypeConst): Env => c.Tree = env => {
+    import c.universe._
+    val x = typeConst.code
+    val n = env.length
+    val i = env indexOf x
+    require(i < 0)
+    evalConst(c, x, n)
   }
 
   /** n-nary traversable functor mapping everything to tau */
@@ -212,6 +222,10 @@ trait Denotation extends UniverseConstruction with util.Traverse {
 
   def getBounds(c: Context)(data: Datatype, env: Env): Many[Option[c.Tree]] =
     data match {
+      // type constants produce no constraints
+      case TypeConst(x) =>
+        unconstrainedBounds(c)(env)
+
       // type vars produce no constraints
       case TypeVar(x) =>
         unconstrainedBounds(c)(env)

@@ -16,11 +16,11 @@ class ParserSpec extends FlatSpec {
 
     assert(WithFields ==
       Record("SomeRecord", Many(
-        Field("_1", TypeVar("Field1")),
-        Field("_2", TypeVar("Field2")),
-        Field("_3", TypeVar("Field3")),
-        Field("_4", TypeVar("Field4")),
-        Field("_5", TypeVar("Field5")))))
+        Field("_1", TypeConst("Field1")),
+        Field("_2", TypeConst("Field2")),
+        Field("_3", TypeConst("Field3")),
+        Field("_4", TypeConst("Field4")),
+        Field("_5", TypeConst("Field5")))))
 
   }
 
@@ -42,7 +42,7 @@ class ParserSpec extends FlatSpec {
           Variant("IntListT", Many(
             Record("Nil", Many.empty),
             Record("Cons", Many(
-              Field("head", TypeVar("Int")),
+              Field("head", TypeConst("Int")),
               Field("tail", TypeVar("intList")))))))))
 
     @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })

@@ -18,6 +18,10 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
   def meaning(c: Context)(rep: Datatype): c.Tree = {
     import c.universe._
     rep match {
+      case TypeConst(tpe) =>
+        val q"??? : $result" = c parse(s"??? : ($tpe)")
+        result
+
       case TypeVar(tpe) =>
         val q"??? : $result" = c.parse(s"??? : ($tpe)")
         result
