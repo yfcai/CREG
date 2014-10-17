@@ -188,7 +188,11 @@ trait Parsers extends util.AbortWithError with util.Paths {
   }
 
   // basically DatatypeP, but instead of 0-nary records we have type constants
-  lazy val FieldBodyP = FixedPointP orElse VariantP orElse RecordWithFieldsP orElse TypeVarP orElse TypeConstP
+  lazy val FieldBodyP = {
+    FixedPointP orElse VariantP orElse RecordWithFieldsP orElse
+    FunctorApplicationP orElse
+    TypeVarP orElse TypeConstP
+  }
 
   // context-sensitive type constant
   // a type constant must NOT be bound in the context gamma
@@ -229,6 +233,25 @@ trait Parsers extends util.AbortWithError with util.Paths {
     } {
       _ => "bound type variable"
     } map TypeVar
+
+  lazy val FunctorApplicationP: ParserC[FunctorApplication] = new ParserC[FunctorApplication] {
+    lazy val ArgsP = OneOrMore("functor arguments", DatatypeP)
+
+    def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[FunctorApplication, c.Position] = {
+      import c.universe._
+      input match {
+        case q"$functorName apply (..$functorArgs)" =>
+          for {
+            functor <- TypeConstP.parse(c, gamma)(functorName)
+            args <- ArgsP.parse(c, gamma)(functorArgs)
+          }
+          yield FunctorApplication(functor, args)
+
+        case _ =>
+          Failure(input.pos, s"expect functor application `f apply (x, y, ...)`; got ${showCode(input)}")
+      }
+    }
+  }
 
   def mkContextSensitiveNameParser(
     predicate: (Name, Set[Name]) => Boolean)(

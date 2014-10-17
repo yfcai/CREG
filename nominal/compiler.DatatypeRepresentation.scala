@@ -116,6 +116,14 @@ object DatatypeRepresentation {
       }
   }
 
+  case class FunctorApplication(functor: TypeConst, args: Many[Datatype])
+      extends Datatype with DatatypeLike[FunctorApplication]
+  {
+    def children = args.iterator
+    final val construct: Iterator[Datatype] => FunctorApplication =
+      children => copy(args = children.toSeq)
+  }
+
   case class TypeVar(name: Name) extends Datatype with DatatypeLike[TypeVar] {
     def children = Iterator.empty
     final val construct = (x: Iterator[Datatype]) => this

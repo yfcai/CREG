@@ -3,10 +3,9 @@ import nominal.compiler._
 
 class ParserSpec extends FlatSpec {
   import Parsers._
+  import DatatypeRepresentation._
 
   "Parser" should "parse records with or without fields" in {
-    import DatatypeRepresentation._
-
     @record def WithoutFields = SomeRecord
 
     assert(WithoutFields == Record("SomeRecord", Many.empty))
@@ -25,7 +24,6 @@ class ParserSpec extends FlatSpec {
   }
 
   it should "parse nonempty data declarations" in {
-    import DatatypeRepresentation._
 
     @data def IntList =
       Fix(intList =>
@@ -58,23 +56,33 @@ class ParserSpec extends FlatSpec {
               Field("head", TypeVar("A")),
               Field("tail", TypeVar("list")))))))))
   }
-/*
-  it should "parse families of datatypes" in {
-    @familydecl trait Company[P] {
-      Dept { D(units = List[Subunit]) }
-      Subunit { DU(dept = Dept) ; PU(person = P) }
+
+  it should "parse datatypes interlaced with built-in types" in {
+
+    @data def SubUnit = SubUnitT {
+      PU(person = String)
+      DU(dept = Dept)
     }
 
-    assert(Company ==
-      DataFamily(
-        "Company",
-        Many(Param invariant "P"),
-        Many(
-          Variant("Dept", Many(
-            Record("D", Many(Field("units", TypeVar("List[Subunit]")))))),
-          Variant("Subunit", Many(
-            Record("DU", Many(Field("dept", TypeVar("Dept")))),
-            Record("PU", Many(Field("person", TypeVar("P")))))))))
+    @data def Dept = Fix(dept => D(name = String, subunits = Seq apply (
+      SubUnitT {
+        PU(person = String)
+        DU(dept = dept)
+      }
+    )))
+
+    assert(Dept ==
+      DataConstructor(
+        "Dept",
+        Many.empty,
+        FixedPoint("dept",
+          Record("D", Many(
+            Field("name",
+              TypeConst("String")),
+            Field("subunits",
+              FunctorApplication(TypeConst("Seq"), Many(
+                Variant("SubUnitT", Many(
+                  Record("PU", Many(Field("person", TypeConst("String")))),
+                  Record("DU", Many(Field("dept", TypeVar("dept"))))))))))))))
   }
-   */
 }
