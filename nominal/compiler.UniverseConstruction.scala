@@ -46,6 +46,11 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
 
       case RecordAssignment(rcd, tvar) =>
         meaning(c)(tvar)
+
+      case FunctorApplication(functor, args) =>
+        val f = meaning(c)(functor)
+        val xs = args map (x => meaning(c)(x))
+        tq"$f[..$xs]"
     }
   }
 

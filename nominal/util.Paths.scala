@@ -26,6 +26,9 @@ trait Paths {
   def getTraversableEndofunctor(c: Context, n: Int): c.Tree =
     getSomeTraversableTrait(c, n, traversableEndofunctorTrait)
 
+  def getTraversableEndofunctorOf(c: Context, n: Int): c.Tree =
+    getSomeTraversableTrait(c, n, traversableEndofunctorOf)
+
   def getBoundedTraversable(c: Context, n: Int): c.Tree =
     getSomeTraversableTrait(c, n, boundedTraversableTrait)
 
@@ -43,6 +46,7 @@ trait Paths {
   }
 
   def traversableEndofunctorTrait: String = "_root_.nominal.lib.Traversable.EndofunctorTrait"
+  def traversableEndofunctorOf: String = "_root_.nominal.lib.Traversable.EndofunctorOf"
   def boundedTraversableTrait: String = "_root_.nominal.lib.Traversable"
 
   def mappingOnObjects: String = "Map"
@@ -110,5 +114,10 @@ trait Paths {
     Many(
       q"import _root_.scala.language.higherKinds",
       q"import _root_.scala.language.implicitConversions")
+  }
+
+  def getImplicitly(c: Context)(typeTree: c.Tree): c.Tree = {
+    import c.universe._
+    q"_root_.scala.Predef.implicitly[$typeTree]"
   }
 }

@@ -53,7 +53,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
   }
 
   lazy val DatatypeP: Parser[Set[Name], Datatype] =
-    FixedPointP orElse VariantP orElse RecordP orElse TypeVarP
+    FixedPointP orElse VariantP orElse RecordP orElse TypeVarP orElse FunctorApplicationP
 
   lazy val FixedPointP: ParserC[FixedPoint] = new ParserC[FixedPoint] {
     def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[FixedPoint, c.Position] = {

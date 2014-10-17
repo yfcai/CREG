@@ -4,10 +4,6 @@ package lib
 import language.higherKinds
 
 object Traversable {
-  type EndofunctorOf[F[+_]] = Endofunctor {
-    type Map[+X] = F[X]
-  }
-
   type Endofunctor = Traversable {
     type Cat0 = Any
     type Map[+X]
@@ -49,6 +45,12 @@ object Traversable {
     type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any ; type Cat3 = Any
     type Map[+A, +B, +C, +D]
   }
+
+  type EndofunctorOf[F[+_]] = EndofunctorOf1[F]
+  type EndofunctorOf1[F[+_]] = Endofunctor { type Map[+X] = F[X] }
+  type EndofunctorOf2[F[+_, +_]] = Endofunctor2 { type Map[+X1, +X2] = F[X1, X2] }
+  type EndofunctorOf3[F[+_, +_, +_]] = Endofunctor3 { type Map[+X1, +X2, +X3] = F[X1, X2, X3] }
+  type EndofunctorOf4[F[+_, +_, +_, +_]] = Endofunctor4 { type Map[+X1, +X2, +X3, +X4] = F[X1, X2, X3, X4] }
 }
 
 trait Traversable0 {

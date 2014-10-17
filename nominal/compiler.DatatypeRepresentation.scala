@@ -122,6 +122,8 @@ object DatatypeRepresentation {
     def children = args.iterator
     final val construct: Iterator[Datatype] => FunctorApplication =
       children => copy(args = children.toSeq)
+
+    def functorArity: Int = args.length
   }
 
   case class TypeVar(name: Name) extends Datatype with DatatypeLike[TypeVar] {
