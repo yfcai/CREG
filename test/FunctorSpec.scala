@@ -3,9 +3,6 @@ import nominal.compiler._
 import nominal.lib._
 import nominal.functors._
 
-// ISSUE: universe.Type.dealias does not work in class scope
-// should post StackOverflow question.
-
 class FunctorSpec extends FlatSpec {
   @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
