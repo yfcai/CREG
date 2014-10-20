@@ -75,10 +75,14 @@ trait Parsers extends util.AbortWithError with util.Paths {
   }
 
   lazy val DatatypeP: Parser[Set[Name], Datatype] = {
-    FixedPointP orElse VariantP orElse RecordP orElse
+    FixedPointP orElse VariantP orElse
     FunctorApplicationP orElse
     LetBindingP orElse LetBindingBlockP orElse
-    TypeVarP
+    TypeVarP orElse
+    // at top level, unknown names are interpretated as constants.
+    // inside a variant, unknown names are interpreted as nullary records.
+    // beware: TypeConstP succeeds on EVERYTHING.
+    RecordWithFieldsP orElse TypeConstP
   }
 
   lazy val FixedPointP: ParserC[FixedPoint] = new ParserC[FixedPoint] {
