@@ -27,6 +27,28 @@ trait Parsers extends util.AbortWithError with util.Paths {
       case Failure(pos, message) => abortWithError(c)(pos, message)
     }
 
+  // convert returnType of DefDef into a series of traits to extend
+  def supersP(c: Context): ParserC[Many[c.Tree]] = new ParserC[Many[c.Tree]] {
+    def parse(d: Context, gamma: Set[Name])(input: d.Tree): Result[Many[c.Tree], d.Position] = {
+      import c.universe._
+      input.asInstanceOf[c.Tree] match {
+        case DefDef(mods, name, params, args, returnType, body) => Success(returnType match {
+          case CompoundTypeTree(Template(supers, selfType, stuff)) =>
+            supers
+
+          case tq"" =>
+            Many.empty
+
+          case other =>
+            Many(other)
+        })
+
+        case _ =>
+          Failure(input.pos, s"expect `def lhs: supers = rhs`, got $input")
+      }
+    }
+  }
+
   lazy val DataDeclP: ParserC[DataConstructor] = new ParserC[DataConstructor] {
     def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[DataConstructor, c.Position] = {
       import c.universe._
@@ -139,7 +161,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
     }
   }
 
-  lazy val AssignmentC: ParserC[RecordAssignment] = new ParserC[RecordAssignment] {
+  lazy val AssignmentP: ParserC[RecordAssignment] = new ParserC[RecordAssignment] {
     def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[RecordAssignment, c.Position] = {
       import c.universe._
       input match {

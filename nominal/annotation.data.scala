@@ -18,8 +18,9 @@ extends Parsers
 
     val Seq(input)   = annottees
     val datadecl     = parseOrAbort(c)(DataDeclP, input)
+    val supers       = parseOrAbort(c)(supersP(c), input)
     val imports      = scalaLanguageFeatureImports(c)
-    val declarations = generateDeclarations(c)(datadecl.body, Many.empty)
+    val declarations = generateDeclarations(c)(datadecl.body, supers)
     val synonyms     = generateSynonyms(c)(datadecl)
     val result       = imports ++ declarations ++ synonyms
 
