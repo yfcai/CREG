@@ -3,6 +3,8 @@ import nominal.compiler._
 import nominal.lib._
 import nominal.functors._
 
+import BuiltInFunctors._
+
 class FunctorSpec extends FlatSpec {
   @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
@@ -43,16 +45,6 @@ class FunctorSpec extends FlatSpec {
   it should "handle summand positions" in {
     @functor def consF[C] = ListT { Nil ; Cons(head, tail) = C }
     assert(consF(x14.unroll).map(c => c.copy(tail = length(c.tail))) == Cons(1, 3))
-  }
-
-  implicit object SeqIsTraversable extends Traversable.EndofunctorTrait {
-    type Map[+X] = Seq[X]
-    def traverse[A, B](G: Applicative)(f: A => G.Map[B]): Map[A] => G.Map[Map[B]] = xs => {
-      val mbs: Seq[G.Map[B]] = xs map f
-      val nil: G.Map[Map[B]] = G pure Seq.empty
-      val prepend: G.Map[B => Map[B] => Map[B]] = G pure (x => xs => x +: xs)
-      mbs.foldRight(nil) { case (mb, acc) => G.call(G.call(prepend, mb), acc) }
-    }
   }
 
   it should "permit interspersing with built-in functors" in {
