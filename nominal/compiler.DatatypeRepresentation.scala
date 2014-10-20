@@ -38,16 +38,22 @@ object DatatypeRepresentation {
 
     def exist(predicate: PartialFunction[Datatype, Unit]): Boolean = everything(predicate).nonEmpty
 
-    def subst(x: Name, xdef: Datatype): Datatype = (this: Datatype) match {
-      case TypeVar(y) if x == y =>
-        xdef
-
-      case FixedPoint(y, body) if x == y =>
+    def subst(mapping: Map[Name, Datatype]): Datatype =
+      if (mapping.isEmpty)
         this
+      else (this: Datatype) match {
+        case TypeVar(y) if mapping contains y =>
+          mapping(y)
 
-      case other =>
-        other gmapT { case t => t subst (x, xdef) }
-    }
+        case FixedPoint(y, body) =>
+          val newMapping = mapping - y
+          FixedPoint(y, body subst newMapping)
+
+        case _ =>
+          gmapT { case t => t subst mapping }
+      }
+
+    def subst(x: Name, xdef: Datatype): Datatype = subst(Map(x -> xdef))
 
     def rename(table: Map[Name, Name]): This = ((this: Datatype) match {
       case TypeVar(x) if table contains x =>
