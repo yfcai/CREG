@@ -412,9 +412,9 @@ class DataSpec extends FlatSpec {
 
   it should "permit tagging datatypes" in {
     trait A
-    trait B
+    trait B[R, S, T]
     trait C
-    @data def TaggedData: A with B with C = Tagged
-    implicitly[Tagged.type <:< A with B with C]
+    @data def TaggedData: A with B[Int, String, Boolean] with C = TaggedT { Tagged }
+    implicitly[Tagged.type <:< A with B[Int, String, Boolean] with C]
   }
 }
