@@ -46,7 +46,9 @@ object Coercion extends UniverseConstruction with util.Traverse {
     import c.universe._
 
     val argName = TermName(c freshName "coerced")
-    val result = performCoercion(c)(q"$argName", actualTag.tpe, expectedTag.tpe)
+
+    // gotta dealias at every turn (dealiasing isn't recursive)
+    val result = performCoercion(c)(q"$argName", actualTag.tpe.dealias, expectedTag.tpe.dealias)
 
     q"""{
       val $argName = $arg
@@ -153,7 +155,11 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
           case (Record(subname, subfields), Record(supername, superfields))
               if subname == supername && subfields.map(_.name) == superfields.map(_.name) =>
-            subtype.typeArgs.zip(supertype.typeArgs).foldLeft[Result](Some(newAssumptions)) {
+
+            // dealias type arguments (dealiasing isn't done recursively)
+            val (subdealiased, superdealiased) = (subtype.dealias, supertype.dealias)
+
+            subdealiased.typeArgs.zip(superdealiased.typeArgs).foldLeft[Result](Some(newAssumptions)) {
               case (Some(assumption), (subchild, superchild)) =>
                 isSubDatatype(c)(assumption, subchild, superchild)
 
