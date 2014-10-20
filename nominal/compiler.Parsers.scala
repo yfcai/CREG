@@ -76,7 +76,8 @@ trait Parsers extends util.AbortWithError with util.Paths {
 
   lazy val DatatypeP: Parser[Set[Name], Datatype] = {
     FixedPointP orElse VariantP orElse RecordP orElse
-    FunctorApplicationP orElse LetBindingP orElse
+    FunctorApplicationP orElse
+    LetBindingP orElse LetBindingBlockP orElse
     TypeVarP
   }
 
@@ -89,7 +90,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
             _ <- FixP.parse(c, gamma)(fixCode)
             param <- OneParamP.parse(c, gamma)(paramCode)
             bodyGamma = gamma + param
-            body <- CaseP.parse(c, bodyGamma)(bodyCode)
+            body <- DatatypeP.parse(c, bodyGamma)(bodyCode)
           }
           yield FixedPoint(param, body)
 
@@ -192,6 +193,19 @@ trait Parsers extends util.AbortWithError with util.Paths {
 
         case _ =>
           Failure(input.pos, s"expect record assignment like Cons(head, tail) = tau, got $input")
+      }
+    }
+  }
+
+  lazy val LetBindingBlockP: ParserC[LetBinding] = new ParserC[LetBinding] {
+    def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[LetBinding, c.Position] = {
+      import c.universe._
+      input match {
+        case Block(List(letBinding), Literal(Constant(()))) =>
+          LetBindingP.parse(c, gamma)(letBinding)
+
+        case _ =>
+          Failure(input.pos, s"expect { def lhs = rhs }, got $input")
       }
     }
   }
@@ -367,7 +381,7 @@ object Parsers extends util.Persist with Parsers {
     def macroTransform(annottees: Any*): Any = macro oneparserImpl
   }
 
-  lazy val OneParser = VariantP
+  lazy val OneParser = FixedPointP
 
   def oneparserImpl(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._

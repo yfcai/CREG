@@ -21,8 +21,14 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
       case FixedPoint(name, body) =>
         generateClasses(c)(body, supers)
 
-      case TypeVar(_) =>
+      case TypeVar(_) | TypeConst(_) =>
         Many.empty
+
+      case RecordAssignment(lhs, rhs) =>
+        generateClasses(c)(lhs, supers)
+
+      case LetBinding(lhs, rhs) =>
+        generateClasses(c)(rhs, supers)
 
       case other =>
         noRecognition(other)
@@ -161,16 +167,18 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
   def generatePrimitives(c: Context)(datatype: Datatype): Many[c.Tree] =
     datatype match {
-      case r: Record =>
-        Many(generateRecordPrototype(c)(r))
-
+      // variant is special in that it appends the top-level variant prototype
       case v: Variant =>
         generateVariantPrimitives(c)(v)
+
+      // other variant cases: records, record assignments, let bindings
+      case vcase: VariantCase =>
+        generateVariantCasePrimitives(c)(vcase)
 
       case FixedPoint(name, body) =>
         generatePrimitives(c)(body)
 
-      case TypeVar(_) =>
+      case TypeVar(_) | TypeConst(_) =>
         Many.empty
 
       case other =>

@@ -70,4 +70,11 @@ class SynonymGeneratorSpec extends FlatSpec {
     implicitly[Even =:= EvenT[Zero, ESuc[Odd]]]
     implicitly[Nat =:= NatT[Even, Odd]]
   }
+
+  it should "not generate unbound type names in nested synonyms" in {
+    @data def Rolled = Fix(rolled => { def Unrolled = Loop(get = rolled) })
+
+    implicitly[Rolled =:= Fix[RolledF]]
+    implicitly[Unrolled =:= Loop[Rolled]]
+  }
 }

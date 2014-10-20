@@ -28,7 +28,7 @@ trait SynonymGenerator extends UniverseConstruction {
         generateContextualNestedSynonyms(c)(genericParams, body, newEnv)
 
       case LetBinding(lhs, rhs) =>
-        generateTopLevelSynonym(c)(DataConstructor(lhs, genericParams, rhs)) +:
+        generateTopLevelSynonym(c)(DataConstructor(lhs, genericParams, rhs subst fixedPointEnv)) +:
         generateContextualNestedSynonyms(c)(genericParams, rhs, fixedPointEnv)
 
       case other =>
