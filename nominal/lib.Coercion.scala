@@ -280,9 +280,18 @@ object Coercion extends UniverseConstruction with util.Traverse {
       case _ => TypeError
     }
 
-  /** record => fixed = record => variant -> fixed */
+  /** record => fixed */
   def recordToFixedPoint(c: Context)(arg: c.Tree, record: Record, fixed: FixedPoint): Adjustment[c.Tree] =
-    recordToVariant(c)(arg, record, fixed.unroll.asInstanceOf[Variant]) map rollWith(c)(fixed)
+    fixed.body match {
+      case _: Variant =>
+        recordToVariant(c)(arg, record, fixed.unroll.asInstanceOf[Variant]) map rollWith(c)(fixed)
+
+      case _: Record =>
+        recordToRecord(c)(arg, record, fixed.unroll.asInstanceOf[Record]) map rollWith(c)(fixed)
+
+      case _ =>
+        sys error s"\nCannot convert.\n\nActual datatype:\n$record\n\Expected datatype:\n$fixed\n\nCode:\n$arg\n"
+    }
 
   def rollWith(c: Context)(fixed: FixedPoint): c.Tree => c.Tree = {
     import c.universe._
