@@ -65,7 +65,10 @@ trait Denotation extends UniverseConstruction with util.Traverse {
       evalFunctorApplication(c)(functorApp)
 
     case RecordAssignment(record, x) =>
-      evalTypeVar(c)(x)
+      evalData(c)(x)
+
+    case LetBinding(lhs, rhs) =>
+      evalData(c)(rhs)
   }
 
   def evalTypeVar(c: Context)(typeVar: TypeVar): Env => c.Tree = env => {
@@ -261,7 +264,10 @@ trait Denotation extends UniverseConstruction with util.Traverse {
         bodyBounds.tail
 
       case RecordAssignment(lhs, rhs) =>
-        unconstrainedBounds(c)(env)
+        getBounds(c)(rhs, env)
+
+      case LetBinding(lhs, rhs) =>
+        getBounds(c)(rhs, env)
     }
 
   def unconstrainedBounds(c: Context)(env: Env): Many[Option[c.Tree]] =

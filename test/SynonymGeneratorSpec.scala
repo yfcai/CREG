@@ -51,4 +51,23 @@ class SynonymGeneratorSpec extends FlatSpec {
     val xs: GList[Int] = cons(1, cons(2, cons(3, cons(4, nil))))
     info(s"xs = $xs")
   }
+
+  it should "generate nested synonyms" in {
+    @data def Nat = NatT {
+      def Even = EvenT { Zero ; ESuc(pred = Odd) }
+      def Odd  = OSuc(pred = Fix(even => EvenT { Zero ; ESuc(pred = OSuc(pred = even)) }))
+    }
+
+    // test that the constructors are properly tagged `Record` or `Variant`
+    import nominal.lib.Fix.{Record, Variant}
+    implicitly[EvenT[Any, Any] <:< Variant]
+    implicitly[ESuc[Any] <:< Record]
+    implicitly[OSuc[Any] <:< Record]
+
+    // test that synonyms `Odd`, `Even` and `Natz are generated correctly
+    type MuEven = Fix[({ type λ[+even] = EvenT[Zero, ESuc[OSuc[even]]] })#λ]
+    implicitly[Odd =:= OSuc[MuEven]]
+    implicitly[Even =:= EvenT[Zero, ESuc[Odd]]]
+    implicitly[Nat =:= NatT[Even, Odd]]
+  }
 }

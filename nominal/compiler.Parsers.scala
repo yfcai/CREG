@@ -74,8 +74,11 @@ trait Parsers extends util.AbortWithError with util.Paths {
     }
   }
 
-  lazy val DatatypeP: Parser[Set[Name], Datatype] =
-    FixedPointP orElse VariantP orElse RecordP orElse TypeVarP orElse FunctorApplicationP
+  lazy val DatatypeP: Parser[Set[Name], Datatype] = {
+    FixedPointP orElse VariantP orElse RecordP orElse
+    FunctorApplicationP orElse LetBindingP orElse
+    TypeVarP
+  }
 
   lazy val FixedPointP: ParserC[FixedPoint] = new ParserC[FixedPoint] {
     def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[FixedPoint, c.Position] = {
@@ -136,7 +139,8 @@ trait Parsers extends util.AbortWithError with util.Paths {
     }
   }
 
-  lazy val CaseP: Parser[Set[Name], VariantCase] = RecordP orElse VariantP orElse AssignmentC
+  lazy val CaseP: Parser[Set[Name], VariantCase] =
+    RecordP orElse VariantP orElse AssignmentP orElse LetBindingP
 
   lazy val RecordP = RecordWithoutFieldsP orElse RecordWithFieldsP
 
@@ -188,6 +192,20 @@ trait Parsers extends util.AbortWithError with util.Paths {
 
         case _ =>
           Failure(input.pos, s"expect record assignment like Cons(head, tail) = tau, got $input")
+      }
+    }
+  }
+
+  lazy val LetBindingP: ParserC[LetBinding] = new ParserC[LetBinding] {
+    def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[LetBinding, c.Position] = {
+      import c.universe._
+      input match {
+        case q"def $lhs = $rhs" =>
+          for { body <- CaseP.parse(c, gamma)(rhs) }
+          yield LetBinding(lhs.toString, body)
+
+        case _ =>
+          Failure(input.pos, s"expect `def lhs = rhs`, got $input")
       }
     }
   }

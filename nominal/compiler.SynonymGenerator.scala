@@ -6,8 +6,39 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
 trait SynonymGenerator extends UniverseConstruction {
-  def generateSynonyms(c: Context)(data: DataConstructor): Many[c.Tree] =
-    Many(generateTopLevelSynonym(c)(data)) ++ generatePatternFunctorSynonym(c)(data)
+  def generateSynonyms(c: Context)(data: DataConstructor): Many[c.Tree] = {
+    Many(generateTopLevelSynonym(c)(data)) ++
+    generatePatternFunctorSynonym(c)(data) ++
+    generateNestedSynonyms(c)(data)
+  }
+
+  // generate synonyms for inner let-bindings
+  def generateNestedSynonyms(c: Context)(genericDatatype: DataConstructor): Many[c.Tree] =
+    generateContextualNestedSynonyms(c)(genericDatatype.params, genericDatatype.body, Map.empty)
+
+  def generateContextualNestedSynonyms(c: Context)(
+    genericParams: Many[Param],
+    datatype: Datatype,
+    fixedPointEnv: Map[Name, Datatype]
+  ): Many[c.Tree] = {
+    import c.universe._
+    datatype match {
+      case fixed @ FixedPoint(name, body) =>
+        val newEnv = fixedPointEnv updated (name, fixed subst fixedPointEnv)
+        generateContextualNestedSynonyms(c)(genericParams, body, newEnv)
+
+      case LetBinding(lhs, rhs) =>
+        generateTopLevelSynonym(c)(DataConstructor(lhs, genericParams, rhs)) +:
+        generateContextualNestedSynonyms(c)(genericParams, rhs, fixedPointEnv)
+
+      case other =>
+        val subsynonyms = other.gmapQ {
+          case child =>
+            generateContextualNestedSynonyms(c)(genericParams, child, fixedPointEnv)
+        }
+        subsynonyms.toList flatMap identity
+    }
+  }
 
   def generateTopLevelSynonym(c: Context)(genericDatatype: DataConstructor): c.Tree =
     generateBoundedSynonym(c)(genericDatatype, Map.empty)

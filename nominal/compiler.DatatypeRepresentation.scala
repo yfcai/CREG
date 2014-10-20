@@ -110,6 +110,14 @@ object DatatypeRepresentation {
   // cases for a variant, can be records or variants
   sealed trait VariantCase extends Datatype with Nominal with DatatypeLike[VariantCase] { def get = this }
 
+  // let-bindings: basically ID with extra synonym request
+  case class LetBinding(lhs: Name, rhs: VariantCase) extends VariantCase with DatatypeLike[LetBinding] {
+    def name = rhs.name
+    def children = Iterator(rhs)
+    final val construct: Iterator[Datatype] => LetBinding =
+      children => copy(rhs = children.next.asInstanceOf[VariantCase])
+  }
+
   // List { Nil = x, Cons(head, tail) = y }
   case class RecordAssignment(lhs: Record, rhs: TypeVar) extends VariantCase with DatatypeLike[RecordAssignment] {
     def name = lhs.name

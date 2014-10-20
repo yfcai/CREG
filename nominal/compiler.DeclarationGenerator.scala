@@ -73,44 +73,57 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     * @return generated code for cases of the variant
     */
   def generateCases(c: Context)(template: c.TypeName, cases: Many[VariantCase]): Many[c.Tree] = {
+    val n = cases.size
+    cases.zipWithIndex flatMap { case (vcase, i) => generateVariantCase(c)(template, vcase, i, n) }
+  }
+
+  def generateVariantCase(c: Context)(template: c.TypeName, variantCase: VariantCase, i: Int, n: Int):
+      Many[c.Tree] =
+  {
     import c.universe._
-    cases.zipWithIndex flatMap {
-      case (record @ Record(name, Many()), i) => // empty record
+    variantCase match {
+      case record @ Record(name, Many()) => // empty record
         val typeName = TypeName(name)
-        val params = namedParamsWithNothing(c)(typeName, i, cases.size)
+        val params = namedParamsWithNothing(c)(typeName, i, n)
         val (termName, traversable0, typeMap, emptyDefTraverse) = recordPrototypeFragments(c)(record)
         Many(
           q"sealed trait $typeName extends $template[..$params] with ${getRecord(c)}",
           q"case object $termName extends $typeName with $traversable0 { $typeMap }")
 
-      case (Record(name, fields), i) =>
+      case Record(name, fields) =>
         // records are wholely free
         val typeName = TypeName(name)
         val fieldNames = fields.map(_.name)
         val caseParams = covariantTypeParams(c)(fieldNames)
         val myType = tq"$typeName[..${fieldNames.map(name => TypeName(name))}]"
-        val templateParams = appliedParamsWithNothing(c)(myType, i, cases.size)
+        val templateParams = appliedParamsWithNothing(c)(myType, i, n)
         val decls = generateFreeDecls(c)(fieldNames)
         Many(q"""sealed case class $typeName[..$caseParams](..$decls) extends
           $template[..$templateParams] with ${getRecord(c)}""")
 
       // copy-paste for variants
-      case (variant @ Variant(name, Many()), i) =>
+      case variant @ Variant(name, Many()) =>
         val typeName = TypeName(name)
         val termName = TermName(name)
-        val params = namedParamsWithNothing(c)(typeName, i, cases.size)
+        val params = namedParamsWithNothing(c)(typeName, i, n)
         val newSuper = tq"$template[..$params]"
         generateVariants(c)(variant, Many(newSuper))
 
-      case (variant @ Variant(name, fields), i) =>
+      case variant @ Variant(name, fields) =>
         // records are wholely free
         val typeName = TypeName(name)
         val fieldNames = fields.map(_.name)
         val caseParams = covariantTypeParams(c)(fieldNames)
         val myType = tq"$typeName[..${fieldNames.map(name => TypeName(name))}]"
-        val templateParams = appliedParamsWithNothing(c)(myType, i, cases.size)
+        val templateParams = appliedParamsWithNothing(c)(myType, i, n)
         val newSuper = tq"$template[..$templateParams]"
         generateVariants(c)(variant, Many(newSuper))
+
+      case RecordAssignment(lhs, typeVar) =>
+        generateVariantCase(c)(template, lhs, i, n)
+
+      case LetBinding(lhs, rhs) =>
+        generateVariantCase(c)(template, rhs, i, n)
     }
   }
 
@@ -164,12 +177,17 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
         noRecognition(other)
     }
 
+  def generateVariantCasePrimitives(c: Context)(variantCase: VariantCase): Many[c.Tree] =
+    variantCase match {
+      case x: Record => Many(generateRecordPrototype(c)(x))
+      case x: Variant => generateVariantPrimitives(c)(x)
+      case RecordAssignment(lhs, rhs) => generateVariantCasePrimitives(c)(lhs)
+      case LetBinding(lhs, rhs) => generateVariantCasePrimitives(c)(rhs)
+    }
+
   def generateVariantPrimitives(c: Context)(datatype: Variant): Many[c.Tree] = {
-      datatype.cases.flatMap({
-        case x: Record  => Many(generateRecordPrototype(c)(x))
-        case x: Variant => generateVariantPrimitives(c)(x)
-        case other      => noRecognition(other)
-      }) :+ generateVariantPrototype(c)(datatype)
+    datatype.cases.flatMap(x => generateVariantCasePrimitives(c)(x)) :+
+    generateVariantPrototype(c)(datatype)
   }
 
   def generateVariantPrototype(c: Context)(datatype: Variant): c.Tree = {
@@ -198,24 +216,33 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
       case (g, fs, as, bs) =>
         val caseDefs: Many[CaseDef] =
           (fs, as, datatype.cases).zipped flatMap {
-            case (f, a, record: Record) =>
-              Many(generateRecordTraversal(c)(record, g, f, a, bs))
-
-            case (f, a, variant: Variant) =>
-              def loop(v: Variant): Many[CaseDef] = v.cases.flatMap {
-                case record : Record  => Many(generateRecordTraversal(c)(record, g, f, a, bs))
-                case variant: Variant => loop(variant)
-                case other            => noRecognition(other)
-              }
-              loop(variant)
-
-            case (_, _, other) =>
-              noRecognition(other)
+            case (f, a, vcase) =>
+              mkDefTraverseVariantCase(c)(g, f, a, bs, vcase)
           }
         val x = TermName(c freshName "x")
         q"{ ${mkValDef(c)(x, TypeTree())} => ${ Match(q"$x", caseDefs.toList) } }"
     }
     q"object $objName extends $traversableN { ..$cats ; $typeMap ; $defTraverse }"
+  }
+
+  def mkDefTraverseVariantCase(c: Context)(
+    g: c.TermName, // the applicative functor
+    f: c.TermName, // the appropriate mapping `A => Map[B]`
+    a: c.TypeName, // the argument type `A`
+    bs: Many[c.TypeName], // the result type params `B`
+    v: VariantCase
+  ): Many[c.universe.CaseDef] = {
+    import c.universe._
+    v match {
+      case record: Record =>
+        Many(generateRecordTraversal(c)(record, g, f, a, bs))
+
+      case variant: Variant =>
+        variant.cases.flatMap { vcase => mkDefTraverseVariantCase(c)(g, f, a, bs, vcase) }
+
+      case RecordAssignment(lhs, rhs) => mkDefTraverseVariantCase(c)(g, f, a, bs, lhs)
+      case LetBinding(lhs, rhs) => mkDefTraverseVariantCase(c)(g, f, a, bs, rhs)
+    }
   }
 
   /** @param record the record to generate a CaseDef for
