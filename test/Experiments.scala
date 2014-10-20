@@ -4,8 +4,9 @@ import nominal.experiment._
 import scala.language.experimental.macros
 
 class Experiments extends FlatSpec {
-  "@hello" should "insert method `hello`" in {
+  "@hello" should "insert method `hello` and extend `A with B with C`" in {
     @hello object X
+    implicitly[X.type <:< (A with B with C)]
     info(X.hello)
   }
 
