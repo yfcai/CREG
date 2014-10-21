@@ -14,7 +14,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
     *
     * @functor def elemF[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
     *
-    * TODO: remove the context-free parsers, make context-sensitive parsers the default.
+    * @synonym def ElemF[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
     *
     */
   import compiler.DatatypeRepresentation._

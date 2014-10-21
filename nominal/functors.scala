@@ -6,13 +6,16 @@ package functors
 import scala.language.experimental.macros
 import scala.annotation.StaticAnnotation
 
-// TODO: rename this to @data
 class data extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro annotation.data.expandData
 }
 
 class functor extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro annotation.functor.impl
+}
+
+class synonym extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro annotation.synonym.impl
 }
 
 object coerce {
