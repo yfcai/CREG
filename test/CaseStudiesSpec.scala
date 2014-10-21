@@ -48,11 +48,12 @@ class CaseStudiesSpec extends FlatSpec {
     assert(deptNames(flatten2(overmanaged)) == deptNames(flatten(overmanaged)))
   }
 
-  "Compos-pattern" should "work" in pending /*{
+  "Compos-pattern" should "work" in {
     import Compos._
-    assert(rename(fst) == (coerce { EAbs("_x", EAbs("_y", EVar("_x"))) }: Term))
-    assert(rename(fst) == rename2(fst))
+    assert(prependUnderscore(fst) == (coerce { Abs("_x", Abs("_y", "_x")) }: Exp))
+    //assert(rename(fst) == rename2(fst))
 
+    /*
     assert(fresh(fst) == (coerce { EAbs("_0", EAbs("_1", EVar("_0"))) }: Term))
     assert(fresh(fst) == fresh2(fst))
 
@@ -67,5 +68,6 @@ class CaseStudiesSpec extends FlatSpec {
     assert(vars(plusExp) == Set("x", "y", "z"))
     assert(vars(renameExp(plusExp)) == Set("_x", "_y", "_z"))
     assert(vars(renameExp2(plusExp)) == Set("_x", "_y", "_z"))
-  }*/
+    */
+  }
 }
