@@ -158,6 +158,9 @@ object Compos {
       }
   }
 
+
+  // PREPEND UNDERSCORE EXAMPLE //
+
   val prependUnderscore: Op[Syntactic, Identity] = new  Op[Syntactic, Identity] {
     def apply[A: Syntactic](syntax: A): A = implicitly[Syntactic[A]] match {
       // Type variable `A` is refined to `Var` in this case.
@@ -169,47 +172,26 @@ object Compos {
     }
   }
 
-/*
-  // EXPRESSION EXAMPLE //
-
-  @datatype trait Term { EAbs(String, Term) ; EApp(Term, Term) ; EVar(String) }
-  sealed trait TermFamily[_]
-  implicit case object Term extends TermFamily[Term]
-
-  implicit object composTerm extends Compos[TermFamily] {
-    val termF = {
-      @functor val termF = e => Term { EAbs(String, e) ; EApp(e, e) }
-      termF
-    }
-
-    def compos[F[+_]: Applicative.Endofunctor, C: TermFamily](f: Op[TermFamily, F], data: C): F[C] = {
-      implicitly[TermFamily[C]] match {
-        case Term =>
-          implicitly[Applicative.Endofunctor[F]].roll[termF.Map](
-            termF(data.unroll).traverse(implicitly[Applicative.Endofunctor[F]])(f[Term])
-          )
-      }
-    }
+  @functor implicit def nameStmF[name, exp] = StmT {
+    Assign(lhs = V(name = name), rhs = exp)
+    Return(exp = exp)
   }
 
-  // PREPEND UNDERSCORE EXAMPLE //
+  @functor implicit def nameExpF[name, exp] = ExpT {
+    Ident(x = V(name = name))
 
-  val rename = new Op[TermFamily, Identity] {
-    def apply[A: TermFamily](e: A): A = implicitly[TermFamily[A]] match {
-      case Term =>
-        e.unroll match {
-          case EAbs(x, b) => coerce { EAbs("_" + x, this(b)) }: Term
-          case EVar(x)    => coerce { EVar("_" + x) }: Term
-          case _          => composOp(this, e)
-        }
-    }
+    Abs(param = V(name = name), body = exp)
+
+    App(operator = exp, operand = exp)
+
+    Block(stms = List apply (nameStmF.Map apply (name, exp)))
   }
 
-  def rename2(e: Term): Term = {
-    @functor val renameF = n => Term { EAbs(n, Term) ; EVar(n) }
-    renameF(e) map ("_" + _)
-  }
+  @functor def nameF[name] = nameExpF.Map apply (name, Fix(exp => nameExpF.Map apply (name, exp)))
 
+  def prependUnderscore2(e: Exp): Exp = nameF(e) map ("_" + _)
+
+  /*
   // MAKE NAMES GLOBALLY UNIQUE //
 
   private[this] // necessary to make inner type λ covariant
@@ -305,107 +287,9 @@ object Compos {
 
     evalState(f(Seq.empty)(e), names)
   }
-   */
-
-  // MUTUAL RECURSION EXAMPLE //
-
-  /*
-  sealed trait SyntaxT
-  @data def MuExp: SyntaxT = Fix(exp => {
-    def Exp = ExpT {
-      Ident(x = Var)
-
-      // blocks of statements
-      Block(stms = List apply StmT {
-        Assign(lhs = Var, rhs = exp)
-        Return(exp = exp)
-      })
-    }
-  })
-
-  @data def Stm: SyntaxT = StmT {
-    Assign(lhs = Var, rhs = MuExp)
-    Return(exp = MuExp)
-  }
-
-  @data def Var: SyntaxT = V(name = String)
-  */
-
-  // this doesn't make sense...
-  // type Syntax = SyntaxT with (Exp or Stm or Var)
-
-  /*
-  @datatype trait Expression[E, S] {
-    Block(List[S])
-    Var(Variable)
-    Add(E, E)
-  }
-
-  @datatype trait Statement[Expression] {
-    Assign(lhs = Variable, rhs = Expression)
-    Return(Expression)
-  }
-
-  @datatype trait Variable { V(name = String) }
-
-  type Exp = Fix[expF.Map]
-  type Stm = Statement[Exp]
-
-  val expF = {
-    @functor val expF = exp => Expression {
-      Block(List {
-        Cons(head = Statement {
-          Assign(String, exp)
-          Return(exp)
-        })
-      })
-
-      Add(exp, exp)
-    }
-    expF
-  }
-
-  sealed trait ExpFamily[T]
-  implicit case object Exp extends ExpFamily[Exp]
-  implicit case object Stm extends ExpFamily[Stm]
-  implicit case object Var extends ExpFamily[Variable]
-
-  implicit def stringToVar(x: String): Variable = V(x)
-  implicit def stringToExp(x: String): Exp = coerce { Var(x) }
-
-  implicit object composExp extends Compos[ExpFamily] {
-    val expFun = {
-      // BUG: does not work if rhs is `Exp { Block(List[stm]) }` instead
-      @functor val fun = (exp, stm, _var) => Exp {
-        Block(List { Cons(head = stm) })
-        Add(exp, exp)
-        Var(_var)
-      }
-      fun
-    }
-
-    val stmFun = {
-      @functor val fun = (exp, _var) => Stm { Assign(_var, exp) ; Return(exp) }
-      fun
-    }
 
 
-    def compos[F[+_]: Applicative.Endofunctor, C: ExpFamily](f: Op[ExpFamily, F], data: C): F[C] = {
-      val apl = implicitly[Applicative.Endofunctor[F]]
-      implicitly[ExpFamily[C]] match {
-        case Exp =>
-          apl.roll[expF.Map] {
-            expFun(data.unroll).traverse(apl)(f[Exp], f[Stm], f[Variable])
-          }
-
-        case Stm =>
-          stmFun(data).traverse(apl)(f[Exp], f[Variable])
-
-        case Var =>
-          apl pure data
-      }
-    }
-  }
+  // MUTUAL RECURSION EXAMPLES //
 
   // {
   //   x = y + z

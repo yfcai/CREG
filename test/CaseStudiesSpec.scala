@@ -51,7 +51,7 @@ class CaseStudiesSpec extends FlatSpec {
   "Compos-pattern" should "work" in {
     import Compos._
     assert(prependUnderscore(fst) == (coerce { Abs("_x", Abs("_y", "_x")) }: Exp))
-    //assert(rename(fst) == rename2(fst))
+    assert(prependUnderscore2(fst) == prependUnderscore(fst))
 
     /*
     assert(fresh(fst) == (coerce { EAbs("_0", EAbs("_1", EVar("_0"))) }: Term))
