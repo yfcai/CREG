@@ -39,13 +39,6 @@ object Scrap extends Scrap {
     }
   ))
 
-  // We should generate this now that coercion doesn't work so well any more...
-  // together with other constructors/extractors. Which even make sense.
-  trait RollableLike[F[+_]] { def roll(x: F[Fix[F]]): Fix[F] = Roll[F](x) }
-  trait Rollable[-S, +T] { def roll(x: S): T }
-  implicit object rollDept extends Rollable[D[Name, Manager, List[Subunit]], Dept] with RollableLike[DeptF]
-  def roll[S, T](x: S)(implicit rollX: Rollable[S, T]): T = rollX roll x
-
   @data def Subunit  = SubunitT { PU(employee = Employee) ; DU(dept = Dept) }
   @data def Employee = E(person = Person, salary = Salary)
   @data def Person   = P(name = Name, address = Address)
