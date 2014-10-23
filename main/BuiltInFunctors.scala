@@ -8,7 +8,7 @@ import nominal.lib._
 object BuiltInFunctors {
   // Open problem: How to interact with Scala collection library without code duplication?
 
-  implicit object SeqIsTraversable extends Traversable.EndofunctorTrait {
+  object seqF extends Traversable.EndofunctorTrait {
     type Map[+X] = Seq[X]
     def traverse[A, B](G: Applicative)(f: A => G.Map[B]): Map[A] => G.Map[Map[B]] = xs => {
       val mbs: Seq[G.Map[B]] = xs map f
@@ -18,7 +18,7 @@ object BuiltInFunctors {
     }
   }
 
-  implicit object ListIsTraversable extends Traversable.EndofunctorTrait {
+  object elemF extends Traversable.EndofunctorTrait {
     type Map[+X] = List[X]
     def traverse[A, B](G: Applicative)(f: A => G.Map[B]): Map[A] => G.Map[Map[B]] = xs => {
       val mbs: List[G.Map[B]] = xs map f

@@ -181,10 +181,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
   def isScalaSubtype(c: Context)(subtype: c.Type, supertype: c.Type): Boolean = {
     import c.universe._
-    c.inferImplicitValue(treeToType(c)(tq"$subtype <:< $supertype")) match {
-      case q"" => false
-      case _ => true
-    }
+    inferImplicitValue(c)(tq"$subtype <:< $supertype").nonEmpty
   }
 
   sealed trait Adjustment[+T] { def map[U](f: T => U): Adjustment[U] }

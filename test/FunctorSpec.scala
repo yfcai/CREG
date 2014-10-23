@@ -3,8 +3,6 @@ import nominal.compiler._
 import nominal.lib._
 import nominal.functors._
 
-import BuiltInFunctors._
-
 class FunctorSpec extends FlatSpec {
   @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
@@ -48,7 +46,9 @@ class FunctorSpec extends FlatSpec {
   }
 
   it should "permit interspersing with built-in functors" in {
-    @functor def elemSeqF[x] = List apply (Seq apply x)
+    import BuiltInFunctors.seqF
+
+    @functor def elemSeqF[x] = List apply (seqF apply x)
 
     val xs: List[Seq[Int]] = coerce {
       Cons(Seq(1), Cons(Seq(1, 2), Cons(Seq(1, 2, 3), Cons(Seq(1, 2, 3, 4), Nil))))

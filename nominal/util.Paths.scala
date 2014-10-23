@@ -61,6 +61,11 @@ trait Paths {
     tq"$applicative.Map"
   }
 
+  def getTreeMapOnObjects(c: Context)(applicative: c.Tree): c.Tree = {
+    import c.universe._
+    tq"$applicative.Map"
+  }
+
   def getThisMapOnObjects(c: Context): c.Tree = {
     import c.universe._
     tq"this.Map"
@@ -72,6 +77,11 @@ trait Paths {
   }
 
   def getFunctorCat(c: Context, i: Int)(functor: c.TermName): c.Tree = {
+    import c.universe._
+    tq"$functor.${typeNameCat(c, i)}"
+  }
+
+  def getTreeCat(c: Context, i: Int)(functor: c.Tree): c.Tree = {
     import c.universe._
     tq"$functor.${typeNameCat(c, i)}"
   }

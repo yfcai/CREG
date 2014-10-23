@@ -111,6 +111,14 @@ trait Denotation extends UniverseConstruction with util.Traverse {
   def evalFunctorApplication(c: Context)(functorApp: FunctorApplication):
       Env => c.Tree = {
     import c.universe._
+
+    val functorCode = c parse functorApp.functor.code
+    val n = functorApp.functorArity
+    evalComposite(c)("functor", functorApp, functorCode)
+
+    /* Use implicits so as to interoperate with built-in functors
+     * (Seems unnecessary)
+
     // `functor` is not a type; it is a type constructor
     // here betting on Scalac's parser not doing enough type checking
     // to figure that out & throw tantrums
@@ -118,6 +126,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     val n = functorApp.functorArity
     val functorCode = getImplicitly(c)(tq"${getTraversableEndofunctorOf(c, n)}[$functor]")
     evalComposite(c)("functor", functorApp, functorCode)
+     */
   }
 
   def evalRecord(c: Context)(record: Record): Env => c.Tree = {
@@ -237,7 +246,22 @@ trait Denotation extends UniverseConstruction with util.Traverse {
       // to make things simple here,
       // we only support interspercing endofunctors for now
       case FunctorApplication(functor, args) =>
-        intersect(c, env.length)(args map (arg => getBounds(c)(arg, env)))
+        val functorCode = c parse functor.code
+        val argWithIndex = args.zipWithIndex
+        val argBounds = intersect(c, env.length)(args map (arg => getBounds(c)(arg, env)))
+        val projBounds = env map {
+          case x =>
+            val xSummands = argWithIndex flatMap {
+              case (TypeVar(y), i) if x == y =>
+                Some(getTreeCat(c, i)(functorCode))
+
+              case _ =>
+                None
+            }
+            intersectOnce(c)(xSummands)
+        }
+
+        intersect(c, env.length)(Many(argBounds, projBounds))
 
       // variants generate constraints on cases that are variables in env
       // in addition to accumulating bounds
@@ -260,7 +284,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
       // fixed points require `x` to be unconstrained
       case FixedPoint(x, body) =>
         val bodyBounds = getBounds(c)(body, x +: env)
-        require(bodyBounds.head.isEmpty) // `x` must be unconstrained
+        // require(bodyBounds.head.isEmpty) // `x` must be unconstrained, but we let scalac check that.
         bodyBounds.tail
 
       case RecordAssignment(lhs, rhs) =>

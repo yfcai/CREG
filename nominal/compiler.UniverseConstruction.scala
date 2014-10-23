@@ -51,9 +51,8 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         meaning(c)(rhs)
 
       case FunctorApplication(functor, args) =>
-        val f = meaning(c)(functor)
         val xs = args map (x => meaning(c)(x))
-        tq"$f[..$xs]"
+        tq"${getTreeMapOnObjects(c)(c parse functor.code)}[..$xs]"
     }
   }
 
@@ -125,6 +124,18 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
 
   def mkBoundedTypeDefs(c: Context)(params: Many[Param], bounds: Map[Name, Datatype]): Many[c.universe.TypeDef] =
     params.map(param => mkBoundedTypeDef(c)(param, bounds))
+
+  /* get implicit value of a reified type */
+  def inferImplicitValue(c: Context)(typeTree: c.Tree): Option[c.Tree] = {
+    import c.universe._
+    c.inferImplicitValue(treeToType(c)(typeTree), true /*silent*/) match {
+      case q"" =>
+        None
+
+      case tree =>
+        Some(tree)
+    }
+  }
 
 
 

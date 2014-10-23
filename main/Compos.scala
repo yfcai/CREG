@@ -26,10 +26,10 @@ object Compos {
   @data def Syntax = SyntaxT {
 
     def Exp = ExpT {
-      Ident(x = Var)
-      Abs(param = Var, body = Fix[ExpF])
-      App(operator = Fix[ExpF], operand = Fix[ExpF])
-      Block(stms = List apply Stm)
+      def Identifier = Ident(x = Var)
+      def Abstraction = Abs(param = Var, body = Fix[ExpF])
+      def Application = App(operator = Fix[ExpF], operand = Fix[ExpF])
+      def BlockExpression = Block(stms = List apply Stm)
     }
 
     def Stm = StmT {
@@ -184,14 +184,14 @@ object Compos {
 
     App(operator = exp, operand = exp)
 
-    Block(stms = List apply (nameStmF.Map apply (name, exp)))
+    Block(stms = List apply (nameStmF apply (name, exp)))
   }
 
-  @functor def nameF[name] = nameExpF.Map apply (name, Fix(exp => nameExpF.Map apply (name, exp)))
+  @functor def nameF[name] = nameExpF apply (name, Fix(exp => nameExpF apply (name, exp)))
 
   def prependUnderscore2(e: Exp): Exp = nameF(e) map ("_" + _)
 
-  /*
+
   // MAKE NAMES GLOBALLY UNIQUE //
 
   private[this] // necessary to make inner type λ covariant
@@ -212,82 +212,86 @@ object Compos {
   def writeState[S](s: S): State[S]#λ[Unit] = _ => ((), s)
   def evalState[S, A](sm: State[S]#λ[A], s: S): A = sm(s)._1
 
-  // type of infinite lists of hopefully fresh names
+  // infinite lists of hopefully fresh names
   type Names = Stream[String]
 
-  // type of substitution
+  // substitution defined by an association sequence
   type Subst = Seq[(String, String)]
 
   // lookup key in associative sequence
   def findWithDefault[A, B](key: A, default: B, seq: Seq[(A, B)]): B =
     seq find (_._1 == key) map (_._2) getOrElse default
 
-  def fresh(e: Term): Term = {
+  def fresh(e: Exp): Exp = {
     import Monad._
 
     // infinite list of fresh names
     val names: Names = Stream from 0 map ("_" + _)
 
-    // substitutions are assoc list between names
-    type Subst = Seq[(String, String)]
+    def f(vs: Subst): Op[Syntactic, State[Names]#λ] = new Op[Syntactic, State[Names]#λ] {
+      def apply[A: Syntactic](e: A): State[Names]#λ[A] =
+        (implicitly[Syntactic[A]], e) match {
+          case (Exp, Abs(V(x), b)) =>
+            for {
+              freshNames <- readState[Names]
+              _ <- writeState(freshNames.tail)
+              x2 = freshNames.head
+              b2 <- f((x, x2) +: vs)(b.unroll)
+            }
+            yield coerce { Abs(V(x2), b2) }: Exp
 
-    def f(vs: Subst): Op[TermFamily, State[Names]#λ] = new Op[TermFamily, State[Names]#λ] {
-      def apply[A: TermFamily](e: A): State[Names]#λ[A] =
-        implicitly[TermFamily[A]] match {
-          case Term => e.unroll match {
-            case EAbs(x, b) =>
-              for {
-                freshNames <- readState[Names]
-                _ <- writeState(freshNames.tail)
-                x2 = freshNames.head
-                b2 <- f((x, x2) +: vs)(b)
-              }
-              yield coerce { EAbs(x2, b2) }: Term
+          case (Var, V(x)) =>
+            stateMonad[Names].pure(V(findWithDefault(x, x, vs)))
 
-            case EVar(x) =>
-              stateMonad[Names].pure[Term](coerce {
-                EVar(findWithDefault(x, x, vs))
-              })
-
-            case _ =>
-              composM[TermFamily, State[Names]#λ, Term](this, e)
-          }
+          case _ =>
+            composM[Syntactic, State[Names]#λ, A](this, e)
         }
     }
 
     evalState(f(Seq.empty)(e), names)
   }
 
-  def fresh2(e: Term): Term = {
-    @functor val freshF = (abs, name) => Term { EAbs = abs ; EVar(name) }
+  @functor implicit def freshExpF[abs, name, exp] = ExpT {
+    Ident(x = V(name = name))
+    Abs(param, body) = abs // `abs` overrides abstractions
+    App(operator = exp, operand = exp)
+    Block(stms = List apply (nameStmF apply (name, exp)))
+  }
 
+/*
+  @functor def freshF[abs, name] =
+    freshExpF apply (abs, name, Fix(exp => freshExpF apply (abs, name, exp)))
+
+  def fresh2(e: Exp): Exp = {
     // infinite list of fresh names
     val names: Names = Stream.from(0).map("_" + _)
 
-    // name the record type for the EAbs case
-    type RAbs = EAbs[String, Term]
+    // name the range of freshF we care about
+    // it is isomorphic to Exp, but not exactly the same.
+    type FreshExp = freshF.Map[Abstraction, String]
 
-    def f(vs: Subst)(e: Term): State[Names]#λ[Term] =
-      freshF[RAbs, String](coerce(e)).traverse[RAbs, String](stateMonad[Names])(
-        // RAbs => Names => RAbs
-        {
-          case EAbs(x, b) =>
-            for {
-              freshNames <- readState[Names]
-              _ <- writeState(freshNames.tail)
-              x2 = freshNames.head
-              b2 <- f((x, x2) +: vs)(b)
-            }
-            yield EAbs(x2, b2)
-        }
-          ,
-        // String => Names => String
-        x => stateMonad[Names] pure findWithDefault(x, x, vs)
-      ).asInstanceOf[State[Names]#λ[Term]] // coercion doesn't work for this case yet
+    def f(vs: Subst)(e: Exp): State[Names]#λ[Exp] =
+      freshF[Abstraction, String](coerce(e)).
+        traverse[Abstraction, String](stateMonad[Names])(
+          // Abstraction => Names => Abstraction
+          {
+            case Abs(V(x), b) =>
+              for {
+                freshNames <- readState[Names]
+                _ <- writeState(freshNames.tail)
+                x2 = freshNames.head
+                b2 <- f((x, x2) +: vs)(b.unroll)
+              }
+              yield Abs(V(x2), b2)
+          },
+
+          // String => Names => String
+          x => stateMonad[Names] pure findWithDefault(x, x, vs)
+        ).asInstanceOf[State[Names]#λ[Exp]] // coercion doesn't work for this case yet
 
     evalState(f(Seq.empty)(e), names)
   }
-
+ */
 
   // MUTUAL RECURSION EXAMPLES //
 
@@ -297,40 +301,14 @@ object Compos {
   // }
   val plusExp: Exp = coerce {
     Block(Cons(
-      Assign("x", Add("y", "z")), Cons(
+      Assign("x", App("y", "z")), Cons(
         Return("x"), Nil)))
   }
 
-  val renameExp = new Op[ExpFamily, Identity] {
-    def apply[A: ExpFamily](e: A): A = implicitly[ExpFamily[A]] match {
-      case Var =>
-        e match { case V(x) => V("_" + x) }
-
-      case _ =>
-        composOp(this, e)
-    }
-  }
-
-  val renameF = {
-    // BUG: does not work if I don't mark recursive positions by `Exp` in the body of Stm
-    @functor val renameF = x => Exp {
-      Var(Variable { V(x) })
-      Block(List { Cons(head = Stm {
-        Assign(Variable { V(x) }, Exp)
-        Return(Exp)
-      }) })
-    }
-    renameF
-  }
-
-  def renameExp2(e: Exp): Exp = renameF(e) map ("_" + _)
-
-  def vars(e: Exp): Set[String] = renameF(renameF(e) map (x => Set(x))) reduce (Set.empty, _ ++ _)
+  def vars(e: Exp): Set[String] = nameF(nameF(e) map (x => Set(x))) reduce (Set.empty, _ ++ _)
 
   // vars(plusExp)
-  // vars(renameExp(plusExp))
-  // vars(renameExp2(plusExp))
-   */
+  // vars(prependUnderscore(plusExp))
 }
 
 import Compos._

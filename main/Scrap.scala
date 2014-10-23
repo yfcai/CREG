@@ -26,7 +26,8 @@ object Scrap extends Scrap {
     })
 
   // define an implicit functor for lists so that it's easier to write other datatypes
-  @functor implicit def elemF[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
+  // maybe these functors should be generated?
+  @functor implicit def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
   @data def Company  = C(depts = List apply Dept)
 
@@ -66,6 +67,8 @@ object Scrap extends Scrap {
       case Nil  => ys
       case cons => coerce(cons)
     }
+
+  val elemF: Traversable.EndofunctorOf[List] = List // a bit confusing to write List(xs).
 
   def concatMap[A, B](f: A => List[B], xs: List[A]): List[B] =
     elemF(xs).mapReduce(f)(coerce(Nil), concat)
@@ -192,6 +195,7 @@ object Scrap extends Scrap {
 
 trait Scrap {
   this: Scrap.type =>
+
   // ============== //
   // IMPLEMENTATION //
   // ============== //
@@ -360,6 +364,7 @@ trait Scrap {
     def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Company => apl.Map[Company] =
       company => fun(company).traverse(apl)(sp[List[Dept]])
   }
+
 }
 
 import Scrap._

@@ -53,21 +53,21 @@ class CaseStudiesSpec extends FlatSpec {
     assert(prependUnderscore(fst) == (coerce { Abs("_x", Abs("_y", "_x")) }: Exp))
     assert(prependUnderscore2(fst) == prependUnderscore(fst))
 
-    /*
-    assert(fresh(fst) == (coerce { EAbs("_0", EAbs("_1", EVar("_0"))) }: Term))
-    assert(fresh(fst) == fresh2(fst))
+    assert(fresh(fst) == (coerce { Abs("_0", Abs("_1", "_0")) }: Exp))
+    //assert(fresh(fst) == fresh2(fst))
 
-    assert(renameExp(plusExp) == (coerce {
+    assert(prependUnderscore(plusExp) == (coerce {
       Block(Cons(
-        Assign("_x", Add("_y", "_z")), Cons(
+        Assign("_x", App("_y", "_z")), Cons(
           Return("_x"), Nil)))
     }: Exp))
 
-    assert(renameExp(plusExp) == renameExp2(plusExp))
+    assert(prependUnderscore2(plusExp) == prependUnderscore(plusExp))
 
     assert(vars(plusExp) == Set("x", "y", "z"))
-    assert(vars(renameExp(plusExp)) == Set("_x", "_y", "_z"))
-    assert(vars(renameExp2(plusExp)) == Set("_x", "_y", "_z"))
-    */
+    assert(vars(prependUnderscore(plusExp)) == Set("_x", "_y", "_z"))
+    assert(vars(prependUnderscore2(plusExp)) == Set("_x", "_y", "_z"))
+
+    // TODO: test stuff on expressions with inner blocks
   }
 }
