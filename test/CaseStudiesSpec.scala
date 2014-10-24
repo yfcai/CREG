@@ -2,7 +2,7 @@ import org.scalatest._
 import nominal.functors._
 
 class CaseStudiesSpec extends FlatSpec {
-  "Banana" should "work" in pending /*{
+  "Banana" should "work" in {
     import Banana._
     assert(sum(xs1) == 10)
     assert(upTo(4) == xs1)
@@ -14,7 +14,7 @@ class CaseStudiesSpec extends FlatSpec {
     assert(xs1.map(hyloFactorial)  == factorials)
     assert(xs1.map(paraFactorial)  == factorials)
     assert(xs1.map(paraFactorial0) == factorials)
-  }*/
+  }
 
   "Scrap-your-boilerplate" should "work" in {
     import Scrap._
