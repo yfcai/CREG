@@ -1,15 +1,14 @@
 import org.scalatest._
-import nominal.compiler._
+import nominal.functors._
 
 class SynonymGeneratorSpec extends FlatSpec {
-  import SynonymGenerator.Tests._
   import nominal.lib._
 
   "SynonymGenerator" should "generate a synonym for flat datatypes" in {
-    @flat trait Person {
+    @data def Person = PersonT {
       Boss
-      Manager(dept: Int)
-      Employee(name: String, dept: Int)
+      Manager(dept = Int)
+      Employee(name = String, dept = Int)
     }
 
     val boss     : Person = Boss
@@ -18,10 +17,10 @@ class SynonymGeneratorSpec extends FlatSpec {
   }
 
   it should "generate synonyms for recursive datatypes" in {
-    @recursive trait IntList {
+    @data def IntList = Fix(intList => IntListT {
       Nil
-      Cons(Int, IntList)
-    }
+      Cons(head = Int, tail = intList)
+    })
 
     val nil: IntList = Roll[IntListF](Nil)
     def cons(x: Int, xs: IntList): IntList = Roll[IntListF](Cons(x, xs))
@@ -31,10 +30,10 @@ class SynonymGeneratorSpec extends FlatSpec {
   }
 
   it should "generate synonyms for generic recursive datatypes" in {
-    @generic trait GList[A] {
+    @data def GList[A] = Fix(gList => GListT {
       Nil
-      Cons(A, GList[A])
-    }
+      Cons(head = A, tail = gList)
+    })
 
     object InnerModuleForTechnicalReasons {
       private[this] type GF[+A] = {
@@ -53,8 +52,29 @@ class SynonymGeneratorSpec extends FlatSpec {
     info(s"xs = $xs")
   }
 
-  it should "not generate recursive synonyms for mutually recursive datatypes" in pending ; {
-    // preprocessor should convert mutually recursive datatypes to singly recursive datatypes for synonym generation.
-    // for declaration generation, preprocessor should produce flat sums of products.
+  it should "generate nested synonyms" in {
+    @data def Nat = NatT {
+      def Even = EvenT { Zero ; ESuc(pred = Odd) }
+      def Odd  = OSuc(pred = Fix(even => EvenT { Zero ; ESuc(pred = OSuc(pred = even)) }))
+    }
+
+    // test that the constructors are properly tagged `Record` or `Variant`
+    import nominal.lib.Fix.{Record, Variant}
+    implicitly[EvenT[Any, Any] <:< Variant]
+    implicitly[ESuc[Any] <:< Record]
+    implicitly[OSuc[Any] <:< Record]
+
+    // test that synonyms `Odd`, `Even` and `Natz are generated correctly
+    type MuEven = Fix[({ type λ[+even] = EvenT[Zero, ESuc[OSuc[even]]] })#λ]
+    implicitly[Odd =:= OSuc[MuEven]]
+    implicitly[Even =:= EvenT[Zero, ESuc[Odd]]]
+    implicitly[Nat =:= NatT[Even, Odd]]
+  }
+
+  it should "not generate unbound type names in nested synonyms" in {
+    @data def Rolled = Fix(rolled => { def Unrolled = Loop(get = rolled) })
+
+    implicitly[Rolled =:= Fix[RolledF]]
+    implicitly[Unrolled =:= Loop[Rolled]]
   }
 }

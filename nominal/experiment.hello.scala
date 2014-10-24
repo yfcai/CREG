@@ -14,8 +14,17 @@ object hello {
     val result = {
       annottees.map(_.tree).toList match {
         case q"object $name extends ..$parents { ..$body }" :: Nil =>
+
+          val realParents = tq"A with B with C" match {
+            case CompoundTypeTree(Template(parents, selfType, stuff)) =>
+              parents
+          }
+
           q"""
-            object $name extends ..$parents {
+            sealed trait A
+            sealed trait B
+            sealed trait C
+            object $name extends ..$realParents {
               def hello: ${typeOf[String]} = "Goodbye cruel world!"
               ..$body
             }

@@ -18,23 +18,7 @@ import scala.reflect.macros.blackbox.Context
 import compiler._
 import DatatypeRepresentation._
 
-trait Coercion {
-  // sadly, making `coerce` implicit does not alleviate the burden of writing it in client code.
-  // scalac has problem finding the implicit witness.
-  //
-  // generating `collection.breakOut`-style code does not work either:
-  // `coerceImpl` gets called with `Expected = Nothing`.
-  def coerce[S, T](arg: S)(implicit witness: Fix.TypeWitness[T]): T = macro Coercion.coerceImpl[S, T]
-
-  /** macro for testing purpose
-    * @param info where the info should be written to
-    */
-  def coerceContextInfo[S, T]
-    (arg: S, info: collection.mutable.Map[String, String])
-    (implicit witness: Fix.TypeWitness[T]): T = macro Coercion.infoImpl[S, T]
-}
-
-object Coercion extends UniverseConstruction with TraversableGenerator {
+object Coercion extends UniverseConstruction with util.Traverse {
   import Fix.TypeWitness
 
   def infoImpl[Actual, Expected]
@@ -62,7 +46,9 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
     import c.universe._
 
     val argName = TermName(c freshName "coerced")
-    val result = performCoercion(c)(q"$argName", actualTag.tpe, expectedTag.tpe)
+
+    // gotta dealias at every turn (dealiasing isn't recursive)
+    val result = performCoercion(c)(q"$argName", actualTag.tpe.dealias, expectedTag.tpe.dealias)
 
     q"""{
       val $argName = $arg
@@ -84,8 +70,10 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
 
   def performCoercion(c: Context)(arg: c.Tree, actualType: c.Type, expectedType: c.Type): c.Tree = {
     import c.universe._
+
     val actual = representOnce(c)(actualType)
     val expected = representOnce(c)(expectedType)
+
     (actual, expected) match {
 
       // actual & expected has compatible runtime type. do a cast.
@@ -95,7 +83,7 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
 
       // from fixed to non-fixed: auto-unroll at top level
       case (actual @ FixedPoint(_, _), expected)
-          if isScalaSubtype(c)(scalaType(c)(actual.unrollOnce), scalaType(c)(expected)) =>
+          if isScalaSubtype(c)(scalaType(c)(actual.unroll), scalaType(c)(expected)) =>
         q"$arg.unroll"
 
       case (actual, expected) => adjust(c)(arg, actualType, expectedType) match {
@@ -167,7 +155,11 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
 
           case (Record(subname, subfields), Record(supername, superfields))
               if subname == supername && subfields.map(_.name) == superfields.map(_.name) =>
-            subtype.typeArgs.zip(supertype.typeArgs).foldLeft[Result](Some(newAssumptions)) {
+
+            // dealias type arguments (dealiasing isn't done recursively)
+            val (subdealiased, superdealiased) = (subtype.dealias, supertype.dealias)
+
+            subdealiased.typeArgs.zip(superdealiased.typeArgs).foldLeft[Result](Some(newAssumptions)) {
               case (Some(assumption), (subchild, superchild)) =>
                 isSubDatatype(c)(assumption, subchild, superchild)
 
@@ -178,8 +170,8 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
           case (subfix @ FixedPoint(_, _), superfix @ FixedPoint(_, _)) =>
             isSubDatatype(c)(
               newAssumptions,
-              scalaType(c)(subfix.unrollOnce),
-              scalaType(c)(superfix.unrollOnce))
+              scalaType(c)(subfix.unroll),
+              scalaType(c)(superfix.unroll))
 
           case _ =>
             None
@@ -189,10 +181,7 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
 
   def isScalaSubtype(c: Context)(subtype: c.Type, supertype: c.Type): Boolean = {
     import c.universe._
-    c.inferImplicitValue(treeToType(c)(tq"$subtype <:< $supertype")) match {
-      case q"" => false
-      case _ => true
-    }
+    inferImplicitValue(c)(tq"$subtype <:< $supertype").nonEmpty
   }
 
   sealed trait Adjustment[+T] { def map[U](f: T => U): Adjustment[U] }
@@ -253,11 +242,11 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
 
   /** variant => fixed = variant => variant -> fixed */
   def variantToFixedPoint(c: Context)(arg: c.Tree, variant: Variant, fixed: FixedPoint): Adjustment[c.Tree] =
-    variantToVariant(c)(arg, variant, fixed.unrollToVariant) map rollWith(c)(fixed)
+    variantToVariant(c)(arg, variant, fixed.unroll.asInstanceOf[Variant]) map rollWith(c)(fixed)
 
   /** variant => variant = variant -> record => variant */
   def variantToVariant(c: Context)(arg: c.Tree, actual: Variant, expected: Variant): Adjustment[c.Tree] =
-    if (actual.header == expected.header) {
+    if (actual.name == expected.name) {
       import c.universe._
 
       val adjustedRecords: List[CaseDef] =
@@ -288,9 +277,18 @@ object Coercion extends UniverseConstruction with TraversableGenerator {
       case _ => TypeError
     }
 
-  /** record => fixed = record => variant -> fixed */
+  /** record => fixed */
   def recordToFixedPoint(c: Context)(arg: c.Tree, record: Record, fixed: FixedPoint): Adjustment[c.Tree] =
-    recordToVariant(c)(arg, record, fixed.unrollToVariant) map rollWith(c)(fixed)
+    fixed.body match {
+      case _: Variant =>
+        recordToVariant(c)(arg, record, fixed.unroll.asInstanceOf[Variant]) map rollWith(c)(fixed)
+
+      case _: Record =>
+        recordToRecord(c)(arg, record, fixed.unroll.asInstanceOf[Record]) map rollWith(c)(fixed)
+
+      case _ =>
+        sys error s"\nCannot convert.\n\nActual datatype:\n$record\n\Expected datatype:\n$fixed\n\nCode:\n$arg\n"
+    }
 
   def rollWith(c: Context)(fixed: FixedPoint): c.Tree => c.Tree = {
     import c.universe._

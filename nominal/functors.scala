@@ -6,16 +6,16 @@ package functors
 import scala.language.experimental.macros
 import scala.annotation.StaticAnnotation
 
-class datatype extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro annotation.datatype.vanillaImpl
+class data extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro annotation.data.expandData
 }
 
 class functor extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro annotation.functor.defaultImpl
+  def macroTransform(annottees: Any*): Any = macro annotation.functor.impl
 }
 
-class functorNoUnroll extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro annotation.functor.implNoUnroll
+class synonym extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro annotation.synonym.impl
 }
 
 object coerce {

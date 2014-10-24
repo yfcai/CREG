@@ -6,12 +6,46 @@ import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
 trait SynonymGenerator extends UniverseConstruction {
-  def generateSynonym(c: Context)(name: Name, genericDatatype: DataConstructor): c.Tree =
-    generateBoundedSynonym(c)(name, genericDatatype, Map.empty)
+  def generateSynonyms(c: Context)(data: DataConstructor): Many[c.Tree] = {
+    Many(generateTopLevelSynonym(c)(data)) ++
+    generatePatternFunctorSynonym(c)(data) ++
+    generateNestedSynonyms(c)(data)
+  }
 
-  def generateBoundedSynonym(c: Context)(name: Name, genericDatatype: DataConstructor, bounds: Map[Name, Datatype]): c.Tree = {
+  // generate synonyms for inner let-bindings
+  def generateNestedSynonyms(c: Context)(genericDatatype: DataConstructor): Many[c.Tree] =
+    generateContextualNestedSynonyms(c)(genericDatatype.params, genericDatatype.body, Map.empty)
+
+  def generateContextualNestedSynonyms(c: Context)(
+    genericParams: Many[Param],
+    datatype: Datatype,
+    fixedPointEnv: Map[Name, Datatype]
+  ): Many[c.Tree] = {
+    import c.universe._
+    datatype match {
+      case fixed @ FixedPoint(name, body) =>
+        val newEnv = fixedPointEnv updated (name, fixed subst fixedPointEnv)
+        generateContextualNestedSynonyms(c)(genericParams, body, newEnv)
+
+      case LetBinding(lhs, rhs) =>
+        generateTopLevelSynonym(c)(DataConstructor(lhs, genericParams, rhs subst fixedPointEnv)) +:
+        generateContextualNestedSynonyms(c)(genericParams, rhs, fixedPointEnv)
+
+      case other =>
+        val subsynonyms = other.gmapQ {
+          case child =>
+            generateContextualNestedSynonyms(c)(genericParams, child, fixedPointEnv)
+        }
+        subsynonyms.toList flatMap identity
+    }
+  }
+
+  def generateTopLevelSynonym(c: Context)(genericDatatype: DataConstructor): c.Tree =
+    generateBoundedSynonym(c)(genericDatatype, Map.empty)
+
+  def generateBoundedSynonym(c: Context)(genericDatatype: DataConstructor, bounds: Map[Name, Datatype]): c.Tree = {
     val (newDatatype, newBounds) = disambiguate(c)(genericDatatype, bounds)
-    boundedSynonymWithoutDisambiguation(c)(name, newDatatype, newBounds)
+    boundedSynonymWithoutDisambiguation(c)(newDatatype, newBounds)
   }
 
   /** remove identical names from bounds (currently by failing otherwise) */
@@ -21,7 +55,7 @@ trait SynonymGenerator extends UniverseConstruction {
   ): (DataConstructor, Map[Name, Datatype]) = {
     val identicals = bounds filter {
       case (x1, TypeVar(x2)) => x1 == x2
-      case (x1, Record(x2, _)) => x1 == x2
+      case (x1, c2: VariantCase) => x1 == c2.name
       case _ => false
     }
     if (! identicals.isEmpty) sys error s"duplicate names in bounds: $identicals"
@@ -31,145 +65,29 @@ trait SynonymGenerator extends UniverseConstruction {
   /** precondition: `bounds` contains no identity mapping */
   private[this]
   def boundedSynonymWithoutDisambiguation(c: Context)(
-    name: Name, genericDatatype: DataConstructor, bounds: Map[Name, Datatype]
+    genericDatatype: DataConstructor, bounds: Map[Name, Datatype]
   ): c.Tree = {
     import c.universe._
-    val DataConstructor(params, datatypeBody) = genericDatatype
+    val DataConstructor(name, params, datatypeBody) = genericDatatype
     val typeName = TypeName(name)
     val typeDefs = mkBoundedTypeDefs(c)(params, bounds)
     val rhs = generateRHS(c)(datatypeBody)
     q"type $typeName [ ..$typeDefs ] = $rhs"
   }
 
-  def generateConcreteSynonym(c: Context)(name: Name, concreteDatatype: Datatype): c.Tree =
-    generateSynonym(c)(name, DataConstructor(Many.empty, concreteDatatype))
-
   def generateRHS(c: Context)(datatype: Datatype): c.Tree = meaning(c)(datatype)
 
-  def generatePatternFunctorSynonym(c: Context)(patternFunctorName: Name, genericFixedPoint: DataConstructor): c.Tree = {
-    import c.universe._
-    val DataConstructor(genericParams, FixedPoint(recursiveParam, datatypeBody)) = genericFixedPoint
-    val patternFunctorTypeName = TypeName(patternFunctorName)
-    val typeParams = mkTypeDefs(c)(genericParams :+ Param.covariant(recursiveParam))
-    val rhs = generateRHS(c)(datatypeBody)
-    q"type $patternFunctorTypeName [ ..$typeParams ] = $rhs"
-  }
+  def generatePatternFunctorSynonym(c: Context)(genericFixedPoint: DataConstructor): Option[c.Tree] =
+    genericFixedPoint match {
+      case DataConstructor(_, genericParams, fixed @ FixedPoint(_, _)) =>
+        import c.universe._
+        val DataConstructor(lowerCaseName, recursiveParams, datatypeBody) = fixed.patternFunctor
+        val patternFunctorTypeName = TypeName(lowerCaseName.capitalize)
+        val typeParams = mkTypeDefs(c)(genericParams ++ recursiveParams)
+        val rhs = generateRHS(c)(datatypeBody)
+        Some(q"type $patternFunctorTypeName [ ..$typeParams ] = $rhs")
 
-  def generateConcretePatternFunctor(c: Context)(patternFunctorName: Name, fixedPoint: FixedPoint): c.Tree =
-    generatePatternFunctorSynonym(c)(patternFunctorName, DataConstructor(Many.empty, fixedPoint))
+      case _ =>
+        None
+    }
 }
-
-object SynonymGenerator {
-  /** test macros */
-  object Tests extends SynonymGenerator with DeclarationGenerator with util.AssertEqual {
-    import scala.language.experimental.macros
-    import scala.annotation.StaticAnnotation
-
-    class flat extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro flat.impl }
-    object flat {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
-
-        val q"trait Person { Boss ; Manager(dept: Int) ; Employee(name: String, dept: Int) }" =
-          annottees.head.tree
-
-        val person  = "Person"
-        val personT = "PersonT"
-
-        val datatype =
-          Variant(TypeVar(personT), Many(
-            Record("Boss", Many.empty),
-            Record("Manager", Many(Field("dept", TypeVar("Int")))),
-            Record("Employee", Many(Field("name", TypeVar("String")), Field("dept", TypeVar("Int"))))))
-
-        val declaration = generateDeclaration(c)(datatype)
-        val synonym = generateConcreteSynonym(c)(person, datatype)
-        val expected = q"type Person = PersonT[Boss, Manager[Int], Employee[String, Int]]"
-        assertEqual(c)(expected, synonym)
-
-        c.Expr(q"..${declaration :+ synonym}")
-      }
-    }
-
-    class recursive extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro recursive.impl }
-    object recursive {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
-
-        val q"trait IntList { Nil ; Cons(Int, IntList) }" = annottees.head.tree
-
-        val intList  = "IntList"
-        val intListT = "IntListT"
-        val intListF = "IntListF"
-
-        val datatypeBody =
-          Variant(TypeVar(intListT), Many(
-            Record("Nil", Many.empty),
-            Record("Cons", Many(
-              Field("_1", TypeVar("Int")),
-              Field("_2", TypeVar(intList /* no T */))))))
-
-        val fixedPoint = FixedPoint(intList, datatypeBody)
-
-        val declaration = generateDeclaration(c)(datatypeBody)
-
-        val synonym = generateConcreteSynonym(c)(intList, fixedPoint)
-        val q"""
-          type IntList = _root_.nominal.lib.Fix[({
-            type $innerTypeL[+IntList] = IntListT[Nil, Cons[Int, IntList]]
-          })#$innerTypeR]""" = synonym
-        assert(innerTypeL == innerTypeR)
-
-        val patternF = generateConcretePatternFunctor(c)(intListF, fixedPoint)
-        val expectedPatternF = q"""
-          type IntListF[+IntList] = IntListT[Nil, Cons[Int, IntList]]
-        """
-        assertEqual(c)(expectedPatternF, patternF)
-
-        c.Expr(q"..${declaration ++ Many(synonym, patternF)}")
-      }
-    }
-
-    class generic extends StaticAnnotation { def macroTransform(annottees: Any*): Any = macro generic.impl }
-    object generic {
-      def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
-        import c.universe._
-
-        val q"trait GList[A] { Nil ; Cons(A, GList[A]) }" = annottees.head.tree
-
-        val gList  = "GList"
-        val gListT = "GListT"
-        val gListF = "GListF"
-
-        val datatypeBody =
-          Variant(TypeVar(gListT), Many(
-            Record("Nil", Many.empty),
-            Record("Cons", Many(
-              Field("_1", TypeVar("A")),
-              Field("_2", TypeVar(gList /* no T */))))))
-
-        val fixedPoint = FixedPoint(gList, datatypeBody)
-
-        val genericDatatype = DataConstructor(Many(Param.covariant("A")), fixedPoint)
-
-        val declaration = generateDeclaration(c)(datatypeBody)
-
-        val synonym = generateSynonym(c)(gList, genericDatatype)
-        val q"""
-          type GList[+A] = _root_.nominal.lib.Fix[({
-            type $innerTypeL[+GList] = GListT[Nil, Cons[A, GList]]
-          })#$innerTypeR]""" = synonym
-        assert(innerTypeL == innerTypeR)
-
-        val patternF = generatePatternFunctorSynonym(c)(gListF, genericDatatype)
-        val expectedPatternF = q"""
-          type GListF[+A, +GList] = GListT[Nil, Cons[A, GList]]
-        """
-        assertEqual(c)(expectedPatternF, patternF)
-
-        c.Expr(q"..${declaration ++ Many(synonym, patternF)}")
-      }
-    }
-
-  } // end of SynonymGenerator.Test
-} // end of SynonymGenerator

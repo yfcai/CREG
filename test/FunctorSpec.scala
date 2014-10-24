@@ -3,62 +3,57 @@ import nominal.compiler._
 import nominal.lib._
 import nominal.functors._
 
-// ISSUE: universe.Type.dealias does not work in class scope
-// should post StackOverflow question.
+class FunctorSpec extends FlatSpec {
+  @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
-class FunctorSpec extends FlatSpec with Coercion {
-  @datatype trait List[+A] {
-    Nil
-    Cons(head = A, tail = List[A])
-  }
+  def list[T](elems: T*): List[T] =
+    if (elems.isEmpty)
+      coerce(Nil)
+    else
+      coerce(Cons(elems.head, list(elems.tail: _*)))
 
-  object List {
-    def apply[T](elems: T*): List[T] =
-      if (elems.isEmpty)
-        coerce(Nil)
-      else
-        coerce(Cons(elems.head, apply(elems.tail: _*)))
+  def listF[A] = {
+    @functor def listF[list] = ListT { Nil ; Cons(head = A, tail = list) }
+    listF
   }
 
   // this should be generated
   implicit class ListIsFoldable[A](xs: List[A]) extends Foldable[({ type λ[+L] = ListF[A, L] })#λ](xs)(listF)
 
-  val list = {
-    @functor val list = A => List[A]
-    list
-  }
-
-  def listF[A] = {
-    @functor val listF = L => ListF[A, L]
-    listF
-  }
+  @functor implicit def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
   def length[A](xs: List[A]): Int = xs.fold[Int] {
     case Nil => 0
     case Cons(_, n) => n + 1
   }
 
-  val x14: List[Int] = List(1, 2, 3, 4)
+  val x14: List[Int] = list(1, 2, 3, 4)
 
   "@functor annotation" should "generate functor instances" in {
-    val x25 = list(x14) map (_ + 1)
-    assert(x25 == List(2, 3, 4, 5))
+    val x25 = List(x14) map (_ + 1)
+    assert(x25 == list(2, 3, 4, 5))
   }
 
-  it should "handle override positions" in {
-    @functor val list = C => List { Cons(C, List) }
-    val x25 = list(x14) map (_ + 1)
-    assert(x25 == List(2, 3, 4, 5))
-  }
-
-  it should "handle flattened recursive positions" in {
-    @functor val tailF = L => List { Cons(Int, L) }
+  it should "handle nonrecursive positions" in {
+    val tailF = listF[Int]
     val tailLength = tailF(tailF(x14.unroll).map(length)).reduce(0, _ + _)
     assert(tailLength == 3)
   }
 
   it should "handle summand positions" in {
-    @functor val consF = C => List { Cons = C } // problem: not flattened if variant is overwritten
+    @functor def consF[C] = ListT { Nil ; Cons(head, tail) = C }
     assert(consF(x14.unroll).map(c => c.copy(tail = length(c.tail))) == Cons(1, 3))
+  }
+
+  it should "permit interspersing with built-in functors" in {
+    import BuiltInFunctors.seqF
+
+    @functor def elemSeqF[x] = List apply (seqF apply x)
+
+    val xs: List[Seq[Int]] = coerce {
+      Cons(Seq(1), Cons(Seq(1, 2), Cons(Seq(1, 2, 3), Cons(Seq(1, 2, 3, 4), Nil))))
+    }
+
+    assert(elemSeqF(xs).reduce(0, _ + _) == 20)
   }
 }

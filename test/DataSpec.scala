@@ -1,8 +1,12 @@
 import org.scalatest._
-import nominal.functors.datatype
+import nominal.functors._
 import nominal.lib._
 
-class DataSpec extends FlatSpec with Coercion {
+class DataSpec extends FlatSpec {
+  ///////////////////////////////////////////
+  // TEST THAT THE OLD CASE STUDY COMPILES //
+  ///////////////////////////////////////////
+
   import language.implicitConversions
   import language.higherKinds
 
@@ -72,14 +76,13 @@ class DataSpec extends FlatSpec with Coercion {
   }
 
 
-
-  "data macro" should "generate enough scala types for the case study" in {
-    @datatype trait Term {
+  it should "generate enough scala types for the case study" in {
+    @data def Term = Fix(term => TermT {
       Void
-      Var(String)
-      Abs(param = String, body = Term)
-      App(Term, Term)
-    }
+      Var(name = String)
+      Abs(param = String, body = term)
+      App(operator = term, operand = term)
+    })
 
     def void: Term = Roll[TermF](Void)
     implicit def _var(x: String): Term = Roll[TermF](Var(x))
@@ -346,72 +349,49 @@ class DataSpec extends FlatSpec with Coercion {
     // \f -> f (\z -> ())
     val fzv = abs("f", app("f", abs("z", void)))
 
-    def put (name: String, obj : Any ) = info(s"$name = $obj")
-    def show(name: String, term: Term) = put(name, pretty(term))
-
     List(
       ("id", id), ("idy", idy), ("f_xy", f_xy), ("fx_y", fx_y),
       ("fzv", fzv)
     ).foreach {
       case (name, term) =>
-        show(name, term)
-        put(s"freevars($name)", freevars(term))
-        show(s"prependUnderscore($name)", prependUnderscore(term))
+        val printout  = pretty(term)
+        val freenames = freevars(term)
+        val renamed   = prependUnderscore(term)
         List(
           ("y", app("x", "x")),
           ("y", app("x", "y"))
         ).foreach {
           case (y, ysub) =>
             val s1 = subst(y, ysub, term)
-            show(s"subst($y, ${pretty{ysub}}, $name)", s1)
         }
-        info("")
     }
-
   }
 
   it should "generate enough scala types for the list example" in {
-    // since GADT not surpported anyway, recursion is marked by name
+    @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
 
-    @datatype trait List[+A] { Nil ; Cons(A, tail = List[A]) }
-
-    // superclass of object List is nonsensical on purpose
-    // it's there to test that attributes got passed around
-    final case object List extends Set[Int] {
-      // nonsensical implementation of Set[Int] interface
-      def -(x: Int) = Set.empty
-      def +(x: Int) = this - x
-      def contains(x: Int) = false
-      def iterator = Iterator.empty
-
-      def patternFunctor[Elem] = new RecursivePolynomialFunctor {
-        type Map[+T] = ListF[Elem, T]
-        def apply[A](xs: Map[A]): RecursivePolynomial[A] = new RecursivePolynomial[A] {
-          def gcompos[F[_]: Applicative]: GCompos[F] = new GCompos[F] {
-            import applicative._
-            def apply[B](f: A => F[B]): F[Map[B]] = xs match {
-              case Nil => pure(Nil)
-              case Cons(head, tail) =>
+    def patternFunctor[Elem] = new RecursivePolynomialFunctor {
+      type Map[+T] = ListF[Elem, T]
+      def apply[A](xs: Map[A]): RecursivePolynomial[A] = new RecursivePolynomial[A] {
+        def gcompos[F[_]: Applicative]: GCompos[F] = new GCompos[F] {
+          import applicative._
+          def apply[B](f: A => F[B]): F[Map[B]] = xs match {
+            case Nil => pure(Nil)
+            case Cons(head, tail) =>
+              call(
                 call(
-                  call(
-                    pure[Elem => B => Map[B]](x => b => Cons(x, b)),
-                    pure[Elem](head)),
-                  f(tail))
-            }
+                  pure[Elem => B => Map[B]](x => b => Cons(x, b)),
+                  pure[Elem](head)),
+                f(tail))
           }
         }
       }
     }
 
-    // test that attributes of companion objects are passed around correctly
-    (List: Set[Int]) match {
-      case List => ()
-    }
-
     // List is a synonym and has no companion object recognizable to scalac.
     // therefore the implicit conversion has to be outside.
     implicit class ListIsFoldable[A](xs: List[A]) {
-      def fold[T](f: ListF[A, T] => T): T = f(List patternFunctor xs.unroll map (_ fold f))
+      def fold[T](f: ListF[A, T] => T): T = f(patternFunctor(xs.unroll) map (_ fold f))
     }
 
     val firstNinePrimes: List[Int] =
@@ -428,5 +408,13 @@ class DataSpec extends FlatSpec with Coercion {
 
     assert(theSum == 100)
     info("The sum of the first nine primes is " + theSum)
+  }
+
+  it should "permit tagging datatypes" in {
+    trait A
+    trait B[R, S, T]
+    trait C
+    @data def TaggedData: A with B[Int, String, Boolean] with C = TaggedT { Tagged }
+    implicitly[Tagged.type <:< A with B[Int, String, Boolean] with C]
   }
 }

@@ -9,95 +9,101 @@ import nominal.functors._
 import nominal.lib._
 import nominal.lib.Traversable.Endofunctor
 
-object Banana extends Banana
-
-trait Banana {
-  @datatype trait List[A] {
+object Banana {
+  @data def List[A] = Fix(list => ListT {
     Nil
-    Cons(A, List[A])
-  }
+    Cons(head = A, tail = list)
+  })
 
   val xs1: List[Int] = coerce( Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) )
 
+  @functor def elemF[elem] = Fix(list => ListT { Nil ; Cons(head = elem, tail = list) })
+
   implicit class ListIsMappable[A](xs: List[A]) {
-    def map[B](f: A => B): List[B] = {
-      @functor val elemF = elem => List { Nil ; Cons(elem, List) }
-
-      // alternatively:
-      //@functor val list = Elem => List[Elem]
-
+    def map[B](f: A => B): List[B] =
       elemF(xs) map f
-    }
   }
 
   // pattern functor
   def listF[A] = {
-    @functor val fun = rec => List { Cons(A, rec) }
-    fun
+    @functor def patternFunctor[list] = ListT {
+      Nil
+      Cons(head = A, tail = list)
+    }
+    patternFunctor
   }
 
   // type List[A] = Fix[listF[A].Map]
 
-  // a catamorphism is the unique morphism from an initial algebra to a given algebra.
-  // conceptually, the implicit initial algebra is (Fix[F], id).
-  def cata[T](fun: Endofunctor)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
-    xs => algebra( fun(xs.unroll) map cata(fun)(algebra) )
+  def cataWith[T](fun: Endofunctor)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
+    xs => algebra( fun(xs.unroll) map cataWith(fun)(algebra) )
 
-  val sum: List[Int] => Int =
-    cata[Int](listF[Int]) {
-      case Nil => 0
-      case Cons(head, tail) => head + tail
-    }
+  implicit class ListIsFoldable[A](xs: List[A]) {
+    val patternFunctor = listF[A]
 
-  def ana[T](fun: Endofunctor)(coalgebra: T => fun.Map[T]): T => Fix[fun.Map] =
-    seed => Roll[fun.Map]( fun(coalgebra(seed)) map ana(fun)(coalgebra) )
+    def fold[T](algebra: patternFunctor.Map[T] => T): T =
+      cataWith(patternFunctor)(algebra)(xs)
+  }
 
-  def decrement: Int => ListF[Int, Int] =
-    i => {
-      if (i < 1)
-        Nil
-      else
-        Cons(i, i - 1)
-    }
+  def sum(xs: List[Int]): Int = xs.fold[Int] {
+    case Nil => 0
+    case Cons(head, tail) => head + tail
+  }
 
-  def downFrom: Int => List[Int] =
-    ana[Int](listF[Int])(decrement)
+  def anaWith[T](fun: Endofunctor)(coalgebra: T => fun.Map[T]): T => Fix[fun.Map] =
+    seed => Roll[fun.Map]( fun(coalgebra(seed)) map anaWith(fun)(coalgebra) )
 
-  def hylo[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
-    seed => algebra( fun(coalgebra(seed)) map hylo(fun)(coalgebra)(algebra) )
+  def mkList[A, T](seed: T)(coalgebra: T => ListF[A, T]): List[A] =
+    anaWith(listF[A])(coalgebra)(seed)
 
-  def hylo2[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
-    cata(fun)(algebra) compose ana(fun)(coalgebra)
+  def incrementCoalgebra(n: Int): Int => ListF[Int, Int] = i =>
+    if (i > n)
+      Nil
+    else
+      Cons(i, i + 1)
 
-  def hyloFactorial: Int => Int =
-    hylo[Int, Int](listF[Int])(decrement) {
+  def upTo(n: Int): List[Int] =
+    mkList[Int, Int](1)(incrementCoalgebra(n))
+
+  def hyloWith[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
+    cataWith(fun)(algebra) compose anaWith(fun)(coalgebra)
+
+  def hylo[A, T, R](seed: T)(coalgebra: T => ListF[A, T])(algebra: ListF[A, R] => R): R = {
+    val functor = listF[A]
+    hyloWith(functor)(coalgebra)(algebra)(seed)
+  }
+
+  def hyloFactorial(n: Int): Int =
+    hylo[Int, Int, Int](1)(incrementCoalgebra(n)) {
       case Nil => 1
       case Cons(m, n) => m * n
     }
 
-  // paramorphism is just a hylomorphism with respect to some other functor
+  // paramorphism is just a hylomorphism
 
   // show this after the type signature of `paraWith`
-  @datatype trait Pair[A, B] { MkPair(A, B) }
+  @data def Pair[A, B] = MkPair(_1 = A, _2 = B)
 
-  // paramorphism agreeing with the traditional implementation in Haskell
-  def para0[T](F: Endofunctor)(psi: F.Map[Pair[Fix[F.Map], T]] => T): Fix[F.Map] => T =
-    xs => cata[Pair[Fix[F.Map], T]](F)({
-      input => MkPair(
-        Roll(F(input) map { case MkPair(subterm, result) => subterm }),
+  def paraWith0[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
+    type F[+X] = fun.Map[X]
+    xs => cataWith[Pair[Fix[fun.Map], T]](fun)({
+      (input: F[Pair[Fix[F], T]]) => MkPair(
+        Roll(fun(input) map { case MkPair(subterm, result) => subterm }),
         psi(input)
       )
     })(xs) match {
       case MkPair(xs, result) => result
     }
+  }
 
-  // paramorphism as a hypomorphism
-  def para[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
-
+  def paraWith[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
     type F[+X]      = fun.Map[X]
     type Paired[+X] = F[Pair[Fix[F], X]]
+    type FixedPoint = Fix[F]
 
-    @functor val sndF = y => Pair { MkPair(Fix[F], y) }
+    // BUG: inlining the synonym FixedPoint results in
+    // "not found: type Fix[F]".
+    @functor def sndF[y] = MkPair(_1 = FixedPoint, _2 = y)
 
     val pairingF = fun compose sndF
 
@@ -106,33 +112,21 @@ trait Banana {
     val pairingCoalgebra: Fix[F] => Paired[Fix[F]] =
       xs => fun(xs.unroll) map { child => MkPair(child, child) }
 
-    hylo(pairingF)(pairingCoalgebra)(psi)
+    hyloWith(pairingF)(pairingCoalgebra)(psi)
   }
 
-  // eat a cake and keep it too
-  def cake[T](F: Endofunctor)(eat: Pair[Fix[F.Map], F.Map[T]] => T): Fix[F.Map] => T = {
-    @functor val sndF = y => Pair { MkPair(Fix[F.Map], y) }
-    val pairintF = sndF compose F
-    hylo[Fix[F.Map], T](pairintF)(t => MkPair(t, t.unroll))(eat)
-  }
+  @data def Nat = Fix(nat => NatT { Zero ; Succ(pred = nat) })
 
-  // Factorial as a paramorphism
-
-  @datatype trait Nat { Zero ; Succ(Nat) }
-
-  val natF = {
-    @functor val fun = n => Nat { Succ(n) }
-    fun
-  }
+  @functor def natF[n] = NatT { Zero ; Succ(pred = n) }
 
   val natToInt: Nat => Int =
-    cata[Int](natF) {
+    cataWith[Int](natF) {
       case Zero => 0
       case Succ(n) => n + 1
     }
 
   val intToNat: Int => Nat =
-    ana[Int](natF) { i =>
+    anaWith[Int](natF) { i =>
       if (i == 0)
         Zero
       else
@@ -140,54 +134,16 @@ trait Banana {
     }
 
   def paraFactorial0: Int => Int =
-    para0[Int](natF) {
+    paraWith0[Int](natF) {
       case Zero => 1
       case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
     } compose intToNat
 
   def paraFactorial: Int => Int =
-    para[Int](natF) {
+    paraWith[Int](natF) {
       case Zero => 1
       case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
     } compose intToNat
-
-  def cakeFactorial: Int => Int =
-    cake[Int](natF) {
-      case MkPair(_, Zero)    => 1
-      case MkPair(n, Succ(m)) => natToInt(n) * m
-    } compose intToNat
-
-  // tail of lists
-
-  def tail0[A]: List[A] => List[A] =
-    para[List[A]](listF[A]) {
-      case Nil => coerce { Nil }
-      case Cons(head, MkPair(tail, tailOfTail)) => tail
-    }
-
-  def tail[A]: List[A] => List[A] =
-    cake[List[A]](listF[A]) {
-      case MkPair(_, Nil) => coerce { Nil }
-      case MkPair(thisList, Cons(head, tailOfTail)) =>
-        thisList.unroll match {
-          case Nil => sys error "impossible"
-          case Cons(head, tail) => tail
-        }
-    }
-
-  // suffixes
-
-  def suffixes0[A]: List[A] => List[List[A]] =
-    para[List[List[A]]](listF[A]) {
-      case Nil => coerce { Cons(Nil, Nil) }
-      case Cons(head, MkPair(tail, tails)) => coerce { Cons(Cons(head, tail), tails) }
-    }
-
-  def suffixes[A]: List[A] => List[List[A]] =
-    cake[List[List[A]]](listF[A]) {
-      case MkPair(nil, Nil) => coerce { Cons(nil, Nil) }
-      case MkPair(xs, Cons(_, tails)) => coerce { Cons(xs, tails) }
-    }
 }
 
 import Banana._

@@ -1,103 +1,88 @@
 import org.scalatest._
 import nominal.compiler._
-import nominal.compiler.DatatypeRepresentation._
 
 class ParserSpec extends FlatSpec {
-  import Parser.Tests._
+  import Parsers._
+  import DatatypeRepresentation._
 
   "Parser" should "parse records with or without fields" in {
-    @record trait WithoutFields { SomeRecord }
-    @record trait WithFields { SomeRecord(Field1, Field2, field3 = Field3, field4 = Field4, Field5) }
-  }
+    @record def WithoutFields = SomeRecord
 
-  it should "parse empty data declarations" in {
-    @datadecl trait Empty1
-    @datadecl trait Empty2 {}
-    @datadecl trait Empty3 [W, X, +Y, -Z]
-    @datadecl trait Empty4 [W, X, +Y, -Z] {}
+    assert(WithoutFields == Record("SomeRecord", Many.empty))
+
+    @record def WithFields =
+      SomeRecord(_1 = Field1, _2 = Field2, _3 = Field3, _4 = Field4, _5 = Field5)
+
+    assert(WithFields ==
+      Record("SomeRecord", Many(
+        Field("_1", TypeConst("Field1")),
+        Field("_2", TypeConst("Field2")),
+        Field("_3", TypeConst("Field3")),
+        Field("_4", TypeConst("Field4")),
+        Field("_5", TypeConst("Field5")))))
+
   }
 
   it should "parse nonempty data declarations" in {
-    @datadecl trait IntList {
-      Nil
-      Cons(Int, IntList) // CAUTION: recursion! to be handled by preprocessor.
-    }
 
-    @datadecl trait WeirdList[-A, +B] {
-      Nil = B
-      Cons(head = B, tail = WeirdList[A, B])
-      With(WeirdList[A, B] WITH B)
-      More(reader = A =>: (WeirdList[A, B] WITH B))
-      Over(intersect = A =>: WeirdList[A, B]  WITH  B) // `=>:` binds tighter than `WITH`
-    }
-  }
-
-  it should "parse nested data" in {
-    // a part ripped out of the famous Company example
-    @datadecl trait Dept {
-      D(name = String,
-        manager = Manager {
-          E(name = String,
-            salary = Salary { S(Float) })
+    @data def IntList =
+      Fix(intList =>
+        IntListT {
+          Nil
+          Cons(head = Int, tail = intList)
         })
+
+    assert(IntList ==
+      DataConstructor(
+        "IntList",
+        Many.empty,
+        FixedPoint("intList",
+          Variant("IntListT", Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("head", TypeConst("Int")),
+              Field("tail", TypeVar("intList")))))))))
+
+    @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })
+
+    assert(List ==
+      DataConstructor(
+        "List",
+        Many(Param covariant "A"),
+        FixedPoint("list",
+          Variant("ListT", Many(
+            Record("Nil", Many.empty),
+            Record("Cons", Many(
+              Field("head", TypeVar("A")),
+              Field("tail", TypeVar("list")))))))))
+  }
+
+  it should "parse datatypes interlaced with built-in types" in {
+
+    @data def SubUnit = SubUnitT {
+      PU(person = String)
+      DU(dept = Dept)
     }
+
+    @data def Dept = Fix(dept => D(name = String, subunits = Seq apply (
+      SubUnitT {
+        PU(person = String)
+        DU(dept = dept)
+      }
+    )))
+
+    assert(Dept ==
+      DataConstructor(
+        "Dept",
+        Many.empty,
+        FixedPoint("dept",
+          Record("D", Many(
+            Field("name",
+              TypeConst("String")),
+            Field("subunits",
+              FunctorApplication(TypeConst("Seq"), Many(
+                Variant("SubUnitT", Many(
+                  Record("PU", Many(Field("person", TypeConst("String")))),
+                  Record("DU", Many(Field("dept", TypeVar("dept"))))))))))))))
   }
-
-  it should "parse functors" in {
-    @functor val id = x => x
-    assert(id == DataConstructor(Many(Param covariant "x"), TypeVar("x")))
-
-    @functor val list = A => List { Nil ; Cons(head = A, tail = List) }
-    assert(list ==
-      DataConstructor(
-        Many(Param covariant "A"),
-        Variant("List", Many( // note that parser does not auto-create fixed points
-          Record("Nil", Many.empty),
-          Record("Cons", Many(
-            Field("head", TypeVar("A")),
-            Field("tail", TypeVar("List"))))))))
-
-    // after preprocessing, list2 & list2v1 & list2v2 should generate the same functor.
-
-    @functor val list2 = A => List[List[A]]
-    assert(list2 ==
-      DataConstructor(
-        Many(Param covariant "A"),
-        TypeVar("List[List[A]]"))) // note that type applications are not expanded
-
-    @functor val list2v1 = A => List { Cons(head = List { Cons(head = A) }) }
-    assert(list2v1 ==
-      DataConstructor(
-        Many(Param covariant "A"),
-        Variant("List", Many(
-          Record("Cons", Many(
-            Field("head",
-              Variant("List", Many(
-                Record("Cons", Many(
-                  Field("head",
-                    TypeVar("A")))))))))))))
-
-    @functor val list2v2 = A => List { Cons(head = List[A]) }
-    assert(list2v2 ==
-      DataConstructor(
-        Many(Param covariant "A"),
-        Variant("List", Many(
-          Record("Cons", Many(
-            Field("head",
-              TypeVar("List[A]"))))))))
-
-    @functor val listv = N => List { Nil = N }
-    assert(listv ==
-      DataConstructor(
-        Many(Param covariant "N"),
-        Variant("List", Many(
-          Field("Nil", TypeVar("N"))))))
-  }
-
-  it should "parse datatypes mentioning known functors" in pending // Company example; mentions List
-
-  it should "parse mutually recursive datatype families" in pending
-
-  it should "parse mutually recursive datatypes mentioning known functors" in pending
-
 }

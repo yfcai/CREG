@@ -12,7 +12,7 @@ import nominal.lib._
 import language.higherKinds
 
 object Origami {
-  type Bifunctor = Traversable2 { type Cat1 = Any ; type Cat2 = Any ; type Map[+X, +Y] }
+  type Bifunctor = Traversable2 { type Cat0 = Any ; type Cat1 = Any ; type Map[+X, +Y] }
 
   type Fix2[F[+_, +_], T] = Fix[ ({ type λ[+X] = F[T, X] })#λ ]
 
@@ -46,16 +46,12 @@ object Origami {
 
   def churchDecode(F: Traversable.Endofunctor)(fold: Church[F.Map]): Fix[F.Map] = fold(Roll.apply)
 
-
-  @datatype trait List[A] {
+  @data def List[A] = Fix(list => ListT {
     Nil
-    Cons(A, List[A])
-  }
+    Cons(head = A, tail = list)
+  })
 
-  val listB = {
-    @functor val bifun = (a, r) => List { Cons(a, r) }
-    bifun
-  }
+  @functor def listB[a, r] = ListT { Nil ; Cons(head = a, tail = r) }
 
   val sum: List[Int] => Int =
     cata[Int, Int](listB) {

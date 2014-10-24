@@ -5,48 +5,21 @@ import nominal.functors._
 // maybe should include .lib in .functors?
 import nominal.lib._
 
-object Main extends App with MainTrait {
-  def put (name: String, obj : Any ) = println(s"$name = $obj")
-  def show(name: String, term: Term) = put(name, pretty(term))
-
-
-  Seq(
-    ("id", id), ("idy", idy), ("f_xy", f_xy), ("fx_y", fx_y),
-    ("fzv", fzv)
-  ).foreach {
-    case (name, term) =>
-      show(name, term)
-      put(s"freevars($name)", freevars(term))
-      show(s"prependUnderscore($name)", prependUnderscore(term))
-      Seq[(String, Term)](
-        ("y", coerce(App("x", "x"))),
-        ("y", coerce(App("x", "y")))
-      ).foreach {
-        case (y, ysub) =>
-          val s1 = subst1(y, ysub, term)
-          // val s2 = subst2(y, ysub, term)
-          // assert(s1 == s2)
-          show(s"subst($y, ${pretty{ysub}}, $name)", s1)
-          //show(s"subst2($y, ${pretty{ysub}}, $name)", s2)
-      }
-      println()
-  }
-}
-
-trait MainTrait extends Banana {
-
-  @datatype trait Term {
+object Main extends App {
+  @data def Term = Fix(term => TermT {
     Void
     Var(name = String)
-    Abs(param = String, body = Term)
-    App(operator = Term, operand = Term)
-  }
+    Abs(param = String, body = term)
+    App(operator = term, operand = term)
+  })
 
-  // @functor only works in block scope >_<
-  implicit val termF = {
-    @functor implicit val termF = x => TermF[x]
-    termF
-  }
+  @functor implicit def termF[term] =
+    TermT {
+      Void
+      Var(name = String)
+      Abs(param = String, body = term)
+      App(operator = term, operand = term)
+    }
 
   // implicits
   implicit def _var(x: String): Term = coerce(Var(x))
@@ -56,21 +29,6 @@ trait MainTrait extends Banana {
 
   val t: Term = coerce(Void)
 
-  // USAGE: COUNTING VARIABLE OCCURRENCES
-
-  // typecheck folding
-  def foldTerm[T](inductiveStep: termF.Map[T] => T): Term => T =
-    t => inductiveStep(termF(t.unroll) map foldTerm(inductiveStep))
-
-  val variables: Term => Int =
-    foldTerm[Int] {
-      case Var(n) => 1
-      case other  => termF(other) reduce (0, _ + _)
-    }
-
-  // defining foldTerm in terms of cata
-  def cataTerm[T](algebra: termF.Map[T] => T): Term => T =
-    cata(termF)(algebra)
 
   // USAGE: PRETTY PRINTING
 
@@ -106,66 +64,27 @@ trait MainTrait extends Banana {
     case other        => termF(other) reduce (Set.empty, _ ++ _)
   }
 
-  // compos-style explicit recursion
-  def freevars1(t: Term): Set[String] = t.unroll match {
-    case Var(v)       => Set(v)
-    case Abs(x, body) => freevars(body) - x
-    case other        => termF(other).traverse(Applicative.Const[Set[String]](Set.empty, _ ++ _))(freevars1)
-  }
-
-  val avoidF = {
-    @functor val avoidF = (bound, binding) => Term {
-      Var(bound)
-      Abs = binding
-    }
-    avoidF
-  }
-
-  def freevars2(t: Term): Set[String] =
-    avoidF[String, Abs[String, Term]](
-      coerce(t)
-    ).traverse(Applicative.Const[Set[String]](Set.empty, _ ++ _))(
-      x => Set(x),
-      { case Abs(x, body) => freevars2(body) - x }
-    )
 
   // USAGE: PREPEND UNDERSCORE
 
-  def prependUnderscore(t: Term): Term = {
-    @functor val namesF = name => Term { Var(name) ; Abs(param = name) }
-    namesF(t) map ("_" + _)
-  }
+  @functor def namesF[name] = Fix(term => TermT {
+    Void
+    Var(name = name)
+    Abs(param = name, body = term)
+    App(operator = term, operand = term)
+  })
 
-  // USAGE: FLATTEN TOP-LEVEL APPLICATION
+  def prependUnderscore(t: Term): Term = namesF(t) map ("_" + _)
 
-  // app1F does not produce recursive types
-  // if I define instead
-  //
-  //   @functor val app1F = op => Term { App(op, Term) }
-  //
-  // then #5 will bite me.
-  val app1F = {
-    @functor val app1F = op => termF.Map[Term] { App(op, Term) }
-    app1F
-  }
-
-  def foldApp1[T](f: app1F.Map[T] => T): Term => T =
-    t => f( app1F[Term](coerce { t }) map foldApp1(f) )
-
-  // foldApp1 in terms of cata
-  def cataApp1[T](f: app1F.Map[T] => T): Term => T =
-    t => coerce { cata(app1F)(f)(coerce { t }) }
-
-  val flatten: Term => Seq[Term] =
-    foldApp1[Seq[Term]] {
-      case App(flattenedOperator, operand) =>
-        flattenedOperator :+ operand
-
-      case other =>
-        Seq(coerce(app1F(other) map (_ => ???)))
-    }
 
   // USAGE: CAPTURE-AVOIDING SUBSTITUTION
+
+  @functor def avoidF[bound, binding] = Fix(term => TermT {
+    Void
+    Var(name = bound)
+    Abs(param, body) = binding
+    App(operator = term, operand = term)
+  })
 
   def fresh(default: String, avoid: Set[String]): String = {
     var index = -1
@@ -182,16 +101,16 @@ trait MainTrait extends Banana {
       coerce(t)
     ).map(
       alias withDefault identity,
-      {
-        case Abs(x, body) =>
-          val y = fresh(x, avoid)
-          Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
+      (abs: Abs[String, Term]) => {
+        val Abs(x, body) = abs
+        val y = fresh(x, avoid)
+        Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
       }
     )
   )
 
   def subst1(x: String, xsub: Term, t: Term): Term =
-    avoidCapture(freevars(xsub) ++ freevars(t) + x, Map.empty, t).fold[Term] {
+    avoidCapture(freevars(xsub) + x, Map.empty, t).fold[Term] {
       case Var(y) if x == y =>
         xsub
 
@@ -199,35 +118,6 @@ trait MainTrait extends Banana {
         coerce(other)
     }
 
-  // globally fresh name
-  var freshNameIterator = (Stream from 0 map ("_" + _)).iterator
-
-  def resetFreshNames() {
-    freshNameIterator = (Stream from 0 map ("_" + _)).iterator
-  }
-
-  def freshName: String = freshNameIterator.next
-
-  val absF = {
-    @functor val substF = abs => Term { Abs = abs }
-    substF
-  }
-
-  def avoidCapture2(x: String, xsub: Term, t: Term): Term =
-    t.fold[Term] {
-      case Abs(y, body) if x != y && freevars(xsub).contains(y) =>
-        val z = freshName
-        coerce { Abs(z, subst2(y, z, body)) }
-
-      case other =>
-        coerce { other }
-    }
-
-  def subst2(x: String, xsub: Term, t: Term): Term =
-    avoidCapture2(x, xsub, t).fold[Term] {
-      case Var(y) if x == y => xsub
-      case other            => coerce { other }
-    }
 
   // Execution begins
 
@@ -245,4 +135,27 @@ trait MainTrait extends Banana {
 
   // \f -> f (\z -> ())
   val fzv: Term = coerce(Abs("f", App("f", Abs("z", Void))))
+
+  def put (name: String, obj : Any ) = println(s"$name = $obj")
+  def show(name: String, term: Term) = put(name, pretty(term))
+
+
+  List(
+    ("id", id), ("idy", idy), ("f_xy", f_xy), ("fx_y", fx_y),
+    ("fzv", fzv)
+  ).foreach {
+    case (name, term) =>
+      show(name, term)
+      put(s"freevars($name)", freevars(term))
+      show(s"prependUnderscore($name)", prependUnderscore(term))
+      List[(String, Term)](
+        ("y", coerce(App("x", "x"))),
+        ("y", coerce(App("x", "y")))
+      ).foreach {
+        case (y, ysub) =>
+          val s1 = subst1(y, ysub, term)
+          show(s"subst($y, ${pretty{ysub}}, $name)", s1)
+      }
+      println()
+  }
 }

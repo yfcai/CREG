@@ -1,54 +1,32 @@
+/** Unsweetened functor DSL, where fixed points have to be explicit
+  * and there is no separate syntax distinguishing variants from
+  * records.
+  *
+  * Upside   = easy to parse
+  *            straightforward denotational semantics
+  *            (see nominal.compiler.Denotation)
+  * 
+  * Downside = declaration of functors does NOT mimic use:
+  *            variants are declared using braces { } but
+  *            they are used in the body of functors just
+  *            like records with parentheses ( )
+  */
+
 package nominal
 package annotation
 
-import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
-import scala.annotation.StaticAnnotation
-
 import compiler._
 
-/** at class level, have to say:
-  * val someFunctor = { @functor val _ = TypeParams => ResultDatatype }
-  * // BUG: this does not work; block expr evaluates to unit.
-  *
-  * at block level, can simply say:
-  * @functor val someFunctor = TypeParams => ResultDatatype
-  */
-
-object functor extends Parser with TraversableGenerator with util.AbortWithError {
-  private[this] def classLevelSignal(c: Context)(name: c.TermName): Boolean =
-    name.toString == c.universe.termNames.WILDCARD.toString
-
-  def defaultImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
-    impl(c)(annottees, UC.defaultFlags)
-
-  def implNoUnroll(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] =
-    impl(c)(annottees, Set(UC.AllowFixedPointsOfConstantFunctors))
-
-  def impl(c: Context)(annottees: Seq[c.Expr[Any]], flags: UC.Flags): c.Expr[Any] = {
+object functor extends Parsers with Denotation with util.AbortWithError {
+  def impl(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
     annottees match {
-      case Seq(Expr(ValDef(mods, name, emptyType @ TypeTree(), tree))) =>
-        val input = parseOrAbort(c)(FunctorP, tree)
-        val rep = fleshOut(c)(input)(flags)
-        val instance = generateTraversable(c)(rep)
-
-        if (classLevelSignal(c)(name))
-          c.Expr(instance) // BUG: see above: { @functor val _ = ... }
-        else
-          c.Expr(ValDef(mods, name, emptyType, instance))
-
-      case _ =>
-        abortWithError(c)(annottees.head.tree.pos,
-          s"expect: val functorName = typeParams => resultDataType, got: $annottees")
+      case Seq(DefDef(mods, name, params, args, returnType, body)) =>
+        val input = parseOrAbort(c)(DataDeclP, annottees.head)
+        val instance = evalFunctor(c)(input)
+        val name = TermName(input.name)
+        ValDef(mods, name, returnType, instance)
     }
   }
-}
-
-class functor extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro functor.defaultImpl
-}
-
-class functorNoUnroll extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro functor.implNoUnroll
 }
