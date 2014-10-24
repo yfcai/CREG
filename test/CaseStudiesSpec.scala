@@ -50,24 +50,28 @@ class CaseStudiesSpec extends FlatSpec {
 
   "Compos-pattern" should "work" in {
     import Compos._
+
     assert(prependUnderscore(fst) == (coerce { Abs("_x", Abs("_y", "_x")) }: Exp))
     assert(prependUnderscore2(fst) == prependUnderscore(fst))
 
     assert(fresh(fst) == (coerce { Abs("_0", Abs("_1", "_0")) }: Exp))
-    //assert(fresh(fst) == fresh2(fst))
+    assert(fresh(fst) == fresh2(fst))
 
-    assert(prependUnderscore(plusExp) == (coerce {
-      Block(Cons(
-        Assign("_x", App("_y", "_z")), Cons(
-          Return("_x"), Nil)))
+    assert(prependUnderscore(assignExp) == (coerce {
+      Abs("_x", Abs("_y", Abs("_z",
+        Block(Cons(
+          Assign("_x", App("_y", "_z")), Cons(
+            Return("_x"), Nil))))))
     }: Exp))
 
-    assert(prependUnderscore2(plusExp) == prependUnderscore(plusExp))
+    assert(prependUnderscore2(assignExp) == prependUnderscore(assignExp))
 
-    assert(vars(plusExp) == Set("x", "y", "z"))
-    assert(vars(prependUnderscore(plusExp)) == Set("_x", "_y", "_z"))
-    assert(vars(prependUnderscore2(plusExp)) == Set("_x", "_y", "_z"))
+    assert(vars(assignExp) == Set("x", "y", "z"))
 
-    // TODO: test stuff on expressions with inner blocks
+    assert(vars(prependUnderscore(assignExp)) == Set("_x", "_y", "_z"))
+    assert(prependUnderscore2(assignExp) == prependUnderscore(assignExp))
+
+    assert(vars(fresh(assignExp)) == Set("_0", "_1", "_2"))
+    assert(fresh2(assignExp) == fresh(assignExp))
   }
 }

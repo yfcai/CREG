@@ -215,20 +215,20 @@ object Compos {
   // infinite lists of hopefully fresh names
   type Names = Stream[String]
 
-  // substitution defined by an association sequence
-  type Subst = Seq[(String, String)]
+  def getNameStream: Names = Stream from 0 map ("_" + _)
 
-  // lookup key in associative sequence
-  def findWithDefault[A, B](key: A, default: B, seq: Seq[(A, B)]): B =
-    seq find (_._1 == key) map (_._2) getOrElse default
+  // substitution defined by an association sequence
+  type Subst = collection.immutable.Map[String, String]
+
+  object Subst {
+    def empty: Subst =
+      collection.immutable.Map.empty[String, String].withDefault(identity)
+  }
 
   def fresh(e: Exp): Exp = {
     import Monad._
 
-    // infinite list of fresh names
-    val names: Names = Stream from 0 map ("_" + _)
-
-    def f(vs: Subst): Op[Syntactic, State[Names]#λ] = new Op[Syntactic, State[Names]#λ] {
+    def f(subst: Subst): Op[Syntactic, State[Names]#λ] = new Op[Syntactic, State[Names]#λ] {
       def apply[A: Syntactic](e: A): State[Names]#λ[A] =
         (implicitly[Syntactic[A]], e) match {
           case (Exp, Abs(V(x), b)) =>
@@ -236,19 +236,19 @@ object Compos {
               freshNames <- readState[Names]
               _ <- writeState(freshNames.tail)
               x2 = freshNames.head
-              b2 <- f((x, x2) +: vs)(b.unroll)
+              b2 <- f(subst updated (x, x2))(b.unroll)
             }
             yield coerce { Abs(V(x2), b2) }: Exp
 
           case (Var, V(x)) =>
-            stateMonad[Names].pure(V(findWithDefault(x, x, vs)))
+            stateMonad[Names].pure(V(subst(x)))
 
           case _ =>
             composM[Syntactic, State[Names]#λ, A](this, e)
         }
     }
 
-    evalState(f(Seq.empty)(e), names)
+    evalState(f(Subst.empty)(e), getNameStream)
   }
 
   @functor implicit def freshExpF[abs, name, exp] = ExpT {
@@ -258,57 +258,57 @@ object Compos {
     Block(stms = List apply (nameStmF apply (name, exp)))
   }
 
-/*
+
   @functor def freshF[abs, name] =
     freshExpF apply (abs, name, Fix(exp => freshExpF apply (abs, name, exp)))
 
+  // this monster may compile for 10 minutes or more.
   def fresh2(e: Exp): Exp = {
-    // infinite list of fresh names
-    val names: Names = Stream.from(0).map("_" + _)
+    val stateM = stateMonad[Names]
 
-    // name the range of freshF we care about
-    // it is isomorphic to Exp, but not exactly the same.
-    type FreshExp = freshF.Map[Abstraction, String]
+    def f(subst: Subst)(e: Exp): State[Names]#λ[Exp] = names =>
+      freshF[Abstraction, String](
+        coerce { e }
+      ).traverse[Abstraction, String](stateM)(
+        // Abstraction => Names => Abstraction
+        {
+          case Abs(V(x), b) =>
+            for {
+              freshNames <- readState[Names]
+              _ <- writeState(freshNames.tail)
+              x2 = freshNames.head
+              b2 <- f(subst updated (x, x2))(b.unroll)
+            }
+            yield coerce { Abs(V(x2), b2) }
+        },
 
-    def f(vs: Subst)(e: Exp): State[Names]#λ[Exp] =
-      freshF[Abstraction, String](coerce(e)).
-        traverse[Abstraction, String](stateMonad[Names])(
-          // Abstraction => Names => Abstraction
-          {
-            case Abs(V(x), b) =>
-              for {
-                freshNames <- readState[Names]
-                _ <- writeState(freshNames.tail)
-                x2 = freshNames.head
-                b2 <- f((x, x2) +: vs)(b.unroll)
-              }
-              yield Abs(V(x2), b2)
-          },
+        // String => Names => String
+        x => stateM pure subst(x)
+      )(names) match {
+        case (result, newNames) =>
+          (coerce { result }, newNames)
+      }
 
-          // String => Names => String
-          x => stateMonad[Names] pure findWithDefault(x, x, vs)
-        ).asInstanceOf[State[Names]#λ[Exp]] // coercion doesn't work for this case yet
-
-    evalState(f(Seq.empty)(e), names)
+    evalState(f(Subst.empty)(e), getNameStream)
   }
- */
 
   // MUTUAL RECURSION EXAMPLES //
 
   // {
-  //   x = y + z
+  //   x = y z
   //   return x
   // }
-  val plusExp: Exp = coerce {
-    Block(Cons(
-      Assign("x", App("y", "z")), Cons(
-        Return("x"), Nil)))
+  val assignExp: Exp = coerce {
+    Abs("x", Abs("y", Abs("z",
+      Block(Cons(
+        Assign("x", App("y", "z")), Cons(
+          Return("x"), Nil))))))
   }
 
   def vars(e: Exp): Set[String] = nameF(nameF(e) map (x => Set(x))) reduce (Set.empty, _ ++ _)
 
-  // vars(plusExp)
-  // vars(prependUnderscore(plusExp))
+  // vars(assignExp)
+  // vars(prependUnderscore(assignExp))
 }
 
 import Compos._
