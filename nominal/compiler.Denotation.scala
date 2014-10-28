@@ -64,8 +64,8 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     case functorApp: FunctorApplication =>
       evalFunctorApplication(c)(functorApp)
 
-    case RecordAssignment(record, x) =>
-      evalData(c)(x)
+    case assignment: RecordAssignment =>
+      evalData(c)(assignment.toRecord)
 
     case LetBinding(lhs, rhs) =>
       evalData(c)(rhs)
@@ -129,22 +129,19 @@ trait Denotation extends UniverseConstruction with util.Traverse {
      */
   }
 
-  def evalRecord(c: Context)(record: Record): Env => c.Tree = {
-    import c.universe._
-    evalComposite(c)(record.name, record, q"${TermName(record.name)}")
-  }
+  def evalRecord(c: Context)(record: Record): Env => c.Tree =
+    evalComposite(c)(record.name, record, c parse record.name)
 
-  def evalVariant(c: Context)(variant: Variant): Env => c.Tree = {
-    import c.universe._
-    evalComposite(c)(variant.name, variant, q"${TermName(variant.name)}")
-  }
+  def evalVariant(c: Context)(variant: Variant): Env => c.Tree =
+    evalComposite(c)(variant.name, variant, c parse variant.name)
 
   def evalComposite(c: Context)(
     parentName: Name, parentData: Datatype, parentCode: c.Tree):
       Env => c.Tree = env => {
     import c.universe._
 
-    val parent = TermName(c freshName parentName)
+    // parentName may not be a well-formed identifier
+    val parent = TermName(c freshName "parent")
     val parentDef = q"val $parent = $parentCode"
 
     val namedSubfunctors = parentData.children.toSeq.zipWithIndex.map {
@@ -230,6 +227,8 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     bounds map (_.getOrElse(getAnyType(c)))
 
   def getBounds(c: Context)(data: Datatype, env: Env): Many[Option[c.Tree]] =
+    unconstrainedBounds(c)(env)
+  /* TODO: delete
     data match {
       // type constants produce no constraints
       case TypeConst(x) =>
@@ -293,6 +292,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
       case LetBinding(lhs, rhs) =>
         getBounds(c)(rhs, env)
     }
+   */
 
   def unconstrainedBounds(c: Context)(env: Env): Many[Option[c.Tree]] =
     env map (_ => None)

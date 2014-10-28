@@ -17,7 +17,7 @@ extends Parsers
     import c.universe._
 
     val Seq(input)   = annottees
-    val datadecl     = parseOrAbort(c)(DataDeclP, input)
+    val datadecl     = parseOrAbort(c)(DataDeclP, input).injectTuples
     val supers       = parseOrAbort(c)(supersP(c), input)
     val imports      = scalaLanguageFeatureImports(c)
     val declarations = generateDeclarations(c)(datadecl.body, supers)

@@ -24,7 +24,7 @@ object functor extends Parsers with Denotation with util.AbortWithError {
     annottees match {
       case Seq(DefDef(mods, name, params, args, returnType, body)) =>
         val input = parseOrAbort(c)(DataDeclP, annottees.head)
-        val instance = evalFunctor(c)(input)
+        val instance = evalFunctor(c)(input.injectTuples)
         val name = TermName(input.name)
         ValDef(mods, name, returnType, instance)
     }

@@ -11,7 +11,7 @@ import nominal.functors._
 import nominal.lib._
 
 import reflect.runtime.universe.TypeTag
-
+/*
 object Scrap extends Scrap {
   // =========== //
   // DECLARATION //
@@ -364,7 +364,7 @@ trait Scrap {
     def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Company => apl.Map[Company] =
       company => fun(company).traverse(apl)(sp[List[Dept]])
   }
-
 }
 
 import Scrap._
+ */

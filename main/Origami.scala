@@ -12,6 +12,7 @@ import nominal.lib._
 import language.higherKinds
 
 object Origami {
+/*
   type Bifunctor = Traversable2 { type Cat0 = Any ; type Cat1 = Any ; type Map[+X, +Y] }
 
   type Fix2[F[+_, +_], T] = Fix[ ({ type λ[+X] = F[T, X] })#λ ]
@@ -64,4 +65,5 @@ object Origami {
       case Nil => coerce { Nil }
       case Cons(x, xs) => coerce { Cons(f(x), xs) }
     }
+ */
 }

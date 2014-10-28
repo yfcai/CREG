@@ -57,7 +57,11 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     covariantTypeParams(c)(cases.map(_.name))
 
   /** generate a record that's not a case of some variant */
-  def generateStandaloneRecord(c: Context)(record: Record, supers: Many[c.Tree]): Many[c.Tree] = {
+  def generateStandaloneRecord(c: Context)(record: Record, supers: Many[c.Tree]): Many[c.Tree] =
+    generateRecordTagClass(c)(record)(_ => supers)
+
+  // TODO: DELETE DEBUG
+  /*{
     import c.universe._
     val typeName = TypeName(record.name)
     if (record.fields.isEmpty) {
@@ -70,6 +74,54 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
       val fieldNames = record.fields map (_.name)
       val caseParams = covariantTypeParams(c)(fieldNames)
       val decls = generateFreeDecls(c)(fieldNames)
+      Many(q"sealed case class $typeName[..$caseParams](..$decls) extends ..$supers")
+    }
+  }
+   */
+
+  /** generate something like
+    *
+    * sealed class Abs[+Get](val get: Get) extends CaseClass(get) with TermT[⊥, ⊥, Abs[Get], ⊥]
+    *
+    * @param supers: mapping type of this record to a list of super classes
+    */
+  def generateRecordTagClass(c: Context)(record: Record)(getSupers: c.Tree => Many[c.Tree]): Many[c.Tree] = {
+    import c.universe._
+    val typeName = TypeName(record.name)
+
+    if (record.fields.isEmpty) {
+      val (termName, traversable0, typeMap, emptyDefTraverse) =
+        recordPrototypeFragments(c)(record)
+      val supers = getSupers(tq"$typeName")
+      Many(
+        q"sealed trait $typeName extends ..$supers",
+        q"case object $termName extends $typeName with $traversable0 { $typeMap }")
+    }
+    else if (record.hasInjectedTuple) {
+      // rely on caseParam shadowing record.name in case they clash
+      val singleFieldName = getSingleRecordFieldName
+      val caseParam = covariantTypeParam(c)(singleFieldName)
+      val field = TermName(singleFieldName)
+      val fieldType = TypeName(singleFieldName)
+
+      val supers = getSupers(tq"$typeName[$fieldType]")
+
+      val supersWithExtra = supers :+ getCaseClassTrait(c)
+
+      val t = TypeName(c freshName "t")
+
+      Many(q"""
+        sealed class $typeName[$caseParam](val $field : $fieldType) extends ..$supersWithExtra {
+          def copy[$t]($field : $t): $typeName[$t] = new $typeName($field)
+        }
+      """)
+    }
+    else {
+      val fieldNames = record.fields map (_.name)
+      val caseParams = covariantTypeParams(c)(fieldNames)
+      val decls = generateFreeDecls(c)(fieldNames)
+      val myType = tq"$typeName[..${fieldNames.map(name => TypeName(name))}]"
+      val supers = getSupers(myType)
       Many(q"sealed case class $typeName[..$caseParams](..$decls) extends ..$supers")
     }
   }
@@ -88,6 +140,15 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
   {
     import c.universe._
     variantCase match {
+      case record @ Record(name, fields) =>
+        generateRecordTagClass(c)(record) { myType =>
+          val templateParams = appliedParamsWithNothing(c)(myType, i, n)
+          Many(
+            tq"$template[..$templateParams]",
+            getRecord(c))
+        }
+
+        /* TODO: DELETE
       case record @ Record(name, Many()) => // empty record
         val typeName = TypeName(name)
         val params = namedParamsWithNothing(c)(typeName, i, n)
@@ -106,6 +167,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
         val decls = generateFreeDecls(c)(fieldNames)
         Many(q"""sealed case class $typeName[..$caseParams](..$decls) extends
           $template[..$templateParams] with ${getRecord(c)}""")
+         */
 
       // copy-paste for variants
       case variant @ Variant(name, Many()) =>
@@ -206,7 +268,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
 
     // compute bounds
     val bounds = datatype.cases map {
-      child => tq"${TermName(child.name)}.${typeNameRange(c)}"
+      child => getAnyType(c) //tq"${TermName(child.name)}.${typeNameRange(c)}" // TODO: delete
     }
 
     // trait to extend
@@ -278,8 +340,38 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     else {
       import c.universe._
       val (termName, traversableN, typeMap, defTraverse) = recordPrototypeFragments(c)(record)
-      q"object $termName extends $traversableN { $typeMap ; $defTraverse }"
+      val tractors = generateConsExTractors(c)(record)
+      val members = typeMap +: defTraverse +: tractors
+      q"object $termName extends $traversableN { ..$members }"
     }
+
+  // generate constructors & extractors for records with fields nested within
+  def generateConsExTractors(c: Context)(record: Record): Many[c.Tree] = {
+    import c.universe._
+    record.injectedTuple match {
+      case Some(tuple) =>
+        val t = TypeName(c freshName "t")
+        val x = TermName(c freshName "x")
+        val field = TermName(getSingleRecordFieldName)
+        val n = tuple.fields.length
+        require(n > 1) // should not inject tuples into nullary or unary records
+        val ts = tuple.fields map (_ => TypeName(c freshName "t"))
+        val xs = tuple.fields map (_ => TermName(c freshName "x"))
+        val rcd = parseType(c)(record.name)
+        val rcdt = tq"$rcd[$t]"
+        val rcdts = tq"$rcd[${tupleType(c, n)}[..$ts]]"
+        val tdefs = mkInvariantTypeDefs(c)(ts, ts map (_ => getAnyType(c)))
+        val xdefs = mkValDefs(c)(xs, ts map (typeName => tq"$typeName"))
+        Many(
+          q"def apply[$t]($x: $t): $rcdt = new $rcd($x)",
+          q"def apply[..$tdefs](..$xdefs): $rcdts = new $rcd(${tupleTerm(c, n)}(..$xs))",
+          q"def unapply[$t]($x: $rcdt): ${getScalaOption(c)}[$t] = ${getScalaSomeTerm(c)}($x.$field)"
+        )
+
+      case None =>
+        Many.empty
+    }
+  }
 
  /** @return (name, supertrait, typeMap, traverse)
    */

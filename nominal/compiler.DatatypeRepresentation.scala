@@ -4,7 +4,7 @@ package compiler
 import lib.Applicative
 import lib.Applicative._
 
-object DatatypeRepresentation {
+object DatatypeRepresentation extends util.Paths {
   // name of records, variants, fields
   type Name = String
 
@@ -101,6 +101,15 @@ object DatatypeRepresentation {
 
       loop(this)
     }
+
+    /** inject a tuple into each record */
+    def injectTuples: This = everywhere {
+      case Record(name, fields) if fields.length > 1 =>
+        val n = fields.length
+        Record(name, Many(
+          Field(getSingleRecordFieldName,
+            Record(tuplePath(n), fields))))
+    }
   }
 
   // here to support legacy code in UniverseConstruction.carePackage
@@ -128,6 +137,10 @@ object DatatypeRepresentation {
         children.dropWhile(_ => true) // set iterator to empty
         copy(rhs = rhs)
       }
+
+    // modify record assignment behavior
+    def toRecord: Record =
+      Record(lhs.name, Many(Field(getSingleRecordFieldName, rhs)))
   }
 
   case class FunctorApplication(functor: TypeConst, args: Many[Datatype])
@@ -156,6 +169,17 @@ object DatatypeRepresentation {
       name,
       fields.zip(xs.toSeq) map { case (Field(name, _), data) => Field(name, data) }
     )
+
+    def hasInjectedTuple: Boolean = injectedTuple.nonEmpty
+
+    def injectedTuple: Option[Record] = fields match {
+      case Seq(Field(_, tuple @ Record(tupleName, tupleFields)))
+          if isTuplePath(tupleName, tupleFields.length)=>
+        Some(tuple)
+
+      case _ =>
+        None
+    }
   }
 
   case class Variant(name: Name, cases: Many[VariantCase]) extends VariantCase with DatatypeLike[Variant] {
@@ -179,6 +203,7 @@ object DatatypeRepresentation {
 
   case class DataConstructor(name: Name, params: Many[Param], body: Datatype) {
     def arity: Int = params.size
+    def injectTuples = copy(body = body.injectTuples)
   }
 
   case class DataFamily(name: Name, params: Many[Param], members: Many[Variant])

@@ -10,6 +10,7 @@ import nominal.lib._
 import nominal.lib.Traversable.Endofunctor
 
 object Banana {
+/*
   @data def List[A] = Fix(list => ListT {
     Nil
     Cons(head = A, tail = list)
@@ -144,6 +145,7 @@ object Banana {
       case Zero => 1
       case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
     } compose intToNat
+*/
 }
 
 import Banana._

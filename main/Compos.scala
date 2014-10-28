@@ -11,6 +11,7 @@ import nominal.lib._
 import nominal.lib.Applicative._
 
 object Compos {
+/*
   import BuiltInFunctors._
 
   // BUG: DataDecl doesn't know to resolve imports.
@@ -309,6 +310,7 @@ object Compos {
 
   // vars(assignExp)
   // vars(prependUnderscore(assignExp))
+ */
 }
 
 import Compos._

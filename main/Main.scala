@@ -29,6 +29,11 @@ object Main extends App {
 
   val t: Term = coerce(Void)
 
+  // DEBUG: test standalone records // wow!
+  @data def r1 = R1(r1 = Int, r2 = String)
+  @functor def r1F[r2] = R1(r1 = Int, r2 = r2)
+  val x2: r1 = coerce { R1(nominal.lib.Tuple._2(5, "hi")) }
+
 
   // USAGE: PRETTY PRINTING
 
@@ -58,6 +63,7 @@ object Main extends App {
 
   // USAGE: FREE VARIABLES
 
+  // TODO: switch to using avoidF
   def freevars(t: Term): Set[String] = t.fold[Set[String]] {
     case Var(v)       => Set(v)
     case Abs(x, body) => body - x
@@ -82,7 +88,7 @@ object Main extends App {
   @functor def avoidF[bound, binding] = Fix(term => TermT {
     Void
     Var(name = bound)
-    Abs(param, body) = binding
+    Abs = binding
     App(operator = term, operand = term)
   })
 
@@ -97,14 +103,17 @@ object Main extends App {
   }
 
   def avoidCapture(avoid: Set[String], alias: Map[String, String], t: Term): Term = coerce(
-    avoidF[String, Abs[String, Term]](
+    avoidF[String, (String, Term)](
+      // coercion works because tuples happen to look like records:
+      // they are non-nullary and are not abstract.
+      // this is fragile.
       coerce(t)
-    ).map(
+    ) map (
       alias withDefault identity,
-      (abs: Abs[String, Term]) => {
-        val Abs(x, body) = abs
-        val y = fresh(x, avoid)
-        Abs(y, avoidCapture(avoid + y, alias + (x -> y), body))
+      {
+        case (x, body) =>
+          val y = fresh(x, avoid)
+          (y, avoidCapture(avoid + y, alias + (x -> y), body))
       }
     )
   )
@@ -118,7 +127,7 @@ object Main extends App {
         coerce(other)
     }
 
-
+/* BUG: COERCIONS TO TERM DOES NOT WORK!
   // Execution begins
 
   // \x -> x
@@ -158,4 +167,5 @@ object Main extends App {
       }
       println()
   }
+ */
 }

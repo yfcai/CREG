@@ -19,15 +19,13 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     import c.universe._
     rep match {
       case TypeConst(tpe) =>
-        val q"??? : $result" = c parse(s"??? : ($tpe)")
-        result
+        parseType(c)(tpe)
 
       case TypeVar(tpe) =>
-        val q"??? : $result" = c.parse(s"??? : ($tpe)")
-        result
+        parseType(c)(tpe)
 
       case Record(name, fields) =>
-        tq"${TypeName(name)}[..${fields.map(field => meaning(c)(field.get))}]"
+        tq"${parseType(c)(name)}[..${fields.map(field => meaning(c)(field.get))}]"
 
       case Variant(typeVar, records) =>
         tq"${meaning(c)(TypeVar(typeVar))}[..${records.map(record => meaning(c)(record))}]"
@@ -44,8 +42,8 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
           })#$innerType]
         """
 
-      case RecordAssignment(rcd, tvar) =>
-        meaning(c)(tvar)
+      case assignment @ RecordAssignment(_, _) =>
+        meaning(c)(assignment.toRecord)
 
       case LetBinding(lhs, rhs) =>
         meaning(c)(rhs)
@@ -567,7 +565,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
         s"generated records must be concrete classes; got $tpe")
 
     Record(
-      symbol.name.toString,
+      tpe.typeConstructor.toString, // XXX not guaranteed to work...
       fields.zip(typeParams).map {
         case (carePkg, param) =>
           Field(param.name.toString, carePkg.get)

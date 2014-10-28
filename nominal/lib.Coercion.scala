@@ -45,10 +45,16 @@ object Coercion extends UniverseConstruction with util.Traverse {
       c.Tree = try {
     import c.universe._
 
-    val argName = TermName(c freshName "coerced")
+    val actualType = actualTag.tpe.dealias
+    val expectedType = expectedTag.tpe.dealias
 
-    // gotta dealias at every turn (dealiasing isn't recursive)
-    val result = performCoercion(c)(q"$argName", actualTag.tpe.dealias, expectedTag.tpe.dealias)
+    val actual = representOnce(c)(actualType)
+    val expected = representOnce(c)(expectedType)
+
+    val argName    = TermName(c freshName "beforeCoerce")
+
+    val result = performCoercion(c)(q"$argName",
+      actualType, actual, expectedType, expected)
 
     q"""{
       val $argName = $arg
@@ -68,11 +74,11 @@ object Coercion extends UniverseConstruction with util.Traverse {
       throw e
   }
 
-  def performCoercion(c: Context)(arg: c.Tree, actualType: c.Type, expectedType: c.Type): c.Tree = {
+  def performCoercion(c: Context)(arg: c.Tree,
+    actualType: c.Type, actual: Datatype,
+    expectedType: c.Type, expected: Datatype): c.Tree =
+  {
     import c.universe._
-
-    val actual = representOnce(c)(actualType)
-    val expected = representOnce(c)(expectedType)
 
     (actual, expected) match {
 
@@ -184,6 +190,9 @@ object Coercion extends UniverseConstruction with util.Traverse {
     inferImplicitValue(c)(tq"$subtype <:< $supertype").nonEmpty
   }
 
+  def isRecordSubtype(subtype: String, supertype: String): Boolean =
+    subtype == supertype || subtype == supertype + ".type" // hack around singleton types
+
   sealed trait Adjustment[+T] { def map[U](f: T => U): Adjustment[U] }
   case object TypeError extends Adjustment[Nothing] { def map[U](f: Nothing => U): Adjustment[U] = this }
   case object NoChange extends Adjustment[Nothing] { def map[U](f: Nothing => U): Adjustment[U] = this }
@@ -269,7 +278,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
   /** record => variant = record => record -> variant */
   def recordToVariant(c: Context)(arg: c.Tree, record: Record, variant: Variant): Adjustment[c.Tree] =
-    variant.cases.find(_.name == record.name) match {
+    variant.cases.find(expected => isRecordSubtype(record.name, expected.name)) match {
       case Some(expectedRecord @ Record(_, _)) =>
         // `recordToRecord` will test that actual and expected record fields match
         recordToRecord(c)(arg, record, expectedRecord)
@@ -300,31 +309,38 @@ object Coercion extends UniverseConstruction with util.Traverse {
   def recordToRecord(c: Context)(arg: c.Tree, actual: Record, expected: Record): Adjustment[c.Tree] = {
     import c.universe._
     if (
-      actual.name != expected.name ||
+      ! isRecordSubtype(actual.name, expected.name) || //
       actual.fields.map(_.name) != expected.fields.map(_.name)
     )
       TypeError
     else if (actual.fields.isEmpty)
       Adjusted(arg)
     else {
-      val subAdjustments = actual.fields.zip(expected.fields).foldRight[Option[List[c.Tree]]](Some(Nil)) {
-        case (_, None) =>
-          None
+      val subAdjustments =
+        actual.fields.zip(expected.fields).zipWithIndex.foldRight[Option[List[c.Tree]]](Some(Nil)) {
+          case (_, None) =>
+            None
 
-        case ((Field(fieldName, fieldRep), Field(_, expectedFieldRep)), Some(otherCode)) =>
-          val projectedArg = q"$arg.${TermName(fieldName)}"
-          val (fieldType, expectedFieldType) = (scalaType(c)(fieldRep), scalaType(c)(expectedFieldRep))
-          adjust(c)(projectedArg, fieldType, expectedFieldType) match {
-            case TypeError =>
-              None
+          case (((Field(fieldName, fieldRep), Field(_, expectedFieldRep)), i), Some(otherCode)) =>
+            val projectedArg = q"$arg.${TermName(fieldName)}"
+            val (fieldType, expectedFieldType) = (scalaType(c)(fieldRep), scalaType(c)(expectedFieldRep))
+            adjust(c)(projectedArg, fieldType, expectedFieldType) match {
+              case TypeError =>
+                None
 
-            case NoChange =>
-              Some(otherCode)
+              case NoChange =>
+                Some(otherCode)
 
-            case Adjusted(code) =>
-              Some(q"${TermName(fieldName)} = $code" :: otherCode)
-          }
-      }
+              case Adjusted(code) =>
+                val lhs =
+                  if (expected.name startsWith "Tuple")
+                    s"_${i + 1}" // hack to work around tuples violating field naming convention
+                  else
+                    fieldName
+                Some(q"${TermName(lhs)} = $code" :: otherCode)
+            }
+        }
+
       subAdjustments match {
         case None =>
           TypeError

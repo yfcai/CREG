@@ -5,6 +5,12 @@ import scala.reflect.macros.blackbox.Context
 import compiler.DatatypeRepresentation.Many
 
 trait Paths {
+  def parseType(c: Context)(code: String): c.Tree = {
+    import c.universe._
+    val q"??? : $result" = c parse s"??? : ($code)"
+    result
+  }
+
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._
@@ -129,5 +135,36 @@ trait Paths {
   def getImplicitly(c: Context)(typeTree: c.Tree): c.Tree = {
     import c.universe._
     q"_root_.scala.Predef.implicitly[$typeTree]"
+  }
+
+  def tuplePath(n: Int): String =
+    s"_root_.nominal.lib.Tuple._$n"
+
+  def isTuplePath(tupleName: String, n: Int): Boolean =
+    tupleName == tuplePath(n) // || tupleName == s"Tuple$n"
+                              // eval to false on built-in tuples
+
+  def tupleTerm(c: Context, n: Int): c.Tree =
+    c parse tuplePath(n)
+
+  def tupleType(c: Context, n: Int): c.Tree =
+    parseType(c)(tuplePath(n))
+
+  def getCaseClassTrait(c: Context): c.Tree = {
+    import c.universe._
+    tq"_root_.nominal.lib.Tuple.CaseClass"
+  }
+
+  // abstract field of lib.Tuple.CaseClass
+  def getSingleRecordFieldName: String = "get"
+
+  def getScalaOption(c: Context): c.Tree = {
+    import c.universe._
+    tq"_root_.scala.Option"
+  }
+
+  def getScalaSomeTerm(c: Context): c.Tree = {
+    import c.universe._
+    q"_root_.scala.Some"
   }
 }

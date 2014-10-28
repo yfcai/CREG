@@ -11,14 +11,18 @@ trait Traverse extends Paths {
     */
   def recordCaseDef(c: Context)(record: Record)(mkBody: (c.TermName, Many[c.TermName]) => c.Tree): c.universe.CaseDef = {
     import c.universe._
-    val recordIdentName = TermName(record.name)
-    val recordIdent = Ident(recordIdentName)
-    val recordName = TermName(c freshName record.name.toLowerCase)
+    val recordIdent = c parse record.name
+    val recordName = TermName(c freshName "rcd")
     val fieldNames = record.fields.map(field => TermName(c freshName field.name))
     val fieldBindings = fieldNames.map(name => Bind(name, Ident(termNames.WILDCARD)))
     if (fieldNames.isEmpty)
-      cq"$recordIdent => ${mkBody(recordIdentName, fieldNames)}"
+      cq"""$recordIdent => {
+        val $recordName = $recordIdent
+        ${mkBody(recordName, fieldNames)}
+      }"""
     else
+      // ISSUE: may trigger SI-6675 deprecation warning
+      // but working around it is too hard
       cq"$recordName @ $recordIdent(..$fieldBindings) => ${mkBody(recordName, fieldNames)}"
   }
 
