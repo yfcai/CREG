@@ -163,6 +163,51 @@ object Main extends App {
     }
 
 
+  // AN UNUSUAL FUNCTOR (to replace avoidF as argument for equirecursion)
+
+  @functor def H[sigma] = TermT {
+    Void
+    Var(name = String)
+    Abs(param = String, body = Term)
+    App(op = sigma, arg = Term)
+  }
+
+  def foldH[T](f: H.Map[T] => T): Term => T =
+    t => f( H(coerce { t }: H.Map[Term]) map foldH(f) )
+
+  // Convert `Term` to `μσ. H(σ)`.
+  def termToFixH(t: Term): Fix[H.Map] = Roll[H.Map] {
+    t.unroll match {
+      case Void         => Void
+      case Var(x)       => Var(x)
+      case Abs(x, body) => Abs(x, body)
+      case App(op, arg) => App(termToFixH(op), arg)
+    }
+  }
+
+  // Convert `μσ. H(σ)` to `Term`.
+  // Recall that `termF` is the pattern functor of `Term`.
+  def fixHToTerm(t: Fix[H.Map]): Term = Roll[termF.Map] {
+    t.unroll match {
+      case Void         => Void
+      case Var(x)       => Var(x)
+      case Abs(x, body) => Abs(x, body)
+      case App(op, arg) => App(fixHToTerm(op), arg)
+    }
+  }
+
+  // flatten application tree
+  val flatten: Term => Seq[Term] =
+    foldH[Seq[Term]] {
+      case App(flattenedOp, arg) =>
+        flattenedOp :+ arg
+
+      case Void         => Seq(coerce(Void))
+      case Var(x)       => Seq(coerce(Var(x)))
+      case Abs(x, body) => Seq(coerce(Abs(x, body)))
+    }
+
+
   // Execution begins
 
   // \x -> x
