@@ -91,6 +91,10 @@ trait Traversable { thisFunctor =>
       traverse(Applicative.Const(monoidId, monoidOp))(f)
   }
 
+  // reinterpret 't' as the fixed point of this functor.
+  // not really possible due to subcategory bounds. ugh!
+  // def apply(t: Fix[Map]): Foldable[Map] = new Foldable[Map](t)(this)
+
   // compose with another functor
   def compose(that: Traversable { type Map[+X] <: thisFunctor.Cat0 }) =
     new Traversable {
