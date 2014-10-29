@@ -109,6 +109,50 @@ object Main extends App {
     )
   )
 
+  // avoidCapture is better written as a fold.
+  // caution: subst should test for binders.
+  def avoidCapture2(avoid: Map[String, Set[String]], alias: Map[String, String])(t: Term): Term =
+    t.unroll match {
+      case Var(x) =>
+        (alias withDefault identity)(x)
+
+      case abs @ Abs(x, body) =>
+        val occursFree = freevars(t)
+
+        val avoidInThisCase =
+          avoid.filter({
+            case (replaced, shouldAvoid) => occursFree(replaced)
+          }).foldLeft[Set[String]](Set.empty) {
+            case (acc, (replaced, shouldAvoid)) => acc ++ shouldAvoid
+          }
+
+        if (avoidInThisCase(x)) {
+          val y = fresh(x, avoidInThisCase)
+          val newBody = avoidCapture2(avoid + (x -> Set(y)), alias + (x -> y))(body)
+          coerce { Abs(y, newBody) }
+        }
+        else
+          coerce { termF(abs) map avoidCapture2(avoid, alias) }
+
+      case other =>
+        coerce { termF(other) map avoidCapture2(avoid, alias) }
+    }
+
+  def subst2(x: String, xsub: Term, t0: Term): Term = {
+    def loop(t: Term): Term = t.unroll match {
+      case Var(y) if x == y =>
+        xsub
+
+      case Abs(y, body) if x == y =>
+        t
+
+      case other =>
+        coerce { termF(other) map (s => subst2(x, xsub, s)) }
+    }
+
+    loop(avoidCapture2(Map(x -> freevars(xsub)), Map.empty)(t0))
+  }
+
   def subst1(x: String, xsub: Term, t: Term): Term =
     avoidCapture(freevars(xsub) + x, Map.empty, t).fold[Term] {
       case Var(y) if x == y =>
@@ -153,8 +197,8 @@ object Main extends App {
         ("y", coerce(App("x", "y")))
       ).foreach {
         case (y, ysub) =>
-          val s1 = subst1(y, ysub, term)
-          show(s"subst($y, ${pretty{ysub}}, $name)", s1)
+          //show(s"subst($y, ${pretty{ysub}}, $name)", subst1(y, ysub, term))
+          show(s"substs($y, ${pretty{ysub}}, $name)", subst2(y, ysub, term))
       }
       println()
   }
