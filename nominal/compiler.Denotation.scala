@@ -145,7 +145,14 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     import c.universe._
 
     val parent = TermName(c freshName parentName)
-    val parentDef = q"val $parent = $parentCode"
+
+    // help Scalac typecheck things
+    val parentSelfType = parentCode match {
+      case ident @ Ident(_) => tq"$ident.type"
+      case _ => TypeTree()
+    }
+
+    val parentDef = q"val $parent: $parentSelfType = $parentCode"
 
     val namedSubfunctors = parentData.children.toSeq.zipWithIndex.map {
       case (data, i) =>

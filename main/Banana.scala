@@ -82,17 +82,17 @@ object Banana {
   // paramorphism is just a hylomorphism
 
   // show this after the type signature of `paraWith`
-  @data def Pair[A, B] = MkPair(_1 = A, _2 = B)
+  @data def _Pair[A, B] = Pair(_1 = A, _2 = B)
 
   def paraWith0[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
     type F[+X] = fun.Map[X]
     xs => cataWith[Pair[Fix[fun.Map], T]](fun)({
-      (input: F[Pair[Fix[F], T]]) => MkPair(
-        Roll(fun(input) map { case MkPair(subterm, result) => subterm }),
+      (input: F[Pair[Fix[F], T]]) => Pair(
+        Roll(fun(input) map { case Pair(subterm, result) => subterm }),
         psi(input)
       )
     })(xs) match {
-      case MkPair(xs, result) => result
+      case Pair(xs, result) => result
     }
   }
 
@@ -101,16 +101,12 @@ object Banana {
     type Paired[+X] = F[Pair[Fix[F], X]]
     type FixedPoint = Fix[F]
 
-    // BUG: inlining the synonym FixedPoint results in
-    // "not found: type Fix[F]".
-    @functor def sndF[y] = MkPair(_1 = FixedPoint, _2 = y)
-
-    val pairingF = fun compose sndF
+    @functor def pairingF[x] = fun apply Pair(_1 = FixedPoint, _2 = x)
 
     implicitly[ pairingF.Map[Any] =:= Paired[Any] ]
 
     val pairingCoalgebra: Fix[F] => Paired[Fix[F]] =
-      xs => fun(xs.unroll) map { child => MkPair(child, child) }
+      xs => fun(xs.unroll) map { child => Pair(child, child) }
 
     hyloWith(pairingF)(pairingCoalgebra)(psi)
   }
@@ -136,13 +132,13 @@ object Banana {
   def paraFactorial0: Int => Int =
     paraWith0[Int](natF) {
       case Zero => 1
-      case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
+      case Succ(Pair(n, i)) => (natToInt(n) + 1) * i
     } compose intToNat
 
   def paraFactorial: Int => Int =
     paraWith[Int](natF) {
       case Zero => 1
-      case Succ(MkPair(n, i)) => (natToInt(n) + 1) * i
+      case Succ(Pair(n, i)) => (natToInt(n) + 1) * i
     } compose intToNat
 }
 

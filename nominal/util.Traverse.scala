@@ -59,9 +59,9 @@ trait Traverse extends Paths {
     import c.universe._
     q"""
       new $theTrait {
+        ..$valDefs
         ${mkTypeMap(c, n)(mapping)}
         ${mkDefTraverse(c, n)(body)}
-        ..$valDefs
       }
     """
   }
