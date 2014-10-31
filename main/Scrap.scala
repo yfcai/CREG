@@ -97,13 +97,16 @@ object Scrap extends Scrap {
   def increase(percentage: Int, company: Company): Company =
     company everywhere mkT[Int](_ * (100 + percentage) / 100)
 
+  @functor def salaryOfEmployeeF[amount] =
+    E(person = Person, salary = S(amount = amount))
+
   @functor def salaryF[amount] =
     C(depts = List apply {
       Fix(dept => D(
         name = Name,
-        manager = E(person = Person, salary = S(get = amount)),
+        manager = salaryOfEmployeeF apply amount,
         subunits = List apply SubunitT {
-          PU(employee = E(person = Person, salary = S(get = amount)))
+          PU(employee = salaryOfEmployeeF apply amount)
           DU(dept = dept)
         }
       ))
@@ -240,8 +243,7 @@ trait Scrap {
       safeCast[A, T](x) map query getOrElse default
   }
 
-  abstract class Data[T: TypeTag] {
-    val typeTag: TypeTag[T] = implicitly
+  abstract class Data[T: TypeTag](implicit val typeTag: TypeTag[T]) {
 
     def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): T => apl.Map[T]
 
