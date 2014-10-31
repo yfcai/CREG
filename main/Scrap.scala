@@ -97,6 +97,12 @@ object Scrap extends Scrap {
   def increase(percentage: Int, company: Company): Company =
     company everywhere mkT[Int](_ * (100 + percentage) / 100)
 
+  // will not show `increase1` as example, because
+  // the implementation of `Scrap.everywhere` is
+  // ugly for technical reasons.
+  def increase1(percentage: Int): Company => Company =
+    everywhere(mkT[Int](_ * (100 + percentage) / 100))
+
   @functor def salaryOfEmployeeF[amount] =
     E(person = Person, salary = S(amount = amount))
 
@@ -113,7 +119,7 @@ object Scrap extends Scrap {
     })
 
   def increase2(percentage: Int, company: Company): Company =
-    salaryF(company).map[Int](_ * (100 + percentage) / 100)
+    salaryF(company).map(_ * (100 + percentage) / 100)
 
   // EXAMPLE: flatten departments
 
@@ -203,6 +209,19 @@ trait Scrap {
   // IMPLEMENTATION //
   // ============== //
 
+  // SpecialCase is not a supertype of Transform and Query
+  // due to technical reasons. If we change the type of
+  // SpecialCase.apply to resemble Transform.apply, then
+  // we run into "Unable to convert functio with dependent
+  // type to function value". If we change the type of
+  // Transform.apply to resemble SpecialCase.apply, then
+  // we have to call a transformation like this:
+  //
+  //   tr(implicitly)(x)
+  //
+  // because the implicit argument of the transformation
+  // would come before the explicit argument.
+
   trait SpecialCase[W[_]] {
     def apply[A: Data]: A => W[A]
   }
@@ -243,7 +262,7 @@ trait Scrap {
       safeCast[A, T](x) map query getOrElse default
   }
 
-  abstract class Data[T: TypeTag](implicit val typeTag: TypeTag[T]) {
+  abstract class Data[T](implicit val typeTag: TypeTag[T]) {
 
     def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): T => apl.Map[T]
 
@@ -260,6 +279,16 @@ trait Scrap {
           def apply[A: Data]: A => Seq[R] = x => Seq(query(x))
         })
   }
+
+  def everywhere[A: Data](f: Transform): A => A =
+    x => {
+      val dataInstance = implicitly[Data[A]]
+
+      f(dataInstance.gmapT(
+        new Transform {
+          def apply[B: Data](y: B): B = everywhere[B](f)(implicitly)(y) // ugly
+        })(x))
+    }
 
   implicit class GenericOps[A](data: A)(implicit gen: Data[A]) {
     def gmapT(tr: Transform): A = gen.gmapT(tr)(data)
@@ -280,8 +309,6 @@ trait Scrap {
     }
   }
 
-  implicit object nothingData extends DataWithConstantFunctor[Nothing]
-
   class DataWithConstantFunctor[T: TypeTag] extends Data[T] {
     @functor def fun[X] = T
 
@@ -289,6 +316,7 @@ trait Scrap {
       data => fun(data).traverse(apl)(sp[Nothing])
   }
 
+  implicit val nothingData: Data[Nothing] = new DataWithConstantFunctor[Nothing]
   implicit val stringData: Data[String] = new DataWithConstantFunctor[String]
   implicit val intData: Data[Int] = new DataWithConstantFunctor[Int]
 
