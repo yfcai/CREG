@@ -324,7 +324,7 @@ trait Scrap {
     @functor def fun[amount] = S(get = amount)
 
     def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): Salary => apl.Map[Salary] =
-      salary => fun(salary).traverse(apl)(sp[Int])
+      fun.traverse(apl)(sp[Int])
   }
 
   implicit val personData: Data[Person] = new Data[Person] {
@@ -349,8 +349,7 @@ trait Scrap {
   }
 
   implicit def listData[A](implicit genA: Data[A]): Data[List[A]] = {
-    implicit val tagA = genA.typeTag
-    implicit val tagL = implicitly[TypeTag[List[A]]]
+    import genA.typeTag
 
     new Data[List[A]] {
       @functor def fun[head, tail] = ListT { Nil ; Cons(head = head, tail = tail) }
