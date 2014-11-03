@@ -227,13 +227,19 @@ trait Scrap {
   }
 
   // forall a. Data a => a -> a
-  trait Transform {
+  trait Transform extends SpecialCase[Applicative.Identity] {
     def apply[A: Data](x: A): A
+    def apply[A: Data]: A => A = x => this.apply(x)(implicitly)
   }
 
   // forall a. Data a => a -> R
-  trait Query[R] {
+  trait Query[R] extends SpecialCase[Applicative.Const[R]#λ] {
+    queryTrait =>
     def apply[A: Data](x: A): R
+    def apply[A: Data]: A => R = x => this.apply(x)(implicitly)
+    def lift: Query[Seq[R]] = new Query[Seq[R]] {
+      def apply[A: Data](x: A): Seq[R] = Seq(queryTrait(x))
+    }
   }
 
   // CAVEAT:
@@ -269,15 +275,12 @@ trait Scrap {
     type ID[+X] = Applicative.Identity[X]
 
     def gmapT(tr: Transform): T => T =
-      gfoldl(Applicative.Identity)(new SpecialCase[ID] { def apply[A: Data] = tr[A] })
+      gfoldl(Applicative.Identity)(tr)
 
     type Const[A] = { type λ[+X] = A }
 
     def gmapQ[R](query: Query[R]): T => Seq[R] =
-      gfoldl(Applicative.Const[Seq[R]](Seq.empty, _ ++ _))(
-        new SpecialCase[Const[Seq[R]]#λ] {
-          def apply[A: Data]: A => Seq[R] = x => Seq(query(x))
-        })
+      gfoldl(Applicative.Const[Seq[R]](Seq.empty, _ ++ _))(query.lift)
   }
 
   def everywhere[A: Data](f: Transform): A => A =
