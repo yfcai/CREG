@@ -132,6 +132,9 @@ trait Traversable2 {
       Traversable2.this.traverse(G)(f, g)(mAB)
 
     def map[C <: Cat0, D <: Cat1](f: A => C, g: B => D): Map[C, D] = this.traverse(Applicative.Identity)(f, g)
+
+    def mapReduce[C](f: A => C, g: B => C)(default: C, combine: (C, C) => C): C =
+      traverse(Applicative.Const(default, combine))(f, g)
   }
 }
 
