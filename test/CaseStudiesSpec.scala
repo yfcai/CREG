@@ -74,4 +74,20 @@ class CaseStudiesSpec extends FlatSpec {
     assert(vars(fresh(assignExp)) == Set("_0", "_1", "_2"))
     assert(fresh2(assignExp) == fresh(assignExp))
   }
+
+  "De-Bruijn indices" should "work" in {
+    // manual syntax tree construction
+    import DeBruijn._
+    import nominal.lib._
+    val roll = Roll[TermF] _
+    val _abs = (x: String, body: Term) => roll(Abs(x, body))
+    val _app = (op: Term, arg: Term) => roll(App(op, arg))
+    val _atm = (x: String) => roll(Var(Free(x)))
+    val _bdd = (idx: Int) => roll(Var(Bound(idx)))
+
+    // test smart constructors _var, abs, app
+    assert(id == _abs("x", _bdd(0)))
+    assert(fst == _abs("x", _abs("y", _bdd(1))))
+    assert(ap == _abs("f", _abs("x", _app(_bdd(1), _bdd(0)))))
+  }
 }
