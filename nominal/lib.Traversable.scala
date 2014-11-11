@@ -68,6 +68,14 @@ trait Traversable { thisFunctor =>
   // McBride & Paterson's traverse
   def traverse[A <: Cat0, B <: Cat0](G: Applicative)(f: A => G.Map[B]): this.Map[A] => G.Map[this.Map[B]]
 
+  def fmap[A <: Cat0, B <: Cat0](f: A => B): Map[A] => Map[B] =
+    traverse[A, B](Applicative.Identity)(f)
+
+  def mapReduce[A <: Cat0, B <: Cat0](f: A => B)(
+    default: B, combine: (B, B) => B):
+      Map[A] => B =
+    traverse[A, B](Applicative.Const(default, combine))(f)
+
   // reinterpret `x` in the light of `Map` being a traversable functor
   def apply[A <: Cat0](mA: Map[A]): View[A] = new View(mA)
 
