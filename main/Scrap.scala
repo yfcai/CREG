@@ -10,7 +10,7 @@ import language.higherKinds
 import nominal.functors._
 import nominal.lib._
 
-import reflect.runtime.universe.TypeTag
+import reflect.runtime.universe.{TypeTag, typeTag}
 
 object Scrap extends Scrap {
   // =========== //
@@ -242,12 +242,17 @@ trait Scrap {
     }
   }
 
+  object DataToTypeTag {
+    implicit def dataToTypeTag[A: Data]: TypeTag[A] =
+      implicitly[Data[A]].typeTag
+  }
+
   // CAVEAT:
   // due to limitation of runtime.universe.TypeTag,
   // `safeCast` only works for *static* datatypes,
   // namely those declared inside an object, not a trait.
-  def safeCast[A: Data, T: TypeTag](x: A): Option[T] = {
-    val tpeA = implicitly[Data[A]].typeTag.tpe.dealias
+  def safeCast[A: TypeTag, T: TypeTag](x: A): Option[T] = {
+    val tpeA = implicitly[TypeTag[A]].tpe.dealias
     val tpeT = implicitly[TypeTag[T]].tpe.dealias
     if (tpeA <:< tpeT)
       Some(x.asInstanceOf[T])
@@ -256,16 +261,20 @@ trait Scrap {
   }
 
   def mkT[T: TypeTag](f: T => T): Transform = new Transform {
-    def apply[A: Data](x: A): A =
-      safeCast[A, T](x) match {
-        case Some(x) => f(x).asInstanceOf[A]
+    def apply[A: Data](x: A): A = {
+      import DataToTypeTag._
+      safeCast[T => T, A => A](f) match {
+        case Some(f) => f(x)
         case None => x
       }
+    }
   }
 
   def mkQ[T: TypeTag, R](default: R, query: T => R): Query[R] = new Query[R] {
-    def apply[A: Data](x: A): R =
+    def apply[A: Data](x: A): R = {
+      import DataToTypeTag._
       safeCast[A, T](x) map query getOrElse default
+    }
   }
 
   abstract class Data[T](implicit val typeTag: TypeTag[T]) {
@@ -357,7 +366,7 @@ trait Scrap {
     new Data[List[A]] {
       @functor def fun[head, tail] = ListT { Nil ; Cons(head = head, tail = tail) }
 
-      implicit val genList: Data[List[A]] = this
+      implicit def genList: Data[List[A]] = this
 
       def gfoldl(apl: Applicative)(sp: SpecialCase[apl.Map]): List[A] => apl.Map[List[A]] =
         xs =>
