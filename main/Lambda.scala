@@ -36,4 +36,197 @@ object Lambda {
   })
 
   val literals: Term => Int = litF.mapReduce[Int, Int](_ => 1)(0, _ + _)
+
+  // folds
+
+  @functor def termF[t] = TermT {
+    Lit(n = Int)
+    Var(x = String)
+    Abs(x = String, t = t)
+    App(t1 = t, t2 = t)
+  }
+
+  def foldTerm[T](induction: termF.Map[T] => T):
+      Term => T =
+    t => induction(termF(t.unroll) map foldTerm(induction))
+
+  val literals3: Term => Int =
+    foldTerm[Int] {
+      case Lit(n) => 1
+      case other  => termF(other) reduce (0, _ + _)
+    }
+
+  val freevars: Term => Set[String] =
+    foldTerm[Set[String]] {
+      case Var(x)    => Set(x)
+      case Abs(x, s) => s - x
+      case other     => termF(other).reduce(Set(), _ ++ _)
+    }
+
+  def getOperator0(t: Term): Term = t.unroll match {
+    case App(t1, t2) => getOperator(t1)
+    case _           => t
+  }
+
+  @functor def opF[t] = TermT {
+    Lit(n = Int)
+    Var(x = String)
+    Abs(x = String, t = Term)
+    App(t1 = t, t2 = Term)
+  }
+
+  // Convert Term to μσ. opF(σ).
+  def termToFixOpF(t: Term): Fix[opF.Map] = Roll[opF.Map] {
+    t.unroll match {
+      case Lit(n)       => Lit(n)
+      case Var(x)       => Var(x)
+      case Abs(x, body) => Abs(x, body)
+      case App(op, arg) => App(termToFixOpF(op), arg)
+    }
+  }
+
+  // Convert μσ. opF(σ) to Term.
+  def fixOpFToTerm(t: Fix[opF.Map]): Term = Roll[termF.Map] {
+    t.unroll match {
+      case Lit(n)       => Lit(n)
+      case Var(x)       => Var(x)
+      case Abs(x, body) => Abs(x, body)
+      case App(op, arg) => App(fixOpFToTerm(op), arg)
+    }
+  }
+
+  def foldOp[T](induction: opF.Map[T] => T): Term => T =
+    t => {
+      val s = coerce { t }: opF.Map[Term]
+      induction(opF(s) map foldOp(induction))
+    }
+
+  // extract operator in nested applications
+  val getOperator: Term => Term = foldOp[Term] {
+    case App(op, arg) => op
+    case operator     => coerce(operator)
+  }
+
+  // extract operands in nested applications
+  val getOperands: Term => Seq[Term] = foldOp[Seq[Term]] {
+    case App(precedingOperands, operand) =>
+      precedingOperands :+ operand
+      // append this operand to preceding operands
+
+    case _ =>
+      Seq.empty
+  }
+
+  @functor def cbvF[t] = TermT {
+    Lit(n = Int)
+    Var(name = String)
+    Abs(param = String, body = Term)
+    App(op = t, arg = t)
+  }
+
+  def foldCbv[T](induction: cbvF.Map[T] => T): Term => T =
+    t => {
+      val s = coerce { t }: cbvF.Map[Term]
+      induction(cbvF(s) map foldCbv(induction))
+    }
+
+  // optionally returns (redex, put-redex-back)
+  def evalContext0(t: Term): Option[(Term, Term => Term)] = t.unroll match {
+    case App(op, arg) => op.unroll match {
+      case Abs(_, _) =>
+        Some((t, identity))
+
+      case _ =>
+        val opResult = evalContext0(op).map[(Term, Term => Term)] {
+          case (redex, put) =>
+            (redex, s => coerce { App(put(s), arg) })
+        }
+        val argResult = evalContext0(arg).map[(Term, Term => Term)] {
+          case (redex, put) =>
+            (redex, s => coerce { App(op, put(s)) })
+        }
+        opResult orElse argResult
+    }
+
+    case _ =>
+      None
+  }
+
+  import Banana.{ Pair, cakeWith, paraWith }
+
+  // this needs paramorphism. needs arg to reconstruct term in eval context.
+  val evalContext: Term => Option[(Term, Term => Term)] =
+    t => cakeWith[Option[(Term, Term => Term)]](cbvF)({
+      case Pair(t, App(opCtx, argCtx)) => t.unroll match {
+        case App(op, arg) if op.unroll.isInstanceOf[Abs[_, _]] =>
+          Some((coerce(t), identity))
+
+        case App(op, arg) =>
+          val opResult = opCtx.map[(Term, Term => Term)]({
+            case (redex, put) =>
+              (redex, s => coerce { App(put(s), coerce(arg): Term) })
+          })
+          val argResult = argCtx.map[(Term, Term => Term)]({
+            case (redex, put) =>
+              (redex, s => coerce { App(coerce(op): Term, put(s)) })
+          })
+          opResult orElse argResult
+      }
+
+      case _ =>
+        None
+    })(coerce(t))
+
+  // present this after paramorphism
+  val evalContext2: Term => Option[(Term, Term => Term)] =
+    t => paraWith[Option[(Term, Term => Term)]](cbvF)({
+      case App(Pair(op, opCtx), Pair(arg, argCtx)) => op.unroll match {
+        case Abs(_, _) =>
+          Some((coerce { App(coerce(op): Term, coerce(arg): Term) }, identity))
+
+        case _ =>
+          val opResult = opCtx.map[(Term, Term => Term)]({
+            case (redex, put) =>
+              (redex, s => coerce { App(put(s), coerce(arg): Term) })
+          })
+          val argResult = argCtx.map[(Term, Term => Term)]({
+            case (redex, put) =>
+              (redex, s => coerce { App(coerce(op): Term, put(s)) })
+          })
+          opResult orElse argResult
+      }
+
+      case _ =>
+        None
+    })(coerce(t))
+
+  def sexp0(t: Term): Seq[Term] = t.unroll match {
+    case App(op, arg) => sexp0(op) :+ arg
+    case _            => Seq(t)
+  }
+
+  val toSExp: Term => Seq[Term] =
+    foldOp[Seq[Term]] {
+      case App(precedingTerms, operand) =>
+        precedingTerms :+ operand
+
+      case Lit(n)    => Seq(coerce { Lit(n) })
+      case Var(x)    => Seq(coerce { Var(x) })
+      case Abs(x, t) => Seq(coerce { Abs(x, t) })
+    }
+
+  @functor def bodyF[t] = TermT {
+    Lit(n = Int)
+    Var(x = String)
+    Abs(x = String, t = t)
+    App(t1 = Term, t2 = Term)
+  }
+
+  import Banana.cataWith
+
+  def params(t: Term): Seq[String] =
+    cataWith[Seq[String]](bodyF)({
+      case Abs(x, innerParams) => x +: innerParams
+      case _ => Seq.empty
+    })(coerce { t })
 }

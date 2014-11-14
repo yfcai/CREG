@@ -111,6 +111,17 @@ object Banana {
     hyloWith(pairingF)(pairingCoalgebra)(psi)
   }
 
+  def cakeWith[T](fun: Endofunctor)(psi: Pair[Fix[fun.Map], fun.Map[T]] => T): Fix[fun.Map] => T = {
+    type F[+X]      = fun.Map[X]
+    type FixedPoint = Fix[F]
+
+    @functor def pairingF[x] = Pair(_1 = FixedPoint, _2 = fun apply x)
+
+    val pairingCoalgebra = (xs: Fix[F]) => Pair(xs, xs.unroll)
+
+    hyloWith(pairingF)(pairingCoalgebra)(psi)
+  }
+
   @data def Nat = Fix(nat => NatT { Zero ; Succ(pred = nat) })
 
   @functor def natF[n] = NatT { Zero ; Succ(pred = n) }
