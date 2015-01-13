@@ -6,6 +6,19 @@ import nominal.functors._
 import nominal.lib._
 
 object Main extends App {
+  {
+    var x : Any = null
+
+    @functor def intF[A, B, C] = Int // testing constant functor
+    @functor def fstF[A, B, C] = A
+
+    x = intF : Traversable3 { type Map[+A, +B, +C] = Int }
+    x = fstF : Traversable3 { type Map[+A, +B, +C] = A }
+
+    @functor def botF[A] = Fix(x => x)
+    @functor def fixF[A] = Fix(x => A)
+  }
+
   @data def Term = Fix(term => TermT {
     Void
     Var(name = String)
