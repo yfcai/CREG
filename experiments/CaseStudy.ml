@@ -81,16 +81,18 @@ value applicative (module PC : PureCall) : (module Applicative) =
     value map f x = pure f <*> x;
   end);
 
-(* traversable functors seem unusable. *)
-
 module type Traverse = functor (G : Applicative) -> sig
   include Map;
   value traverse : ('a -> G.map 'b) -> map 'a -> G.map (map 'b);
 end;
 
+module type Trav = functor (M : Map) -> functor (G : Applicative) -> sig
+  value traverse : ('a -> G.map 'b) -> M.map 'a -> G.map (M.map 'b);
+end;
+
 module type Traversable = functor (G : Applicative) -> sig
   include Functor;
-  value traverse : ('a -> G.map 'b) -> map 'a -> G.map (map 'b); 
+  value traverse : ('a -> G.map 'b) -> map 'a -> G.map (map 'b);
 end;
 
 module type Monoid = sig
@@ -129,13 +131,39 @@ module Applicative = struct
     end);
 end;
 
+(* first unsuccessful attempt to encode "all traversables are functors" *)
 value traversable (module T : Traverse) : (module Traversable) =
   (module functor (G : Applicative) -> struct
     include T G;
+
+    module TId = T Applicative.Id;
 
     (* cai 13.01.2015:
      * want to call `traverse Applicative.id`,
      * but I couldn't find a well-typed encoding of it.
      *)
-    value map f x = raise Not_found;
+    value map = raise Not_found;
   end);
+
+(* 2nd unsuccessful attempt to encode "all traversables are functors" *)
+module MkTraversable
+  (M : Map)
+  (T : functor (G : Applicative) -> sig
+         value traverse : ('a -> G.map 'b) -> M.map 'a -> G.map (M.map 'b);
+       end) : functor (G : Applicative) -> sig
+                type map 'a = M.map 'a;
+                value map : ('a -> 'b) -> map 'a -> map 'b;
+                value traverse : ('a -> G.map 'b) -> map 'a -> G.map (map 'b);
+              end =
+  functor (G : Applicative) -> struct
+    type map 'a = M.map 'a;
+
+    module TG = T G;
+    module TI = T Applicative.Id;
+
+    value traverse = TG.traverse;
+
+    value map f x = raise Not_found;
+      (* TI.traverse f x *)
+      (* signature mismatch: `Applicative.Id.map 'b` is not reduced to `'b` *)
+  end;
