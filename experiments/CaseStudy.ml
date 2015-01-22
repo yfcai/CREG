@@ -8,9 +8,8 @@
  * Advantage:
  * - equirecursive types out of the box
  *
- * Fatal flaws:
- * - no higher-kinded type variables
- * - cannot type `traverse`
+ * Problem:
+ * - how to write `cata`?
  *
  * Dependencies:
  * - OCaml
@@ -23,6 +22,7 @@
  * Execution:
  *   ocaml -rectypes dynlink.cma camlp4r.cma <this-file>
  *)
+
 
 type termT 'a 'b 'c 'd 'e 'f =
   [ Lit of 'a
@@ -75,11 +75,10 @@ module type PureCall = sig
   value (<*>) : map ('a -> 'b) -> map 'a -> map 'b;
 end;
 
-value applicative (module PC : PureCall) : (module Applicative) =
-  (module struct
-    include PC;
-    value map f x = pure f <*> x;
-  end);
+module Applicative (PC : PureCall) = struct
+  include PC;
+  value map f x = pure f <*> x;
+end;
 
 module type Traverse = functor (G : Applicative) -> sig
   include Map;
@@ -90,10 +89,26 @@ module type Trav = functor (M : Map) -> functor (G : Applicative) -> sig
   value traverse : ('a -> G.map 'b) -> M.map 'a -> G.map (M.map 'b);
 end;
 
+module type Traversable = sig
+  include Functor;
+  module Traverse : functor (G : Applicative) -> sig
+    value run : ('a -> G.map 'b) -> (map 'a -> G.map (map 'b));
+  end;
+end;
+
+module type Traverse = sig
+  include Map;
+  module Traverse : functor (G : Applicative) -> sig
+    value run : ('a -> G.map 'b) -> (map 'a -> G.map (map 'b));
+  end;
+end;
+
+(*
 module type Traversable = functor (G : Applicative) -> sig
   include Functor;
   value traverse : ('a -> G.map 'b) -> map 'a -> G.map (map 'b);
 end;
+*)
 
 module type Monoid = sig
   include Type;
@@ -103,67 +118,66 @@ end;
 
 module Applicative = struct
 
-  value id : (module Applicative) = applicative
-    (module struct
-      type map 'a = 'a;
-      value pure x = x;
-      value (<*>) f x = f x;
-    end);
-
   (* repeat value `id` as submodule.
    * does not work, either.
    * see `value traversable`.
    *)
-  module Id : Applicative = struct
+  module Id = Applicative (struct
     type  map 'a = 'a;
-    value map f = f;
     value pure x = x;
     value (<*>) f x = f x;
-  end;
-
-
-  value const (module M : Monoid) : (module Applicative) = applicative
-    (module struct
-      open M;
-      type map 'a = tpe;
-      value pure x = zero;
-      value (<*>) f x = f + x;
-    end);
-end;
-
-(* first unsuccessful attempt to encode "all traversables are functors" *)
-value traversable (module T : Traverse) : (module Traversable) =
-  (module functor (G : Applicative) -> struct
-    include T G;
-
-    module TId = T Applicative.Id;
-
-    (* cai 13.01.2015:
-     * want to call `traverse Applicative.id`,
-     * but I couldn't find a well-typed encoding of it.
-     *)
-    value map = raise Not_found;
   end);
 
-(* 2nd unsuccessful attempt to encode "all traversables are functors" *)
-module MkTraversable
-  (M : Map)
-  (T : functor (G : Applicative) -> sig
-         value traverse : ('a -> G.map 'b) -> M.map 'a -> G.map (M.map 'b);
-       end) : functor (G : Applicative) -> sig
-                type map 'a = M.map 'a;
-                value map : ('a -> 'b) -> map 'a -> map 'b;
-                value traverse : ('a -> G.map 'b) -> map 'a -> G.map (map 'b);
-              end =
-  functor (G : Applicative) -> struct
-    type map 'a = M.map 'a;
 
-    module TG = T G;
-    module TI = T Applicative.Id;
+  module Const (M : Monoid) = Applicative (struct
+    open M;
+    type map 'a = tpe;
+    value pure x = zero;
+    value (<*>) f x = f + x;
+  end);
+end;
 
-    value traverse = TG.traverse;
+module Traversable (T : Traverse) = struct
+  type map 'a = T.map 'a;
+  module Traverse = T.Traverse;
 
-    value map f x = raise Not_found;
-      (* TI.traverse f x *)
-      (* signature mismatch: `Applicative.Id.map 'b` is not reduced to `'b` *)
+  module TraverseId = Traverse Applicative.Id;
+
+  value map = TraverseId.run;
+end;
+
+
+module TermF = Traversable (struct
+  type map 't = termT int string string 't 't 't;
+
+  module Traverse (G : Applicative) = struct
+    value run (f : 'a -> G.map 'b) (t : map 'a): G.map (map 'b) =
+      let open G in match t with
+      [ Lit n   -> pure (fun x -> Lit x) <*> pure n
+      | Var x   -> pure (fun x -> Var x) <*> pure x
+      | Abs x t -> pure (fun x y -> Abs x y) <*> pure x <*> f t
+      | App s t -> pure (fun x y -> App x y) <*> f s <*> f t
+      ];
   end;
+end);
+
+
+(* Error: The type abbreviation fixF is cyclic
+module Cata (F : Traversable) = struct
+  type fixF = F.map fixF;
+  value run (algebra : F.map 'a -> 'a) (t : fixF): 'a = raise Not_found;
+end;
+*)
+
+value rec foldTerm (algebra: TermF.map 'a -> 'a) (t: term): 'a =
+  algebra (TermF.map (foldTerm algebra) t);
+
+(* usage example: free variables *)
+value fv : (term -> list string) =
+  foldTerm (fun x -> match x with
+    [ Lit n   -> []
+    | Var x   -> [x]
+    | Abs x t -> List.filter (fun y -> String.compare x y != 0) t
+    | App s t -> List.append s t
+    ]
+  );
