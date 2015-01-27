@@ -19,7 +19,7 @@ object FoldM {
     )
 
   import Scrap.{List, Nil, Cons}
-  import Compos2._
+  import Compos2._ // for state monad methods
 
   @data def Tree[A] = Fix(tree => TreeT {
     Leaf(get = A)
@@ -35,8 +35,6 @@ object FoldM {
   }
 
   type State[S, +A] = S => (A, S)
-
-  import Compos2._ // for state monad methods
 
   // Given a state monad,
   // produce `uniq` method to replace leaves by unique integers
