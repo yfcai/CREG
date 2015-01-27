@@ -27,7 +27,6 @@ object Monad {
 }
 
 trait MonadWithBind extends Monad {
-  // inherited from applicative
   def pure[A](x: A): Map[A]
   def bind[A, B](m: Map[A], f: A => Map[B]): Map[B]
 
