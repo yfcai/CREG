@@ -38,42 +38,83 @@ object FoldM {
 
   import Compos2._ // for state monad methods
 
-  def uniqM[A]: Tree[A] => State[Int, Tree[Int]] =
-    foldM[Tree[Int]](treeF[A])(stateMonad[Int]) {
-      case Leaf(x) =>
-        for {
-          n <- readState
-          _ <- writeState(n + 1)
-        }
-        yield coerce { Leaf(n) }
+  // Given a state monad,
+  // produce `uniq` method to replace leaves by unique integers
+  trait Uniq {
+    implicit def stateMonad[S]: Monad { type Map[+A] = State[S, A] }
 
-      // not `case t => pure(coerce(t))` because Scala lacks
-      // type refinement/flow-sensitive typing
-      case Branch(left, right) =>
-        stateMonad pure (coerce { Branch(left, right) })
+    def uniqM[A]: Tree[A] => State[Int, Tree[Int]] =
+      foldM[Tree[Int]](treeF[A])(stateMonad[Int]) {
+        case Leaf(x) =>
+          for {
+            n <- readState
+            _ <- writeState(n + 1)
+          }
+          yield coerce { Leaf(n) }
+
+        // not `case t => pure(coerce(t))` because Scala lacks
+        // type refinement/flow-sensitive typing
+        case branch @ Branch(_, _) =>
+          stateMonad pure (coerce { branch })
+      }
+
+    // replace leaves by 0, 1, 2, ...
+    def uniq[A]: Tree[A] => Tree[Int] =
+      t => evalState(uniqM(t), 0)
+
+    def run() {
+      val t: Tree[String] = coerce {
+        Branch(
+          Branch(
+            Leaf("hello"),
+            Leaf("world")),
+          Branch(
+            Leaf("goodbye"),
+            Branch(
+              Leaf("cruel"),
+              Leaf("world"))))
+      }
+
+      println(s"t =\n$t\n")
+
+      val u = uniq(t)
+
+      println(s"uniq(t) =\n$u\n")
     }
 
-  // replace leaves by 0, 1, 2, ...
-  def uniq[A]: Tree[A] => Tree[Int] =
-    t => evalState(uniqM(t), 0)
+  }
+
+  // baseline state monad without specifying traversal order
+  trait StateMonad[S] extends Monad {
+    type Map[+A] = State[S, A]
+    def pure[A](x: A): Map[A] = s => (x, s)
+    def bind[A, B](m: Map[A], f: A => Map[B]): Map[B] =
+      s0 => m(s0) match { case (a, s1) => f(a)(s1) }
+    def join[A](x: Map[Map[A]]): Map[A] =
+      bind(x, (y: Map[A]) => y)
+  }
+
+  // monad for passing state from left to right
+  class ForwardStateMonad[S] extends StateMonad[S] {
+    def call[A, B](mf: Map[A => B], mx: Map[A]): Map[B] =
+      bind(mf, (f: A => B) => bind(mx, (x: A) => pure(f(x))))
+  }
+
+  // monad for passing state from right to left
+  class BackwardStateMonad[S] extends StateMonad[S] {
+    def call[A, B](mf: Map[A => B], mx: Map[A]): Map[B] =
+      bind(mx, (x: A) => bind(mf, (f: A => B) => pure(f(x))))
+  }
+
+  val forward  = new Uniq { def stateMonad[S] = new ForwardStateMonad  }
+  val backward = new Uniq { def stateMonad[S] = new BackwardStateMonad }
+
+  // run Uniq forward and backward
 
   def run() {
-    val t: Tree[String] = coerce {
-      Branch(
-        Branch(
-          Leaf("hello"),
-          Leaf("world")),
-        Branch(
-          Leaf("goodbye"),
-          Branch(
-            Leaf("cruel"),
-            Leaf("world"))))
-    }
-
-    println(s"t =\n$t\n")
-
-    val u = uniq(t)
-
-    println(s"uniq(t) =\n$u\n")
+    println("\nRunning forward:\n")
+    forward.run()
+    println("\nRunning backward:\n")
+    backward.run()
   }
 }
