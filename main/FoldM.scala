@@ -115,4 +115,25 @@ object FoldM {
     println("\nRunning backward:\n")
     backward.run()
   }
+  /*
+  CONSOLE OUTPUT
+  scala> FoldM.run
+
+  Running forward:
+
+  t =
+  Roll(Branch(Roll(Branch(Roll(Leaf(hello)),Roll(Leaf(world)))),Roll(Branch(Roll(Leaf(goodbye)),Roll(Branch(Roll(Leaf(cruel)),Roll(Leaf(world))))))))
+
+  uniq(t) =
+  Roll(Branch(Roll(Branch(Roll(Leaf(0)),Roll(Leaf(1)))),Roll(Branch(Roll(Leaf(2)),Roll(Branch(Roll(Leaf(3)),Roll(Leaf(4))))))))
+
+
+  Running backward:
+
+  t =
+  Roll(Branch(Roll(Branch(Roll(Leaf(hello)),Roll(Leaf(world)))),Roll(Branch(Roll(Leaf(goodbye)),Roll(Branch(Roll(Leaf(cruel)),Roll(Leaf(world))))))))
+
+  uniq(t) =
+  Roll(Branch(Roll(Branch(Roll(Leaf(4)),Roll(Leaf(3)))),Roll(Branch(Roll(Leaf(2)),Roll(Branch(Roll(Leaf(1)),Roll(Leaf(0))))))))
+   */
 }
