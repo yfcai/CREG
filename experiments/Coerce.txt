@@ -1,0 +1,68 @@
+Pierce, figure 21-4., page 305
+
+type Relation = Type × Type
+
+subtype : Relation → (S : Type) → (T : Type) → Relation
+
+subtype(A, S, T) =
+
+  if (S, T) ∈ A, then
+    A
+
+  else
+   let A₀ = A ∪ {(S, T)} in
+
+   if S <: T (as scala types) then
+     A₀
+
+   else if S = Cons S₁ S₂ and T = Cons T₁ T₂ then
+     let
+       A₁ = subtype(A₀, S₁, T₁)
+     in
+       subtype(A₁, S₂, T₂)
+
+   else if T = μX. T₁ then
+     subtype(A₀, S, T₁[X ↦ T])
+
+   else if S = μX. S₁ then
+     subtype(A₀, S₁[X ↦ S], T)
+
+   else
+     fail
+
+
+type Graph = Map[(S : Type) × (T : Type), Name]
+
+witness : Graph → (S : Type) → (T : Type) → Graph × (S → T)
+witness(A, S, T) =
+
+  if A contains (S, T) then
+    (A, invoke A(S, T)) -- magical recursive call
+
+  else
+    let
+      f = fresh name
+      A₀ = A updated ((S, T), f)
+    in
+
+      if S <: T (as scala types) then
+        (A₀, id)
+
+      else if S = Cons S₁ S₂ and T = Cons T₁ T₂ then
+        let
+          (A₁, f₁) = witness(A₀, S₁, T₁)
+          (A₂, f₂) = witness(A₁, S₂, T₂)
+        in
+          (A₂, λ (Cons s₁ s₂) → Cons (f₁ s₁) (f₂ s₂))
+
+      else if T = μX. T₁ then
+        let
+          (A₁, f₁) = witness(A₀, S, T₁)
+        in
+          (A₁, λ s → Roll $ f₁ s)
+
+      else if S = μX. S₁ then
+        let
+          (A₁, f₁) = witness(A₀, S₁, T)
+        in
+          (A₁, λ s → f₁ (unroll s)
