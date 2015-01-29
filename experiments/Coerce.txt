@@ -31,38 +31,47 @@ subtype(A, S, T) =
      fail
 
 
-type Graph = Map[(S : Type) × (T : Type), Name]
+type Witness = Map[(S : Type) × (T : Type), Box[S → T]]
 
-witness : Graph → (S : Type) → (T : Type) → Graph × (S → T)
+-- guarantees that result's key set contains (S, T)
+witness : Witness → S → T → Witness
 witness(A, S, T) =
 
   if A contains (S, T) then
-    (A, invoke A(S, T)) -- magical recursive call
+    A
 
   else
     let
-      f = fresh name
+      f = newNamedBox
       A₀ = A updated ((S, T), f)
     in
 
       if S <: T (as scala types) then
-        (A₀, id)
+        setBox f id
+        A₀
 
       else if S = Cons S₁ S₂ and T = Cons T₁ T₂ then
         let
-          (A₁, f₁) = witness(A₀, S₁, T₁)
-          (A₂, f₂) = witness(A₁, S₂, T₂)
+          A₁ = witness(A₀, S₁, T₁)
+          A₂ = witness(A₁, S₂, T₂)
+          f₁ = openBox A₂(S₁, T₁)
+          f₂ = openBox A₂(S₂, T₂)
         in
-          (A₂, λ (Cons s₁ s₂) → Cons (f₁ s₁) (f₂ s₂))
+          setBox f (λ (Cons s₁ s₂) → Cons (f₁ s₁) (f₂ s₂))
+          A₂
 
       else if T = μX. T₁ then
         let
-          (A₁, f₁) = witness(A₀, S, T₁)
+          A₁ = witness(A₀, S, T₁)
+          f₁ = openBox A₁(S, T₁)
         in
-          (A₁, λ s → Roll $ f₁ s)
+          setBox f (λ s → Roll $ f₁ s)
+          A₁
 
       else if S = μX. S₁ then
         let
-          (A₁, f₁) = witness(A₀, S₁, T)
+          A₁ = witness(A₀, S₁, T)
+          f₁ = openBox A₀(S₁, T)
         in
-          (A₁, λ s → f₁ (unroll s)
+          setBox f (λ s → f₁ $ unroll s)
+          A₁
