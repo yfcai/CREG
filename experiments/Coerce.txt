@@ -31,7 +31,7 @@ subtype(A, S, T) =
      fail
 
 
-type Witness = Map[(S : Type) × (T : Type), Box[S → T]]
+type Witness = Map[(S : Type) × (T : Type), NamedBox[S → T]]
 
 -- guarantees that result's key set contains (S, T)
 witness : Witness → S → T → Witness
@@ -54,8 +54,8 @@ witness(A, S, T) =
         let
           A₁ = witness(A₀, S₁, T₁)
           A₂ = witness(A₁, S₂, T₂)
-          f₁ = openBox A₂(S₁, T₁)
-          f₂ = openBox A₂(S₂, T₂)
+          f₁ = callName A₂(S₁, T₁)
+          f₂ = callName A₂(S₂, T₂)
         in
           setBox f (λ (Cons s₁ s₂) → Cons (f₁ s₁) (f₂ s₂))
           A₂
@@ -63,7 +63,7 @@ witness(A, S, T) =
       else if T = μX. T₁ then
         let
           A₁ = witness(A₀, S, T₁)
-          f₁ = openBox A₁(S, T₁)
+          f₁ = callName A₁(S, T₁)
         in
           setBox f (λ s → Roll $ f₁ s)
           A₁
@@ -71,7 +71,7 @@ witness(A, S, T) =
       else if S = μX. S₁ then
         let
           A₁ = witness(A₀, S₁, T)
-          f₁ = openBox A₀(S₁, T)
+          f₁ = callName A₀(S₁, T)
         in
           setBox f (λ s → f₁ $ unroll s)
           A₁
