@@ -31,10 +31,22 @@ subtype(A, S, T) =
      fail
 
 
-type Witness = Map[(S : Type) × (T : Type), NamedBox[S → T]]
+-- witness generates a conversion from S to T
+-- target langauge is PLT2013/lecturenotes/04-f1wae
+
+-- syntax tree of F1WAE
+type F1WAE = Map[Symbol, FunDef] × Exp
+
+-- we need 1-argument functions only
+data FunDef = FunDef Symbol Exp
+
+-- Exp should support function calls and pattern matching
+
+
+type Witness = Map[(S : Type) × (T : Type), Symbol]
 
 -- guarantees that result's key set contains (S, T)
-witness : Witness → S → T → Witness
+witness : Witness → S → T → Witness × Map[Symbol, FunDef]
 witness(A, S, T) =
 
   if A contains (S, T) then
@@ -42,36 +54,36 @@ witness(A, S, T) =
 
   else
     let
-      f = newNamedBox
+      f = newSymbol
       A₀ = A updated ((S, T), f)
     in
 
       if S <: T (as scala types) then
-        setBox f id
-        A₀
+        fDef = FunDef 'x 'x
+        (A₀, Map(f → fDef) // f compiles to identity function
 
-      else if S = Cons S₁ S₂ and T = Cons T₁ T₂ then
+      else if S = S₁ × S₂ and T = T₁ × T₂ then
         let
-          A₁ = witness(A₀, S₁, T₁)
-          A₂ = witness(A₁, S₂, T₂)
-          f₁ = callName A₂(S₁, T₁)
-          f₂ = callName A₂(S₂, T₂)
+          (A₁, D₁) = witness(A₀, S₁, T₁)
+          (A₂, D₂) = witness(A₁, S₂, T₂)
+          f₁ = A₂(S₁, T₁)
+          f₂ = A₂(S₂, T₂)
         in
-          setBox f (λ (Cons s₁ s₂) → Cons (f₁ s₁) (f₂ s₂))
-          A₂
+          fDef = FunDef 'x (f₁ (fst 'x), f₂ (snd 'x))
+          (A₂, D₁ ++ D₂ + (f → fDef))
 
       else if T = μX. T₁ then
         let
-          A₁ = witness(A₀, S, T₁)
-          f₁ = callName A₁(S, T₁)
+          (A₁, D) = witness(A₀, S, T₁)
+          f₁ = A₁(S, T₁)
         in
-          setBox f (λ s → Roll $ f₁ s)
-          A₁
+          fDef = FunDef 'x (Roll $ f₁ 'x)
+          (A₁, D + (f → fDef))
 
       else if S = μX. S₁ then
         let
-          A₁ = witness(A₀, S₁, T)
+          (A₁, D) = witness(A₀, S₁, T)
           f₁ = callName A₀(S₁, T)
         in
-          setBox f (λ s → f₁ $ unroll s)
-          A₁
+          fDef = FunDef 'x (f₁ $ unroll 'x)
+          (A₁, D + (f → fDef))
