@@ -102,38 +102,50 @@ import Level
 open import Category.Monad
 open RawMonad {Level.zero} monad
 
-{-# NON_TERMINATING #-}
-coerce : (S : Data) → (T : Data) → Maybe (uc S ∅ → (uc T ∅))
 
-coerce (base m) (base n) with m ≤? n
-... | yes m≤n = just (λ s → Fin.inject≤ s m≤n)
+-- terminating specification of `coerce`
+-- it is terminating because:
+--
+-- 1. if `fix T` is contractive (i. e., fix T != μX. X),
+--    then the `fix T` case will trigger one of the other cases.
+--
+-- 2. in every other case, the input data `s` is stripped of
+--    a constructor.
+--
+-- This `coerce` is an interpreter.
+-- The Scala `coerce` is the corresponding compiler.
+--
+{-# NON_TERMINATING #-}
+coerce : (S : Data) → (T : Data) → uc S ∅ → Maybe (uc T ∅)
+
+coerce (base m) (base n) s with m ≤? n
+... | yes m≤n = just (Fin.inject≤ s m≤n)
 ... | no  m>n = nothing
 
-coerce (pair S₁ S₂) (pair T₁ T₂) =
-  coerce S₁ T₁ >>= (λ f₁ →
-  coerce S₂ T₂ >>= (λ f₂ →
-  return (λ s → f₁ (proj₁ s) , f₂ (proj₂ s))))
+coerce (pair S₁ S₂) (pair T₁ T₂) (s₁ , s₂) =
+  coerce S₁ T₁ s₁ >>= (λ t₁ →
+  coerce S₂ T₂ s₂ >>= (λ t₂ →
+  return (t₁ , t₂)))
 
-coerce (plus S₁ S₂) (plus T₁ T₂) =
-  coerce S₁ T₁ >>= (λ f₁ →
-  coerce S₂ T₂ >>= (λ f₂ →
-  return [ inj₁ ∘ f₁ , inj₂ ∘ f₂ ]))
+coerce (plus S₁ S₂) (plus T₁ T₂) (inj₁ s₁) =
+  coerce S₁ T₁ s₁ >>= (λ t₁ → just (inj₁ t₁))
 
-coerce (var j) T =
+coerce (plus S₁ S₂) (plus T₁ T₂) (inj₂ s₂) =
+  coerce S₂ T₂ s₂ >>= (λ t₂ → just (inj₂ t₂))
+
+coerce (var j) T s =
   nothing -- should not happen
 
-coerce (fix S) T =
+coerce (fix S) T (roll x) =
   let
     S′ = S [ 0 ↦ fix S ]
   in
-    coerce S′ T >>= (λ f →
-    return (λ { (roll x) → f (unsafeCast x) }))
+    coerce S′ T (unsafeCast x)
 
-coerce S (fix T) =
+coerce S (fix T) s =
   let
     T′ = T [ 0 ↦ fix T ]
   in
-    coerce S T′ >>= (λ f →
-    return (λ x → (roll (unsafeCast (f x)))))
+    coerce S T′ s >>= (λ t → just (roll (unsafeCast t)))
 
-coerce _ _ = nothing
+coerce _ _ _ = nothing
