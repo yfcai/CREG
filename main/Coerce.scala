@@ -12,7 +12,7 @@ object Coerce {
   @functor def SF[X] = TreeT { Leaf(get = Int) ; Fork(_1 = X, _2 = X) }
 
   // T = μY. Any + Fork(Y, μZ. Int + Fork(Z, Z))
-  type T = Fix[({ type λ[+Y] = TreeT[Leaf[Any], Fork[Y, S]] })#λ]
+  type T = Fix[TF.Map]
   @functor def TF[Y] = TreeT { Leaf(get = Any) ; Fork(_1 = Y, _2 = S) }
 
   val theWitness = new (S => T) {
