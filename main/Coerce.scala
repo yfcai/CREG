@@ -15,24 +15,24 @@ object Coerce {
   type T = Fix[({ type λ[+Y] = TreeT[Leaf[Any], Fork[Y, S]] })#λ]
   @functor def TF[Y] = TreeT { Leaf(get = Any) ; Fork(_1 = Y, _2 = S) }
 
-  object theWitness extends (S => T) {
+  val theWitness = new (S => T) {
     def apply(x: S): T = f0(x)
 
     // witness(S, T)
-    def f0(x: S): T = f1(x.unroll)
+    private[this] def f0(x: S): T = f1(x.unroll)
 
     // witness(Int + Fork(S, S), T)
-    def f1(x: S1): T = Roll[TF.Map](f2(x))
-    type S1 = SF.Map[S]
+    private[this] def f1(x: S1): T = Roll[TF.Map](f2(x))
+    private[this] type S1 = SF.Map[S]
 
     // witness(Int + Fork(S, S), Any + Fork(T, S))
-    def f2(x: S1): T2 = TreeT(x).map(identity, f3)
-    type T2 = TF.Map[T]
+    private[this] def f2(x: S1): T2 = TreeT(x).map(identity, f3)
+    private[this] type T2 = TF.Map[T]
 
     // witness(Fork(S, S), Fork(T, S))
-    def f3(x: S3): T3 = Fork(x).map(f0, identity)
-    type S3 = Fork[S, S]
-    type T3 = Fork[T, S]
+    private[this] def f3(x: S3): T3 = Fork(x).map(f0, identity)
+    private[this] type S3 = Fork[S, S]
+    private[this] type T3 = Fork[T, S]
   }
 
   // moreover, S and T have the same runtime objects.
