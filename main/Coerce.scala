@@ -5,13 +5,15 @@ import nominal.lib._
 
 object Coerce {
   // the binary tree datatype
-  @data def Tree[A] = Fix(X => TreeT { Leaf(get = A) ; Fork(l = X, r = X) })
+  @data def Tree[A] = Fix(X => TreeT { Leaf(get = A) ; Fork(_1 = X, _2 = X) })
 
   // S = μX. Int + Fork(X, X)
-  type S = Fix[({ type λ[+X] = TreeT[Leaf[Int], Fork[X, X]] })#λ]
+  type S = Fix[SF.Map]
+  @functor def SF[X] = TreeT { Leaf(get = Int) ; Fork(_1 = X, _2 = X) }
 
   // T = μY. Any + Fork(Y, μZ. Int + Fork(Z, Z))
   type T = Fix[({ type λ[+Y] = TreeT[Leaf[Any], Fork[Y, S]] })#λ]
+  @functor def TF[Y] = TreeT { Leaf(get = Any) ; Fork(_1 = Y, _2 = S) }
 
   object theWitness extends (S => T) {
     def apply(x: S): T = f0(x)
@@ -20,13 +22,12 @@ object Coerce {
     def f0(x: S): T = f1(x.unroll)
 
     // witness(Int + Fork(S, S), T)
-    def f1(x: S1): T = Roll[TF1](f2(x))
-    type S1 = TreeT[Leaf[Int], Fork[S, S]]
-    type TF1[+Y] = TreeT[Leaf[Any], Fork[Y, S]]
+    def f1(x: S1): T = Roll[TF.Map](f2(x))
+    type S1 = SF.Map[S]
 
     // witness(Int + Fork(S, S), Any + Fork(T, S))
     def f2(x: S1): T2 = TreeT(x).map(identity, f3)
-    type T2 = TreeT[Leaf[Any], Fork[T, S]]
+    type T2 = TF.Map[T]
 
     // witness(Fork(S, S), Fork(T, S))
     def f3(x: S3): T3 = Fork(x).map(f0, identity)
@@ -35,8 +36,7 @@ object Coerce {
   }
 
   // moreover, S and T have the same runtime objects.
-  type SF[+X] = TreeT[Leaf[Int], Fork[X, X]]
-  implicit def toLeaf(x: Int): S = Roll[SF](Leaf(x))
+  implicit def toLeaf(x: Int): S = Roll[SF.Map](Leaf(x))
 
   def run() {
     val s: S = coerce {
