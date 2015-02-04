@@ -20,6 +20,32 @@ object Lambda {
     App(t1 = term, t2 = term)
   })
 
+  // making sure code in paper is well-typed
+  // CAUTION: we don't have the Functor trait.
+  trait Functor {
+    type Map[+A]
+    def fmap[A, B](f: A => B): Map[A] => Map[B]
+  }
+
+  val nameFunctorExpanded = new Functor {
+    type Map [+A] = Fix [H [A] # λ]
+
+    private[this] type H [+A] = {
+      type λ [+T] = TermT [
+        Lit [Int], Var [A], Abs [A, T], App [T, T]
+      ]
+    }
+
+    def fmap[A, B](f: A => B): Map[A] => Map[B] =
+
+      t => Roll[H[B]#λ](t.unroll match {
+        case Lit(n)         => Lit(n)
+        case Var(x)         => Var(f(x))
+        case Abs(x, t)      => Abs(f(x), fmap(f)(t))
+        case App(t_1, t_2)  => App(fmap(f)(t_1), fmap(f)(t_2))
+      })
+  }
+
   val rename: Term => Term = nameF.fmap("_" ++ _)
 
   // count names
