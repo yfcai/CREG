@@ -138,6 +138,34 @@ object Lambda {
       induction(opF(s) map foldOp(induction))
     }
 
+  // (redex, put-back)
+  type EvalCtx = (Term, Term => Term)
+
+  // either eval context, or itself
+  type ECRslt = Either[EvalCtx, TermF[Term]]
+
+  def cbnEvalCtx(t: Term): Option[EvalCtx] =
+    foldForEvalCtx(t).left.toOption
+
+  def foldForEvalCtx: Term => ECRslt =
+    foldOp[ECRslt]({
+      case App(Left((redex, put_back)), operand) =>
+        Left((redex, t => coerce { App(put_back(t), operand) }))
+
+      case App(Right(abs @ Abs(_, _)), operand) =>
+        Left((coerce(App(abs, operand)), identity))
+
+      case App(Right(s), operand) =>
+        Right(coerce(App(s, operand)))
+
+      case t @ Abs(_, _) => Right(t)
+      case t @ Var(_)    => Right(t)
+      case t @ Lit(_)    => Right(t)
+
+      // alternatively:
+      // case t => Right(opF(t) map (_ => sys error "irrelevant"))
+    })
+
   // extract operator in nested applications
   val getOperator: Term => Term = foldOp[Term] {
     case App(op, arg) => op
