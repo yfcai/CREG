@@ -4,12 +4,17 @@ import nominal.lib._
 /** Lambda calculus example in paper */
 
 object Lambda {
+  import Banana.cataWith
+
   @data def Term = Fix(term => TermT {
     Lit(n = Int)
     Var(x = String)
     Abs(x = String, t = term)
     App(t1 = term, t2 = term)
   })
+
+  implicit def _var(x: String): Term = coerce(Var(x))
+  implicit def _lit(n: Int   ): Term = coerce(Lit(n))
 
   // prepend underscore
 
@@ -47,6 +52,12 @@ object Lambda {
   }
 
   val rename: Term => Term = nameF.fmap("_" ++ _)
+
+  def rename2(f: String => String): Term => Term =
+    cataWith[Term](termF) {
+      case Var(x) => Roll[termF.Map](Var(f(x)))
+      case t      => Roll[termF.Map](t)
+    }
 
   // count names
 
@@ -247,8 +258,6 @@ object Lambda {
     Abs(x = String, t = t)
     App(t1 = Term, t2 = Term)
   }
-
-  import Banana.cataWith
 
   def params(t: Term): Seq[String] =
     cataWith[Seq[String]](bodyF)({
