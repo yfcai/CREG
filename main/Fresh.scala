@@ -41,6 +41,8 @@ object Fresh {
       env => for { x <- m(env) ; y <- f(x)(env) } yield y
   }
 
+  implicit class FreshMonadView[T](x: FreshM.Map[T])
+      extends Monad.View[FreshM, T](x)
 
   def refresh: Term => FreshM[Term] =
     cata[FreshM[Term]](termF) {
@@ -56,11 +58,8 @@ object Fresh {
       }
       yield coerce { Abs(y, newBody) }
 
-      case App(f, u) => env => for {
-        g <- f(env)
-        v <- u(env)
-      }
-      yield coerce { App(g, v) }
+      case other =>
+        for { t <- termF(other).traverse(FreshM)(x => x) } yield coerce(t)
     }
 
   def run() {
