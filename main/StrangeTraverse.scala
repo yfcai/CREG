@@ -19,7 +19,7 @@ object StrangeTraverse extends Traversable.EndofunctorTrait {
     x => {
       import G._
       call(call(
-        pure[B => B => B](x => y => y),
+        pure[B => B => B](x => y => x),
         f(x)),
         f(x))
     }
