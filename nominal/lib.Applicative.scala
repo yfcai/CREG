@@ -3,7 +3,7 @@ package lib
 
 import language.higherKinds
 
-trait Applicative {
+trait Applicative { self =>
   // Applicative functors are only defined on the entire Scala category.
   // It's hard to define applicative functors on subcategories because
   // a subcategory may not have exponentials (used in `call`).
@@ -17,6 +17,22 @@ trait Applicative {
     call(
       pure[F[Fix[F]] => Fix[F]](y => Roll(y)),
       x)
+
+  def compose(that: Applicative):
+      Applicative { type Map[+X] = self.Map[that.Map[X]] } =
+    new Applicative {
+      type Map[+X] = self.Map[that.Map[X]]
+
+      def pure[A](x: A): Map[A] = self.pure(that.pure(x))
+
+      def call[A, B](f: Map[A => B], x: Map[A]): Map[B] =
+        self.call(self.call(
+          self pure {
+            (f: that.Map[A => B]) => (x: that.Map[A]) => that.call(f, x)
+          },
+          f),
+          x)
+    }
 }
 
 // specific applicative functors
