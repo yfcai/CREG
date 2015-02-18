@@ -122,6 +122,9 @@ object Lambda {
     }
   }
 
+  // Can we write termToFixOpF using coerce? Yes!
+  def termToFixOpF2(t: Term): Fix[opF.Map] = coerce(t)
+
   // Convert μσ. opF(σ) to Term.
   def fixOpFToTerm(t: Fix[opF.Map]): Term = Roll[termF.Map] {
     t.unroll match {
