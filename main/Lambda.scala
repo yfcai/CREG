@@ -85,7 +85,7 @@ object Lambda {
 
   def foldTerm[T](induction: termF.Map[T] => T):
       Term => T =
-    t => induction(termF(t.unroll) map foldTerm(induction))
+    t => induction(termF.fmap(foldTerm(induction))(t.unroll))
 
   val literals3: Term => Int =
     foldTerm[Int] {
