@@ -50,4 +50,68 @@ object Coerce {
 
     assert(s == t)
   }
+
+
+  // possible slowdowns
+  import Banana._ // for lists & *-morphisms
+  import Traversable.Endofunctor
+
+  // pattern functor of
+  // incompatible representation of lists:
+  // μX. listF (listF X)
+  def listF2[A]: Endofunctor { type Map[+L] = ListF[A, ListF[A, L]] } = {
+    val F = listF[A]
+    F compose F
+  }
+
+  val intsF2 = listF2[Int]
+
+  // lists of integers of even length
+  // like List[Int], except with half as many Rolls
+  type Ints2 = Fix[intsF2.Map]
+
+  // list constructed from listF2 by anamorphism
+  val pairs: Int => Ints2 =
+    anaWith[Int](intsF2) { i =>
+      if (i <= 0)
+        Nil
+      else
+        Cons(i, Cons(i, i - 1))
+    }
+
+  // big list of pairs: 50, 50, 49, 49, 48, 48, ..., 1, 1
+  val xs = pairs(50)
+
+  def isEmpty(ns: List[Int]): Boolean = ns.unroll match {
+    case Nil => true
+    case Cons(_, _) => false
+  }
+
+
+  // expected time: constant
+  //   actual time: linear
+  def isEmpty2_slow(ns: Ints2): Boolean =
+
+    // isEmpty( coerce(ns) )
+
+    ??? // triggers bug in `coerce`!
+
+
+  // non-solution: duplicate `isEmpty`
+  def isEmpty2_dupe(ns: Ints2): Boolean = ns.unroll match {
+    case Nil => true
+    case Cons(_, _) => false
+  }
+
+
+  // possible solution: think of List[Int] as canonical;
+  // never produce incompatible datatypes like Ints
+  //
+  // drawback: lose expressive power: can't express
+  // "lists of even length" as a datatype
+  val pairs_canon: Int => List[Int] =
+
+    // n => coerce[Ints2, List[Int]] { pairs(n) }
+
+    ??? // triggers bug in `coerce`!
 }
