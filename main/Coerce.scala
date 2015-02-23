@@ -104,7 +104,7 @@ object Coerce {
   }
 
 
-  // possible solution: think of List[Int] as canonical;
+  // non-solution: think of List[Int] as canonical;
   // never produce incompatible datatypes like Ints
   //
   // drawback: lose expressive power: can't express
@@ -114,4 +114,21 @@ object Coerce {
     // n => coerce[Ints2, List[Int]] { pairs(n) }
 
     ??? // triggers bug in `coerce`!
+
+
+  // solution: weaken precondition of isEmpty
+  def isEmpty_good(xs: ListF[Any, Any]): Boolean = xs match {
+    case Nil => true
+    case Cons(_, _) => false
+  }
+
+  // expected time: constant
+  //   actual time: constant
+  def isEmpty_List(xs: List[Any]): Boolean =
+    isEmpty_good(coerce(xs))
+
+  // expected time: constant
+  //   actual time: constant
+  def isEmpty_Ints2(xs: Ints2): Boolean =
+    isEmpty_good(coerce(xs))
 }
