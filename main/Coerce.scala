@@ -116,8 +116,8 @@ object Coerce {
     ??? // triggers bug in `coerce`!
 
 
-  // solution: weaken precondition of isEmpty
-  def isEmpty_good(xs: ListF[Any, Any]): Boolean = xs match {
+  // solution: make precondition of isEmpty the weakest possible
+  def isEmpty_good(xs: ListT[Any, Any]): Boolean = xs match {
     case Nil => true
     case Cons(_, _) => false
   }
