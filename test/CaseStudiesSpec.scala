@@ -2,6 +2,7 @@ import org.scalatest._
 import nominal.functors._
 
 class CaseStudiesSpec extends FlatSpec {
+  /*
   "Banana" should "work" in {
     import Banana._
     assert(sum(xs1) == 10)
@@ -130,4 +131,5 @@ class CaseStudiesSpec extends FlatSpec {
     assert(nPutBack(id) == nest(id))
     assert(nPutBack(5) == nest(5))
   }
+   */
 }
