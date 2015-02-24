@@ -135,7 +135,7 @@ object DatatypeRepresentation {
   {
     def children = args.iterator
     final val construct: Iterator[Datatype] => FunctorApplication =
-      children => copy(args = children.toSeq)
+      children => copy(args = children.toList)
 
     def functorArity: Int = args.length
   }
@@ -201,4 +201,39 @@ object DatatypeRepresentation {
     def covariant    (name: Name): Param = Param(name, Variance.Covariant)
     def contravariant(name: Name): Param = Param(name, Variance.Contravariant)
   }
+
+
+  // Regular types
+  sealed trait Regular[T] {
+    val id: String
+    val tpe: T
+
+    def toDatatype: Datatype = regularToDatatype(this, Set.empty)
+  }
+
+  def regularToDatatype(r: Regular[_], bound: Set[String]): Datatype =
+    r match {
+      case RegularVar(id, tpe) =>
+        if (bound(id))
+          TypeVar(id.toString)
+        else
+          TypeConst(tpe.toString)
+
+      case RegularFun(id, tpe, args) =>
+        val newArgs: List[Datatype] = args.map(x => regularToDatatype(x, bound))
+        FunctorApplication(TypeConst(tpe.toString), newArgs)
+
+      case RegularFix(id, tpe, body) =>
+        FixedPoint(id, regularToDatatype(body, bound + id))
+    }
+
+  case class RegularVar[T](id: String, tpe: T) extends Regular[T]
+
+  /** @param tpe fully applied type F[T1, T2, ...] */
+  case class RegularFun[T](id: String, tpe: T, args: List[Regular[T]])
+      extends Regular[T]
+
+  /** @param tpe type argument of fixed point */
+  case class RegularFix[T](id: String, tpe: T, body: Regular[T])
+      extends Regular[T]
 }

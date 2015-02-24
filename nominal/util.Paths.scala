@@ -11,6 +11,8 @@ trait Paths {
     tq"_root_.nominal.lib.Fix"
   }
 
+  def getFixWithoutRoot: String = "nominal.lib.Fix"
+
   def getRoll(c: Context) = c parse "_root_.nominal.lib.Roll"
 
   def getVariant(c: Context) = {

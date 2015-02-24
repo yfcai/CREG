@@ -143,7 +143,73 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
   // FROM SCALA TO DATATYPE //
   // ====================== //
 
-  // TODO: rethink use case and rewrite everything here.
+  def reifyRegular(c: Context)(tpe: c.Type): Regular[c.Type] =
+    reifyWithEnv(c)(tpe, tpe, Map.empty)
+
+  //  precondition: `tpeOut` is valid type in c
+  //                `env` contains only types valid in c
+  //
+  // postcondition: all types in return value are valid in c
+  def reifyWithEnv(c: Context)
+    (tpe0: c.Type, tpeOut: c.Type, env: Map[c.universe.Symbol, (String, c.Type)]):
+      Regular[c.Type] =
+  {
+    val tpe = tpe0.dealias
+
+    // bound type variable
+    if (tpe.typeArgs.isEmpty && env.contains(tpe.typeSymbol)) {
+      val (myId, myTpe) = env(tpe.typeSymbol)
+      RegularVar(myId, myTpe)
+    }
+
+    // fixed point
+    else if (isFixedPointOfSomeFunctor(c)(tpe)) {
+      val List(fun0)  = tpe.typeArgs
+      val functor     = fun0.etaExpand
+      val List(param) = functor.typeParams
+      val myId        = freshID(c)
+      val newEnv      = env.updated(param, (myId, tpeOut))
+
+      val myBody      = functor.resultType
+      val myBodyOut   = applyEnv(c)(myBody, newEnv)
+
+      RegularFix(myId, tpeOut, reifyWithEnv(c)(myBody, myBodyOut, newEnv))
+    }
+
+    // possibly a functor application
+    // do not try to look up the functor here
+    else if (tpe.typeArgs.nonEmpty) {
+      assert(tpe.typeArgs.size == tpeOut.typeArgs.size)
+
+      RegularFun(freshID(c), tpeOut,
+        tpe.typeArgs.zip(tpeOut.typeArgs).map {
+          case (child, childOut) =>
+            reifyWithEnv(c)(child, childOut, env)
+        }
+      )
+    }
+
+    // unrecognized base type
+    else
+      RegularVar(freshID(c), tpeOut)
+  }
+
+  // resolve pending substitutions
+  def applyEnv(c: Context)(
+    tpe: c.Type,
+    env: Map[c.universe.Symbol, (String, c.Type)]): c.Type =
+  {
+    val (lhs, rhs) = env.view.map(p => (p._1, p._2._2)).toList.unzip
+    tpe.substituteTypes(lhs, rhs)
+  }
+
+  def freshID(c: Context): String = c.freshName()
+
+  // requires `tpe` be dealiased
+  def isFixedPointOfSomeFunctor(c: Context)(tpe: c.Type): Boolean =
+    getFixWithoutRoot == tpe.typeConstructor.typeSymbol.fullName
+
+  // BEGIN TODO REWRITE EVERYTHING
 
   object UC extends Enumeration {
     type Flag = Value
@@ -468,16 +534,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     }
 
   // requires `tpe` be dealiased
-  def isFixedPointOfSomeFunctor(c: Context)(tpe: c.Type): Boolean = {
-    import c.universe._
-    val fix = treeToType(c)(tq"${getFix(c)}[({ type ID[+X] = X })#ID]")
-
-    // Type.typeSymbol.fullName is unreliable for code generation.
-    // hope it's good enough to distinguish types from each other.
-    fix.typeConstructor.typeSymbol.fullName == tpe.typeConstructor.typeSymbol.fullName
-  }
-
-  // requires `tpe` be dealiased
   def matchSuboverriders(c: Context)(tpe: c.Type, care: Set[Name], overrider: Option[Datatype]):
       Many[Option[Datatype]] = {
     def nones = tpe.typeArgs.map(_ => None)
@@ -582,12 +638,16 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     val wrapper = q"{ class $dummy { def $method[..$typeDefs]: ${tpe} = ??? } ; new $dummy }"
     c.typecheck(wrapper).tpe.member(method).typeSignature.finalResultType
   }
+
+  // END TODO REWRITE EVERYTHING
 }
 
 object UniverseConstruction {
   object Tests extends UniverseConstruction with Parsers with util.AssertEqual with util.Persist {
     import language.experimental.macros
     import scala.annotation.StaticAnnotation
+
+    // OLD TESTS BEGIN
 
     private[this] def eval[T](c: Context)(x: c.Expr[T]): T =
       c.eval(c.Expr[T](c.untypecheck(x.tree.duplicate)))
@@ -649,6 +709,32 @@ object UniverseConstruction {
           val data = representation(c)(dodgeFreeTypeVariables(c)(tpe, care), care, None)
           c.Expr(ValDef(mods, name, tt, persist(c)(data)))
       }
+    }
+
+    // OLD TESTS END
+
+    def isFix[T]: Boolean = macro isFixImpl[T]
+    def isFixImpl[T](c: Context)(implicit tag: c.WeakTypeTag[T]): c.Tree = {
+      import c.universe._
+
+      val truth = isFixedPointOfSomeFunctor(c)(tag.tpe)
+
+      if (truth)
+        q"true"
+      else
+        q"false"
+    }
+
+    def reify[T]: DatatypeRepresentation.Datatype = macro reifyImpl[T]
+    def reifyImpl[T](c: Context)(implicit tag: c.WeakTypeTag[T]): c.Tree = {
+      val regular = reifyRegular(c)(tag.tpe).toDatatype.canonize
+      persist(c)(regular)
+    }
+
+    def unrollFix[T]: String = macro unrollFixImpl[T]
+    def unrollFixImpl[T](c: Context)(implicit tag: c.WeakTypeTag[T]): c.Tree = {
+      val RegularFix(id, tpe, body) = reifyRegular(c)(tag.tpe)
+      persist(c)(body.tpe.toString)
     }
   }
 }
