@@ -6,10 +6,15 @@ import nominal.compiler.UniverseConstruction.Tests._
 import nominal.compiler.DatatypeRepresentation._
 
 class ReificationSpec extends FlatSpec {
+  @data def List[A] = Fix(list => ListT {
+    Nil
+    Cons(head = A, tail = list)
+  })
+
   "Reification" should "identify fixed points" in {
     assert(isFix[Fix[({type λ[+X] = X})#λ]] == true)
     assert(isFix[Int] == false)
-    assert(isFix[List[Int]] == false)
+    assert(isFix[Seq[Int]] == false)
   }
 
   it should "create representations of types" in {
@@ -30,5 +35,19 @@ class ReificationSpec extends FlatSpec {
 
     assert(unrollFix[Fix[({ type λ[+A] = Array[A] })#λ]] ==
       "Array[nominal.lib.Fix[[+A]Array[A]]]")
+  }
+
+  it should "dealias properly" in {
+    assert(reify[ListF[Int, Any]] ==
+      FunctorApplication(
+        TypeConst(
+          "ReificationSpec.this.ListT[" +
+            "ReificationSpec.this.Nil,ReificationSpec.this.Cons[Int,Any]]"),
+        List(
+          TypeConst("ReificationSpec.this.Nil"),
+          FunctorApplication(
+            TypeConst("ReificationSpec.this.Cons[Int,Any]"),
+            List(TypeConst("Int"), TypeConst("Any")))))
+    )
   }
 }

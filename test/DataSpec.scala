@@ -395,7 +395,7 @@ class DataSpec extends FlatSpec {
     }
 
     val firstNinePrimes: List[Int] =
-      coerce(
+      goodie(
         Cons(2, Cons(3, Cons(5, Cons(7, Cons(11, Cons(13, Cons(17, Cons(19, Cons(23, Nil)))))))))
       )
 

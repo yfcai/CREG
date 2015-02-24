@@ -151,10 +151,12 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
   //
   // postcondition: all types in return value are valid in c
   def reifyWithEnv(c: Context)
-    (tpe0: c.Type, tpeOut: c.Type, env: Map[c.universe.Symbol, (String, c.Type)]):
-      Regular[c.Type] =
+    ( tpe0: c.Type,
+      tpeOut0: c.Type,
+      env: Map[c.universe.Symbol, (String, c.Type)]): Regular[c.Type] =
   {
     val tpe = tpe0.dealias
+    val tpeOut = tpeOut0.dealias
 
     // bound type variable
     if (tpe.typeArgs.isEmpty && env.contains(tpe.typeSymbol)) {

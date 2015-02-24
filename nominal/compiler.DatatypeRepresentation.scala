@@ -235,5 +235,23 @@ object DatatypeRepresentation {
 
   /** @param tpe type argument of fixed point */
   case class RegularFix[T](id: String, tpe: T, body: Regular[T])
-      extends Regular[T]
+      extends Regular[T] {
+
+    def unroll: Regular[T] = {
+      def loop(t: Regular[T]): Regular[T] = t match {
+        case RegularVar(id, tpe) if id == this.id =>
+          this
+
+        case RegularFun(id, tpe, args) =>
+          RegularFun(id, tpe, args map loop)
+
+        case RegularFix(id, tpe, body) if id != this.id =>
+          RegularFix(id, tpe, loop(body))
+
+        case other =>
+          other
+      }
+      loop(body)
+    }
+  }
 }

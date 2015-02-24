@@ -31,6 +31,7 @@ object Fix {
   // if x is a subtype of both Record and Variant, then it is a record
   // if x is a subtype of Variant, then it is a variant
   // if x is a subtype of neither, then it is not a datatype
-  trait Variant
-  trait Record
+  trait RecordOrVariant
+  trait Variant extends RecordOrVariant
+  trait Record  extends RecordOrVariant
 }

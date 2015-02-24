@@ -5,6 +5,11 @@ import scala.reflect.macros.blackbox.Context
 import compiler.DatatypeRepresentation.Many
 
 trait Paths {
+  def getIdentity(c: Context): c.Tree = {
+    import c.universe._
+    q"_root_.scala.Predef.identity"
+  }
+
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._
@@ -14,6 +19,11 @@ trait Paths {
   def getFixWithoutRoot: String = "nominal.lib.Fix"
 
   def getRoll(c: Context) = c parse "_root_.nominal.lib.Roll"
+
+  def getRecordOrVariant(c: Context): c.Tree = {
+    import c.universe._
+    tq"_root_.nominal.lib.Fix.RecordOrVariant"
+  }
 
   def getVariant(c: Context) = {
     import c.universe._
