@@ -22,6 +22,29 @@ object Coercion extends UniverseConstruction with util.Traverse {
     (implicit
       actualTag: c.WeakTypeTag[Actual],
       expectedTag: c.WeakTypeTag[Expected]): c.Tree =
+
+    try { performGoodie(c)(arg)(tagT)(actualTag, expectedTag) }
+    catch {
+      case e: Throwable =>
+        if (
+          false && // disable stack trace printing
+            ! isNothingType(expectedTag.tpe)
+        ) {
+          println(e.getMessage)
+          println(e.printStackTrace)
+          println
+        }
+        throw e
+    }
+
+
+  def performGoodie[Actual, Expected]
+    (c: Context)
+    (arg: c.Tree)
+    (tagT: c.Tree)
+    (implicit
+      actualTag: c.WeakTypeTag[Actual],
+      expectedTag: c.WeakTypeTag[Expected]): c.Tree =
     {
       import c.universe._
 
