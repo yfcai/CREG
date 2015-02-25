@@ -92,7 +92,7 @@ class CaseStudiesSpec extends FlatSpec {
   }
 
   "Lambda" should "compute call-by-name evaluation contexts" in {
-    import Lambda._
+    import TyrannyOfTheDominantFunctor.Lambda._
 
     val id: Term = coerce { Abs("x", "x") }
     assert(cbnEvalCtx(id) == None)
@@ -129,5 +129,14 @@ class CaseStudiesSpec extends FlatSpec {
     assert(nRedex == omega)
     assert(nPutBack(id) == nest(id))
     assert(nPutBack(5) == nest(5))
+  }
+
+  "Fresh" should "work" in {
+    import Fresh._
+    assert(omg == (coerce {
+      App(
+        Abs("_0", App(Var("_0"), Var("_0"))),
+        Abs("_1", App(Var("_1"), Var("_1"))))
+    }: Term))
   }
 }
