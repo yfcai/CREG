@@ -57,8 +57,9 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     covariantTypeParams(c)(cases.map(_.name))
 
   /** generate a record that's not a case of some variant */
-  def generateStandaloneRecord(c: Context)(record: Record, supers: Many[c.Tree]): Many[c.Tree] = {
+  def generateStandaloneRecord(c: Context)(record: Record, declaredSupers: Many[c.Tree]): Many[c.Tree] = {
     import c.universe._
+    val supers = declaredSupers :+ getRecord(c)
     val typeName = TypeName(record.name)
     if (record.fields.isEmpty) {
       val (termName, traversable0, typeMap, emptyDefTraverse) = recordPrototypeFragments(c)(record)
