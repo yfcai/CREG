@@ -80,7 +80,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
       else inferImplicitView(c)(source.tpe, target.tpe) match {
         // source <% target
         case Some(view) =>
-          Some((a0, Seq(mkF { x => q"view($x)" })))
+          Some((a0, Seq(mkF { x => q"$view($x)" })))
 
         case None =>
 
