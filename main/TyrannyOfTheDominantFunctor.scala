@@ -102,6 +102,34 @@ object TyrannyOfTheDominantFunctor {
           case App(t1, t2) ⇒ t1 ++ t2
         }
     }
+
+    object SS4_GetOperator {
+      import SS3_FreeVariables.{Fix, Roll, cata}
+
+      sealed trait OpF[+T]
+      case class Lit[+T](number: Int) extends OpF[T]
+      case class Var[+T](name: String) extends OpF[T]
+      case class Abs[+T](param: String, body: Term4) extends OpF[T]
+      case class App[+T](operator: T, operand: Term4) extends OpF[T]
+
+      type Term4 = Fix[OpF]
+
+      val opF = new Functor {
+        type Map[+A] = OpF[A]
+        def fmap[A,B](f : A ⇒ B) : Map[A] ⇒ Map[B] = {
+          case Lit(n)      ⇒ Lit(n)
+          case Var(x)      ⇒ Var(x)
+          case Abs(x, t)   ⇒ Abs(x, t)
+          case App(t1, t2) ⇒ App(f(t1), t2)
+        }
+      }
+
+      val getOperator: Term4 ⇒ Term4 =
+        cata[Term4](opF) {
+          case App(op, _) ⇒ op
+          case op         ⇒ Roll[OpF](op)
+        }
+    }
   }
 
   object F1_RenamingFreeVariables {
