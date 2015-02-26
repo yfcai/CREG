@@ -51,8 +51,8 @@ object TyrannyOfTheDominantFunctor {
         }
       }
 
-      type Term1 = nameF.Map[String]
-      def rename(f : String ⇒ String) : Term1 ⇒ Term1 = nameF.fmap(f)
+      type Term2 = nameF.Map[String]
+      def rename(f : String ⇒ String) : Term2 ⇒ Term2 = nameF.fmap(f)
     }
 
     object SS3_0_FreevarsWithBoilerplate {
@@ -86,7 +86,7 @@ object TyrannyOfTheDominantFunctor {
 
       sealed trait Fix[F [+_ ]] {def unroll : F[Fix[F]]}
       case class Roll[F [+_ ]](unroll : F[Fix[F]]) extends Fix[F]
-      type Term2 = Fix[TermF]
+      type Term3 = Fix[TermF]
 
       def cata[A](F : Functor)(visitor : F.Map [A] ⇒ A) : Fix[F.Map] ⇒ A =
         t ⇒ {
@@ -94,7 +94,7 @@ object TyrannyOfTheDominantFunctor {
           visitor(F.fmap(loop)(t.unroll))
         }
 
-      val freevars : Term2 ⇒ Set[String] =
+      val freevars : Term3 ⇒ Set[String] =
         cata[Set[String]](termF) {
           case Lit(n)      ⇒ Set.empty
           case Var(x)      ⇒ Set(x)
