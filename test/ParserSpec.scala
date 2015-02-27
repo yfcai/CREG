@@ -85,4 +85,28 @@ class ParserSpec extends FlatSpec {
                   Record("PU", Many(Field("person", TypeConst("String")))),
                   Record("DU", Many(Field("dept", TypeVar("dept"))))))))))))))
   }
+
+  it should "parse struct clarations" in {
+    @struct def TermT {
+      Lit(number) ; Var(name) ; Abs(param, body) ; App(operator, operand)
+    }
+
+    assert(TermT ==
+      Variant("TermT", List(
+        Record("Lit", List(Field("number", TypeConst("Nothing")))),
+        Record("Var", List(Field("name", TypeConst("Nothing")))),
+        Record("Abs", List(
+          Field("param", TypeConst("Nothing")),
+          Field("body", TypeConst("Nothing")))),
+        Record("App", List(
+          Field("operator", TypeConst("Nothing")),
+          Field("operand", TypeConst("Nothing")))))))
+
+    @struct def X { Y ; Z(a) }
+
+    assert(X ==
+      Variant("X", List(
+        Record("Y", Nil),
+        Record("Z", List(Field("a", TypeConst("Nothing")))))))
+  }
 }
