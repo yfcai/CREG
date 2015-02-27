@@ -84,8 +84,8 @@ object TyrannyOfTheDominantFunctor {
         }
       }
 
-      sealed trait Fix[F [+_ ]] {def unroll : F[Fix[F]]}
-      case class Roll[F [+_ ]](unroll : F[Fix[F]]) extends Fix[F]
+      sealed trait Fix[+F [+_ ]] {def unroll : F[Fix[F]]}
+      case class Roll[+F [+_ ]](unroll : F[Fix[F]]) extends Fix[F]
       type Term3 = Fix[TermF]
 
       def cata[A](F : Functor)(visitor : F.Map [A] ⇒ A) : Fix[F.Map] ⇒ A =
@@ -103,6 +103,15 @@ object TyrannyOfTheDominantFunctor {
         }
     }
 
+    object SS4_0_NormalFormWithRecursion {
+      import S1_Introduction._
+
+      def getOperator(t: Term): Term = t match {
+        case App(op, _) => getOperator(op)
+        case t          => t
+      }
+    }
+
     object SS4_GetOperator {
       import SS3_FreeVariables.{Fix, Roll, cata}
 
@@ -116,19 +125,58 @@ object TyrannyOfTheDominantFunctor {
 
       val opF = new Functor {
         type Map[+A] = OpF[A]
-        def fmap[A,B](f : A ⇒ B) : Map[A] ⇒ Map[B] = {
-          case Lit(n)      ⇒ Lit(n)
-          case Var(x)      ⇒ Var(x)
-          case Abs(x, t)   ⇒ Abs(x, t)
-          case App(t1, t2) ⇒ App(f(t1), t2)
+        def fmap[A,B](f : A => B) : Map[A] => Map[B] = {
+          case Lit(n)      => Lit(n)
+          case Var(x)      => Var(x)
+          case Abs(x, t)   => Abs(x, t)
+          case App(t1, t2) => App(f(t1), t2)
         }
       }
 
-      val getOperator: Term4 ⇒ Term4 =
+      val getOperator: Term4 => Term4 =
         cata[Term4](opF) {
-          case App(op, _) ⇒ op
-          case op         ⇒ Roll[OpF](op)
+          case App(op, _) => op
+          case op         => Roll[OpF](op)
         }
+    }
+
+    object SS4_alt_NormalForm {
+
+      // Challenge: Capture the recursion scheme in the test
+      // whether a term is in call-by-value beta-normal-form
+      // or not.
+
+      import SS3_FreeVariables.{Fix, Roll, cata}
+
+      sealed trait CbvF[+S, +T]
+      case class Lit[+S, +T](number: Int) extends CbvF[S, T]
+      case class Var[+S, +T](name: String) extends CbvF[S, T]
+      case class Abs[+S, +T](param: String, body: Term4) extends CbvF[S, T]
+      case class App[+S, +T](operator: S, operand: T) extends CbvF[S, T]
+
+      type Term4 = Fix[({ type λ[+T] = Fix[({ type λ[+S] = CbvF[S, T] })#λ] })#λ]
+
+      private[this] type ArgF[+T] = Fix[OpF[T]#λ]
+      private[this] type OpF [+T] = { type λ[+S] = CbvF[S, T] }
+
+      val argF = new Functor {
+        type Map[+A] = ArgF[A]
+        def fmap[A,B](f : A => B) : Map[A] => Map[B] = ???
+      }
+
+      def opF[T] = new Functor {
+        type Map[+S] = OpF[T]#λ[S]
+        def fmap[A,B](f : A => B) : Map[A] => Map[B] = ???
+      }
+
+      def isNormalForm: Term4 => Boolean =
+        cata[Boolean](argF) { _.unroll match {
+          case App(op, arg) =>
+            val testOp: Any => Boolean = ???
+            arg && testOp(op)
+
+          case _ => true
+        }}
     }
   }
 
