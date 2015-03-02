@@ -7,7 +7,7 @@
 3. Type `compile` into the console to build everything.
     It will take 10 minutes the first time around.
 4. Type `run` into the console to execute [/main/Main.scala][2].
-5. Type `test` into the console to screen for insanity.
+5. Type `test` into the console to screen for errors.
 6. Read case studies in [/main][3]
 
 [1]: http://www.scala-sbt.org/
