@@ -365,9 +365,10 @@ object Coercion extends UniverseConstruction with util.Traverse {
     // be safely replaced by typecasts
     //
     // algorithm is depth-first-search until result stops changing.
-    // It is possible to discover `diff` in one DFS in O(n log n) time
+    // It should be possible to discover `diff` in one DFS in O(n log n) time
     // if we reverse the dependency graph and add links from mu-bindings
     // to all type variables bound by it.
+    // we implement a slow O(n^2 log n) algorithm here because we're lazy.
     val diff  = applyExhaustively(diffRep)(propagateDiff(start, graph))
 
     // discover nearest representation-preserving descendants of `start`
