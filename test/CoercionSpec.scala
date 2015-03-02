@@ -18,7 +18,7 @@ class CoercionSpec extends FlatSpec {
   type F4[+A] = Const[F1[Fix[F1]]]#λ[A]
   type F5[+A] = Const[Fix[F1]]#λ[A]
   type F6[+A] = Fix[Const[Fork[A, A]]#λ]
-/*
+
   "Coercion" should "detect when two types have same representation" in {
     assert(sameRep[Int, Int])
     assert(sameRep[Fix[Identity], Fix[Identity]])
@@ -38,7 +38,6 @@ class CoercionSpec extends FlatSpec {
     assert(! sameRep[Fix[F6], Fix[F3]])
     assert(! sameRep[Fix[F5], Fix[F6]])
   }
- */
 
   it should "typecast between types only if safe and necessary" in {
     assert(hasCast[Fix[Const[Fix[Identity]]#λ], Fix[Identity]])
