@@ -69,6 +69,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
             diffRep, graph
           )
           val f = ctx((actual.id, expected.id))
+
           q"""{
             object $TheWitness { ..$dfs }
             $TheWitness . $f($arg)
@@ -85,12 +86,12 @@ object Coercion extends UniverseConstruction with util.Traverse {
     * with extra book-keeping to compute witnesses
     * with extra book-keeping for optimization via safe typecasts
     *
-    * @return Some((labels, defs, reps))
+    * @return Some((labels, defs, diff, graph))
     *   where
     *     labels = mapping source-target pairs to conversion method names
     *     defs   = mapping source-target pairs to method definitions
-    *     reps   = mapping source-target pairs to whether the method
-    *              preserves runtime representation
+    *     diff   = set of source-target pairs corresponding to conversions
+    *              that do not preserve runtime object representation
     *     graph  = dependency graph between source-target pairs
     *
     * reps & graph are necessary for optimization alone.
@@ -270,10 +271,10 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
               val results = tgtArgs.flatMap { candidate =>
                 for {
-                  (ctx, dfs, diffRep, gr) <- witness(c)(a0, source, candidate)
+                  (ctx, dfs, diff, gr) <- witness(c)(a0, source, candidate)
                 }
                 yield (candidate, ctx, dfs,
-                  diffRep,
+                  diff,
                   ((source.id -> target.id) -> (source.id -> candidate.id)) +: gr
                 )
               }
@@ -302,15 +303,15 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
               // unique match, is good.
               else {
-                val (candidate, a1, dfs, sr, gr) = results.head
+                val (candidate, a1, dfs, diff, graph) = results.head
                 Some((
                   a1,
                   dfs + ((source.id, target.id) -> mkF((x, env) => {
                     val f1 = env((source.id, candidate.id))
                     q"$f1($x)"
                   })),
-                  sr, // updated at candidate's
-                  gr  // updated at candidate's
+                  diff,  // updated at candidate's
+                  graph  // updated at candidate's
                 ))
               }
 
@@ -321,21 +322,89 @@ object Coercion extends UniverseConstruction with util.Traverse {
     }
   }
 
-
   /** optimize away coercions with identical runtime representation */
   def optimizeCoerce(c: Context)(
     context : Env[c.TermName],
     dfs     : Env[Env[c.TermName] => c.Tree],
     source  : Regular[c.Type],
-    expected: Regular[c.Type],
+    target  : Regular[c.Type],
     diffRep : DiffRep,
     graph0  : Graph):
-      (Env[c.TermName], Iterable[c.Tree]) =
+      (Env[c.TermName], List[c.Tree]) =
   {
+    val (env, indexedDfs) = optimizeCoerceWithIndex(c)(
+      context, dfs, source, target, diffRep, graph0
+    )
+
+    (env, indexedDfs.map(_._2))
+  }
+
+  /** @return (env, indexedDfs) where
+    *   `env` maps vertices to name of corresponding conversion methods
+    *   `indexedDfs` is a list of definitions indexed by name of method
+    */
+  def optimizeCoerceWithIndex(c: Context)(
+    context : Env[c.TermName],
+    dfs     : Env[Env[c.TermName] => c.Tree],
+    source  : Regular[c.Type],
+    target  : Regular[c.Type],
+    diffRep : DiffRep,
+    graph0  : Graph):
+      (Env[c.TermName], List[(String, c.Tree)]) =
+  {
+    import c.universe._
+
+    // represent graph by map from each predecessor to its set of successors
     val graph = mkMultiGraph(graph0)
 
-    // TODO: REPLACE STUB
-    (context, dfs.map(p => p._2(context)))
+    // the starting vertex (top-level conversion)
+    val start = (source.id, target.id)
+
+    // propagate nonpreservation of runtime representation exhaustively,
+    // obtain all vertices corresponding to conversions that cannot
+    // be safely replaced by typecasts
+    //
+    // algorithm is depth-first-search until result stops changing.
+    // It is possible to discover `diff` in one DFS in O(n log n) time
+    // if we reverse the dependency graph and add links from mu-bindings
+    // to all type variables bound by it.
+    val diff  = applyExhaustively(diffRep)(propagateDiff(start, graph))
+
+    // discover nearest representation-preserving descendants of `start`
+    val casts = optimizedVertices(start, graph, diff)
+
+    // convert regular types to maps
+    val getTpe: PartialFunction[String, Type] =
+      extractTpes(c)(source) orElse extractTpes(c)(target)
+
+    // optimized context: cast as much as possible
+    val ctxOpt: Env[TermName] = context ++ casts.map({
+      v => (v, TermName(c.freshName("cast")))
+    })
+
+    val conversionMethods: List[(String, Tree)] = dfs.flatMap({
+      case (v @ (src, tgt), dfn) =>
+        if (casts(v)) {
+          // generate a cast
+          val f      = ctxOpt(v)
+          val srcTpe = getTpe(src)
+          val tgtTpe = getTpe(tgt)
+          val x      = TermName(c freshName "x")
+          List(
+            ( f.toString,
+              q"def $f($x : $srcTpe): $tgtTpe = $x.asInstanceOf[$tgtTpe]"
+            ),
+
+            // append method without cast based on old context
+            (context(v).toString, dfn(context))
+          )
+        }
+        else
+          // generate a conversion
+          List((ctxOpt(v).toString, dfn(ctxOpt)))
+    })(collection.breakOut)
+
+    (ctxOpt, conversionMethods)
   }
 
   /** convert a Graph into a MultiGraph, or graph based on multimap */
@@ -352,12 +421,59 @@ object Coercion extends UniverseConstruction with util.Traverse {
       case Some(next) => applyExhaustively(next)(step)
     }
 
+  /** extract all types mentioned in a regular type */
+  def extractTpes(c: Context)(tau: Regular[c.Type]): Map[String, c.Type] =
+    tau match {
+      case RegularVar(id, tpe) =>
+        Map(id -> tpe)
+
+      case RegularFun(id, tpe, args) =>
+        Map(id -> tpe) ++ args.flatMap(sigma => extractTpes(c)(sigma))
+
+      case RegularFix(id, tpe, body) =>
+        Map(id -> tpe) ++ extractTpes(c)(body)
+    }
+
+  /** traverse graph once & discover vertices to convert to casts
+    * those conversions without dependencies are not marked,
+    * because their baseline implementation should be faster than
+    * a typecast
+    */
+  def optimizedVertices(start: Vertex, graph: MultiGraph, diff: DiffRep):
+      Set[Vertex] =
+    abortiveDFS[Set[Vertex]](start, graph)(Set.empty) {
+      // do not descend into representation-preserving conversions
+      case (v, set) =>
+        if (! diff(v)) {
+          if (graph.withDefault(_ => MSet.empty[Vertex])(v).nonEmpty)
+            // convert a traversal into a typecast
+            Some(set + v)
+          else
+            // there's no traversal anyway, no need to generate cast
+            Some(set)
+        }
+        else None
+    } {
+      // descend into non-representation-preserving conversions
+      // to discover nearest representation-preserving descendants
+      (v, set) => { assert(diff(v)) ; set }
+    }
+
   /** traverse graph once & propagage difference in runtime representation */
   def propagateDiff(start: Vertex, graph: MultiGraph): DiffRep => Option[DiffRep] =
     diff => {
-      val (newDiff, acc) = stateDFS[
+      val (newDiff, acc) = abortiveDFS[
         (Set[Vertex], List[Vertex])
       ](start, graph)((diff, Nil)) {
+        // never abort the DFS because non-preserving conversion
+        // may invoke preserving subconversions, which must be marked
+        // according to whether its subsubconversions are preseving
+        // or not.
+        (_, _) => None
+      } {
+        // descend into dependencies.
+        // if they are non-representation-preserving,
+        // so is the conversion associated with `next`.
         case (v, (diff, acc)) =>
           if (
             diff(v) || graph.withDefault(
@@ -374,10 +490,10 @@ object Coercion extends UniverseConstruction with util.Traverse {
         Some(newDiff)
     }
 
-  /** depth-first-search with accumulator
-    */
-  def stateDFS[T](start: Vertex, graph: MultiGraph)
+  /** depth-first-search with accumulator and possibility to not descend */
+  def abortiveDFS[T](start: Vertex, graph: MultiGraph)
     (startingState: T)
+    (abortWithRslt: (Vertex, T) => Option[T])
     (transition   : (Vertex, T) => T): T =
   {
     def search(next: Vertex): (T, Set[Vertex]) => (T, Set[Vertex]) =
@@ -385,14 +501,22 @@ object Coercion extends UniverseConstruction with util.Traverse {
         if (visited(next))
           (state, visited)
         else {
-          val result =
-            graph.withDefault(_ => MSet.empty[Vertex])(next).foldLeft[
-              (T, Set[Vertex])
-            ]((state, visited + next)) {
-              case ((state, visited), child) =>
-                search(child)(state, visited)
-            }
-          (transition(next, result._1), result._2)
+          val nextVisited = visited + next
+
+          abortWithRslt(next, state) match {
+            case Some(nextState) =>
+              (nextState, nextVisited)
+
+            case None =>
+              val result =
+                graph.withDefault(_ => MSet.empty[Vertex])(next).foldLeft[
+                  (T, Set[Vertex])
+                ]((state, nextVisited)) {
+                  case ((state, visited), child) =>
+                    search(child)(state, visited)
+                }
+              (transition(next, result._1), result._2)
+          }
         }
       }
 
@@ -474,6 +598,43 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
   // testing macros
   object Test {
+    // test if there's a cast at top level or not
+    def hasCast[S, T]: Boolean =
+      macro hasCastImpl[S, T]
+
+    def hasCastImpl[Actual, Expected](c: Context)(
+      implicit
+        actualTag: c.WeakTypeTag[Actual],
+      expectedTag: c.WeakTypeTag[Expected]): c.Tree =
+    {
+      import c.universe._
+
+      val actual   = reifyRegular(c)(actualTag.tpe)
+      val expected = reifyRegular(c)(expectedTag.tpe)
+
+      witness(c)(Map.empty, actual, expected) match {
+        case None =>
+          sys error "`hasCast` must be called on valid coercions"
+
+        case Some((ctx0, dfs0, diffRep, graph)) =>
+
+          val (ctx, dfs) = optimizeCoerceWithIndex(c)(
+            ctx0, dfs0, actual, expected,
+            diffRep, graph
+          )
+
+          val f = ctx((actual.id, expected.id)).toString
+
+          dfs.find(_._1 == f) match {
+            case Some((_, q"def $f($x : $src): $tgt = $y.asInstanceOf[$tgt2]")) =>
+              q"true"
+
+            case other =>
+              q"false"
+          }
+      }
+    }
+
     // Test macro sameRep[S, T] returns whether S, T has same runtime
     // representationl.
     def sameRep[S, T]: Boolean =
