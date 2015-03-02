@@ -117,15 +117,15 @@ object Coerce {
 
 
   // solution: make precondition of isEmpty the weakest possible
-  def isEmpty_good[S, T](xs: ListT[S, T]): Boolean = xs match {
+  def isEmpty_good[S, T](xs: ListT[Nil, Cons[S, T]]): Boolean = xs match {
     case Nil => true
     case Cons(_, _) => false
   }
 
   // expected time: constant
   //   actual time: constant
-  def isEmpty_List(xs: List[Any]): Boolean =
-    isEmpty_good[Any, Any](coerce(xs))
+  def isEmpty_List[T](xs: List[T]): Boolean =
+    isEmpty_good[T, Any](coerce(xs))
 
   // expected time: constant
   //   actual time: constant
