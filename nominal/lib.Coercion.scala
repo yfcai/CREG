@@ -6,7 +6,7 @@ package lib
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.language.experimental.macros
-
+import scala.collection.mutable.{HashMap => MMap, MultiMap, Set => MSet}
 import scala.reflect.macros.blackbox.Context
 
 import compiler._
@@ -62,9 +62,13 @@ object Coercion extends UniverseConstruction with util.Traverse {
             s"Coercion failed. Either there's a type error,\n" +
               "or the context has too little information.")
 
-        case Some((context, dfs)) =>
+        case Some((ctx0, dfs0, diffRep, graph)) =>
           val TheWitness = TermName(c freshName "TheWitness")
-          val f = context((actual.id, expected.id))
+          val (ctx, dfs) = optimizeCoerce(c)(
+            ctx0, dfs0, actual, expected,
+            diffRep, graph
+          )
+          val f = ctx((actual.id, expected.id))
           q"""{
             object $TheWitness { ..$dfs }
             $TheWitness . $f($arg)
@@ -72,58 +76,118 @@ object Coercion extends UniverseConstruction with util.Traverse {
       }
     }
 
-  // coercion algorithm
+  private[this] type Vertex        = (String, String)
+  private[this] type Env[TermName] = Map[Vertex, TermName]
+  private[this] type DiffRep       = Set[Vertex]
+  private[this] type Graph         = Seq[(Vertex, Vertex)]
+
+  /** Pierce's memoized version of of Amadio & Cardelli's subtyping algorithm
+    * with extra book-keeping to compute witnesses
+    * with extra book-keeping for optimization via safe typecasts
+    *
+    * @return Some((labels, defs, reps))
+    *   where
+    *     labels = mapping source-target pairs to conversion method names
+    *     defs   = mapping source-target pairs to method definitions
+    *     reps   = mapping source-target pairs to whether the method
+    *              preserves runtime representation
+    *     graph  = dependency graph between source-target pairs
+    *
+    * reps & graph are necessary for optimization alone.
+    */
   def witness(c: Context)(
     context: Map[(String, String), c.universe.TermName],
     source : Regular[c.Type],
     target : Regular[c.Type]):
-      Option[(Map[(String, String), c.universe.TermName], Seq[c.Tree])] =
+      Option[(Env[c.TermName], Env[Env[c.TermName] => c.Tree], DiffRep, Graph)] =
   {
     import c.universe._
+    type ReturnType = Option[(
+      Env[TermName],
+      Env[Env[TermName] => Tree],
+      DiffRep,
+      Graph
+    )]
 
-    // pre-computed
+    // pre-computed: preserves representation only if all subcomputations does
+    // to be determined later
     if (context.contains((source.id, target.id)))
-      Some((context, Seq.empty))
+      Some((context, Map.empty, Set.empty, Seq.empty))
 
     else {
 
       val f  = TermName(c.freshName("f"))
       val a0 = context.updated((source.id, target.id), f)
 
-      def mkF(body: TermName => Tree): Tree = {
+      def mkF(body: (TermName, Env[TermName]) => Tree): Env[TermName] => Tree = {
         val x = TermName(c freshName "x")
-        q"def $f($x: ${source.tpe}): ${target.tpe} = ${body(x)}"
+        env => q"def $f($x: ${source.tpe}): ${target.tpe} = ${body(x, env)}"
       }
 
-      // source <: target
+      // source <: target: preserves representation
       if (isScalaSubtype(c)(source.tpe, target.tpe))
-        Some((a0, Seq(mkF { x => q"$x" })))
+        Some((a0, Map((source.id, target.id) -> mkF((x, env) => q"$x")),
+          Set.empty,
+          Seq.empty
+        ))
 
       else inferImplicitView(c)(source.tpe, target.tpe) match {
-        // source <% target
+        // source <% target: does not preserve representation
         case Some(view) =>
-          Some((a0, Seq(mkF { x => q"$view($x)" })))
+          Some((a0, Map((source.id, target.id) -> mkF((x, env) => q"$view($x)")),
+            Set(source.id -> target.id),
+            Seq.empty
+          ))
 
         case None =>
 
           (source, target) match {
+            // simultaneous unroll: preserves representation
+            case (
+              src @ RegularFix(srcId, srcTpe, _),
+              tgt @ RegularFix(tgtId, tgtTpe, _)) =>
+              for {
+                (a1, dfs, diffRep, graph) <- witness(c)(a0, src.unroll, tgt.unroll)
+                newDfn = mkF { (x, env) =>
+                  val f1 = env((src.body.id, tgt.body.id))
+                  q"${getRoll(c)}[..${tgtTpe.typeArgs}]($f1($x.unroll))"
+                }
+              }
+              yield (
+                a1,
+                dfs + ((srcId -> tgtId) -> newDfn),
+                diffRep,
+                ((srcId -> tgtId) -> (src.body.id -> tgt.body.id)) +: graph
+              )
+
+            // unroll target: does not preserve representation
             case (source @ RegularFix(id, srcTpe, _), _) =>
               for {
-                (a1, dfs) <- witness(c)(a0, source.unroll, target)
-                f1 = a1((source.body.id, target.id))
-                newDfn = mkF(x => q"$f1($x.unroll)")
-              } yield (a1, newDfn +: dfs)
+                (a1, dfs, diffRep, graph) <- witness(c)(a0, source.unroll, target)
+                newDfn = mkF { (x, env) =>
+                  val f1 = env((source.body.id, target.id))
+                  q"$f1($x.unroll)"
+                }
+              } yield (a1, dfs + ((source.id, target.id) -> newDfn),
+                diffRep + (source.id -> target.id),
+                ((source.id -> target.id) -> (source.body.id -> target.id)) +: graph
+              )
 
+            // unroll source: does not preserve representation
             case (_, target @ RegularFix(id, tgtTpe, _)) =>
               for {
-                (a1, dfs) <- witness(c)(a0, source, target.unroll)
-                f1 = a1((source.id, target.body.id))
-                newDfn = mkF { x =>
+                (a1, dfs, diffRep, graph) <- witness(c)(a0, source, target.unroll)
+                newDfn = mkF { (x, env) =>
+                  val f1 = env((source.id, target.body.id))
                   q"${getRoll(c)}[..${tgtTpe.typeArgs}]($f1($x))"
                 }
               }
-              yield (a1, newDfn +: dfs)
+              yield (a1, dfs + ((source.id, target.id) -> newDfn),
+                diffRep + (source.id -> target.id),
+                ((source.id -> target.id) -> (source.id -> target.body.id)) +: graph
+              )
 
+            // identical functor at top level: preserves representation
             case (
               RegularFun(srcId, srcTpe, srcArgs),
               RegularFun(tgtId, tgtTpe, tgtArgs))
@@ -171,36 +235,47 @@ object Coercion extends UniverseConstruction with util.Traverse {
                   val args = srcArgs.zip(tgtArgs)
 
                   for {
-                    (an, dfs) <- args.foldLeft[Option[
-                      (Map[(String, String), c.universe.TermName], Seq[c.Tree])
-                    ]]( Some((a0, Seq.empty)) ) {
+                    (an, dfs, diffRep, graph) <- args.foldLeft[ReturnType](
+                      Some((a0, Map.empty, Set.empty, Seq.empty))
+                    ) {
                       case (maybe, (s_i, t_i)) =>
                         for {
-                          (a_prev, dfs_prev) <- maybe
-                          (a_i, dfs_i) <- witness(c)(a_prev, s_i, t_i)
+                          (a_prev, dfs_prev, sr_prev, gr_prev) <- maybe
+                          (a_i, dfs_i, sr_i, gr_i) <- witness(c)(a_prev, s_i, t_i)
                         }
-                        yield (a_i, dfs_prev ++ dfs_i)
+                        yield (a_i, dfs_prev ++ dfs_i,
+                          sr_prev ++ sr_i,
+                          ((source.id -> target.id) -> (s_i.id -> t_i.id)) +:
+                            (gr_i ++ gr_prev)
+                        )
                     }
 
-                    fs = args.map {
-                      case (srcChild, tgtChild) =>
-                        an((srcChild.id, tgtChild.id))
+                    newDfs = mkF { (x, env) =>
+                      val fs = args.map {
+                        case (srcChild, tgtChild) =>
+                          env((srcChild.id, tgtChild.id))
+                      }
+                      q"$functor[..${srcArgs.map(_.tpe)}]($x).map(..$fs)"
                     }
-
-                    newDfs = mkF { x => q"$functor[..${srcArgs.map(_.tpe)}]($x).map(..$fs)" }
                   }
-                  yield (an, newDfs +: dfs)
+                  yield (an, dfs + ((source.id, target.id) -> newDfs),
+                    diffRep,
+                    graph
+                  )
               }
 
-            // converting records to variants
+            // converting records to variants: preserves representation
             case (_, RegularFun(tgtId, tgtTpe, tgtArgs))
                 if isRecordOfVariant(c)(source.tpe, tgtTpe) =>
 
               val results = tgtArgs.flatMap { candidate =>
                 for {
-                  (ctx, dfs) <- witness(c)(a0, source, candidate)
+                  (ctx, dfs, diffRep, gr) <- witness(c)(a0, source, candidate)
                 }
-                yield (candidate, ctx, dfs)
+                yield (candidate, ctx, dfs,
+                  diffRep,
+                  ((source.id -> target.id) -> (source.id -> candidate.id)) +: gr
+                )
               }
 
               // no match; bad coercion.
@@ -227,9 +302,16 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
               // unique match, is good.
               else {
-                val (candidate, a1, dfs) = results.head
-                val f1 = a1((source.id, candidate.id))
-                Some((a1, mkF(x => q"$f1($x)") +: dfs))
+                val (candidate, a1, dfs, sr, gr) = results.head
+                Some((
+                  a1,
+                  dfs + ((source.id, target.id) -> mkF((x, env) => {
+                    val f1 = env((source.id, candidate.id))
+                    q"$f1($x)"
+                  })),
+                  sr, // updated at candidate's
+                  gr  // updated at candidate's
+                ))
               }
 
             case _ =>
@@ -238,6 +320,87 @@ object Coercion extends UniverseConstruction with util.Traverse {
       }
     }
   }
+
+
+  /** optimize away coercions with identical runtime representation */
+  def optimizeCoerce(c: Context)(
+    context : Env[c.TermName],
+    dfs     : Env[Env[c.TermName] => c.Tree],
+    source  : Regular[c.Type],
+    expected: Regular[c.Type],
+    diffRep : DiffRep,
+    graph0  : Graph):
+      (Env[c.TermName], Iterable[c.Tree]) =
+  {
+    val graph = mkMultiGraph(graph0)
+
+    // TODO: REPLACE STUB
+    (context, dfs.map(p => p._2(context)))
+  }
+
+  /** convert a Graph into a MultiGraph, or graph based on multimap */
+  type MultiGraph = MultiMap[Vertex, Vertex]
+  def mkMultiGraph(graph: Graph): MultiGraph = {
+    val mm = new MMap[Vertex, MSet[Vertex]] with MultiGraph
+    graph.foreach { case (source, target) => mm.addBinding(source, target) }
+    mm
+  }
+
+  def applyExhaustively[T](initial: T)(step: T => Option[T]): T =
+    step(initial) match {
+      case None       => initial
+      case Some(next) => applyExhaustively(next)(step)
+    }
+
+  /** traverse graph once & propagage difference in runtime representation */
+  def propagateDiff(start: Vertex, graph: MultiGraph): DiffRep => Option[DiffRep] =
+    diff => {
+      val (newDiff, acc) = stateDFS[
+        (Set[Vertex], List[Vertex])
+      ](start, graph)((diff, Nil)) {
+        case (v, (diff, acc)) =>
+          if (
+            diff(v) || graph.withDefault(
+              _ => MSet.empty[Vertex]
+            )(v).filter(diff).isEmpty
+          )
+            (diff, acc)
+          else
+            (diff + v, v :: acc)
+      }
+      if (acc.isEmpty)
+        None
+      else
+        Some(newDiff)
+    }
+
+  /** depth-first-search with accumulator
+    */
+  def stateDFS[T](start: Vertex, graph: MultiGraph)
+    (startingState: T)
+    (transition   : (Vertex, T) => T): T =
+  {
+    def search(next: Vertex): (T, Set[Vertex]) => (T, Set[Vertex]) =
+      (state, visited) => {
+        if (visited(next))
+          (state, visited)
+        else {
+          val result =
+            graph.withDefault(_ => MSet.empty[Vertex])(next).foldLeft[
+              (T, Set[Vertex])
+            ]((state, visited + next)) {
+              case ((state, visited), child) =>
+                search(child)(state, visited)
+            }
+          (transition(next, result._1), result._2)
+        }
+      }
+
+    search(start)(startingState, Set.empty)._1
+  }
+
+
+  // UTILITIES
 
   // subsumes subtyping
   def inferImplicitView(c: Context)(actual: c.Type, expected: c.Type):
@@ -306,5 +469,46 @@ object Coercion extends UniverseConstruction with util.Traverse {
   def isScalaSubtype(c: Context)(subtype: c.Type, supertype: c.Type): Boolean = {
     import c.universe._
     inferImplicitValue(c)(tq"$subtype <:< $supertype").nonEmpty
+  }
+
+
+  // testing macros
+  object Test {
+    // Test macro sameRep[S, T] returns whether S, T has same runtime
+    // representationl.
+    def sameRep[S, T]: Boolean =
+      macro sameRepImpl[S, T]
+
+    def sameRepImpl[Actual, Expected](c: Context)(
+      implicit
+        actualTag: c.WeakTypeTag[Actual],
+      expectedTag: c.WeakTypeTag[Expected]): c.Tree =
+    {
+      import c.universe._
+
+      val source = reifyRegular(c)(actualTag.tpe)
+      val target = reifyRegular(c)(expectedTag.tpe)
+
+      witness(c)(Map.empty, source, target) match {
+        case None =>
+          q"false"
+        case Some((ctx0, dfs0, diffRep, graph)) =>
+          val hasSameRep = testRepresentationPreserving(
+            (source.id, target.id), graph, diffRep
+          )
+          q"$hasSameRep"
+      }
+    }
+
+    /** test if starting vertex corresponds to a different runtime rep.
+      * CAUTION: not efficient; for testing only.
+      */
+    def testRepresentationPreserving(start: Vertex, graph0: Graph, diffRep: DiffRep):
+        Boolean =
+    {
+      val graph = mkMultiGraph(graph0)
+      val diff = applyExhaustively(diffRep)(propagateDiff(start, graph))
+      ! diff(start)
+    }
   }
 }

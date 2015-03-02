@@ -253,5 +253,8 @@ object DatatypeRepresentation {
       }
       loop(body)
     }
+
+    // is not Fix[Identity]
+    def wellFormed: Boolean = id != body.id
   }
 }
