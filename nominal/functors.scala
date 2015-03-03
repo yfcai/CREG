@@ -6,6 +6,10 @@ package functors
 import scala.language.experimental.macros
 import scala.annotation.StaticAnnotation
 
+class struct extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro annotation.struct.impl
+}
+
 class data extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro annotation.data.expandData
 }

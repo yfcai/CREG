@@ -103,12 +103,11 @@ object DatatypeRepresentation {
     }
   }
 
-  // here to support legacy code in UniverseConstruction.carePackage
-  // remove after rewriting reification
-  sealed trait Nominal { def name: Name ; def get: Datatype }
-
   // cases for a variant, can be records or variants
-  sealed trait VariantCase extends Datatype with Nominal with DatatypeLike[VariantCase] { def get = this }
+  sealed trait VariantCase extends Datatype with DatatypeLike[VariantCase] {
+    def get = this
+    def name: String
+  }
 
   // let-bindings: basically ID with extra synonym request
   case class LetBinding(lhs: Name, rhs: VariantCase) extends VariantCase with DatatypeLike[LetBinding] {
@@ -183,7 +182,7 @@ object DatatypeRepresentation {
 
   case class DataFamily(name: Name, params: Many[Param], members: Many[Variant])
 
-  case class Field(name: Name, get: Datatype) extends Nominal
+  case class Field(name: Name, get: Datatype)
 
   case class Param(name: Name, variance: Param.Variance) {
     def toInvariant: Param = copy(variance = Param.Variance.Invariant)

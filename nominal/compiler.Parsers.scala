@@ -32,16 +32,17 @@ trait Parsers extends util.AbortWithError with util.Paths {
     def parse(d: Context, gamma: Set[Name])(input: d.Tree): Result[Many[c.Tree], d.Position] = {
       import c.universe._
       input.asInstanceOf[c.Tree] match {
-        case DefDef(mods, name, params, args, returnType, body) => Success(returnType match {
-          case CompoundTypeTree(Template(supers, selfType, stuff)) =>
-            supers
+        case DefDef(mods, name, params, args, returnType, body) =>
+          Success(returnType match {
+            case tq"" | tq"scala.Unit" =>
+              Many.empty
 
-          case tq"" =>
-            Many.empty
+            case CompoundTypeTree(Template(supers, selfType, stuff)) =>
+              supers
 
-          case other =>
-            Many(other)
-        })
+            case other =>
+              Many(other)
+          })
 
         case _ =>
           Failure(input.pos, s"expect `def lhs: supers = rhs`, got $input")
