@@ -145,23 +145,11 @@ object Compos {
 
   // MAKE NAMES GLOBALLY UNIQUE //
 
-  private[this] // necessary to make inner type λ covariant
-  type State[S] = {
-    type λ[+A] = S => (A, S)
-  }
+  import Monad.State._
 
-  implicit def stateMonad[S] = new MonadWithBind {
-    type Map[+A] = State[S]#λ[A]
-    def pure[A](x: A): Map[A] = s => (x, s)
-    def bind[A, B](m: Map[A], f: A => Map[B]): Map[B] =
-      s0 => m(s0) match { case (a, s1) => f(a)(s1) }
-  }
-
-  implicit class StateMonadView[A, S](x: State[S]#λ[A]) extends Monad.View[State[S]#λ, A](x)
-
-  def readState[S]: State[S]#λ[S] = s => (s, s)
-  def writeState[S](s: S): State[S]#λ[Unit] = _ => ((), s)
-  def evalState[S, A](sm: State[S]#λ[A], s: S): A = sm(s)._1
+  // curried state---need not be private?!
+  // what happened to RHS of inner types being an invariant position?
+  type StateC[S] = { type λ[+A] = State[S, A] }
 
   // infinite lists of hopefully fresh names
   type Names = Stream[String]
@@ -179,30 +167,31 @@ object Compos {
   def fresh(e: Exp): Exp = {
     import Monad._
 
-    def f(subst: Subst): Op[Syntactic, State[Names]#λ] = new Op[Syntactic, State[Names]#λ] {
-      def apply[A: Syntactic](e: A): State[Names]#λ[A] =
-        implicitly[Syntactic[A]] match {
-          case Var =>
-            stateMonad[Names].pure(V(subst(e.name)))
+    def f(subst: Subst): Op[Syntactic, StateC[Names]#λ] =
+      new Op[Syntactic, StateC[Names]#λ] {
+        def apply[A: Syntactic](e: A): State[Names, A] =
+          implicitly[Syntactic[A]] match {
+            case Var =>
+              stateMonad[Names].pure(V(subst(e.name)))
 
-          case Exp => e.unroll match {
-            case Abs(V(x), b) =>
-              for {
-                freshNames <- readState[Names]
-                _ <- writeState(freshNames.tail)
-                x2 = freshNames.head
-                b2 <- f(subst updated (x, x2))(b)
-              }
-              yield coerce { Abs(V(x2), b2) }: Exp
+            case Exp => e.unroll match {
+              case Abs(V(x), b) =>
+                for {
+                  freshNames <- readState[Names]
+                  _ <- writeState(freshNames.tail)
+                  x2 = freshNames.head
+                  b2 <- f(subst updated (x, x2))(b)
+                }
+                yield coerce { Abs(V(x2), b2) }: Exp
+
+              case _ =>
+                composM[Syntactic, StateC[Names]#λ, A](this, e)
+            }
 
             case _ =>
-              composM[Syntactic, State[Names]#λ, A](this, e)
+              composM[Syntactic, StateC[Names]#λ, A](this, e)
           }
-
-          case _ =>
-            composM[Syntactic, State[Names]#λ, A](this, e)
-        }
-    }
+      }
 
     evalState(f(Subst.empty)(e), getNameStream)
   }

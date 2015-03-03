@@ -316,6 +316,8 @@ object TyrannyOfTheDominantFunctor {
     }
 
     class SS1_1_PolymorphicRecordsCompileTimeAssertions[T] {
+      // ask Scala compiler to check that
+      //   termF.Map[T] == TermT[Lit[Int],Var[String],Abs[String,T],App[T,T]]
       implicitly[ termF.Map[T] =:=
         TermT[Lit[Int], Var[String], Abs[String, T], App[T, T]]
       ]
@@ -323,12 +325,12 @@ object TyrannyOfTheDominantFunctor {
 
     object SS2_RecursiveTypes {
       val omega : Term =
-        Roll[ termF .Map ](App(
-          Roll[ termF .Map ](Abs("x",
-            Roll[ termF .Map ](App(
-              Roll[ termF .Map ](Var("x")), Roll[ termF .Map ](Var("x")))))),
-          Roll[ termF .Map ](Abs("x", Roll[ termF .Map ](App(
-            Roll[ termF .Map ](Var("x")), Roll[ termF .Map ](Var("x"))))))))
+        Roll[termF.Map](App(
+          Roll[termF.Map](Abs("x",
+            Roll[termF.Map](App(
+              Roll[termF.Map](Var("x")), Roll[termF.Map](Var("x")))))),
+          Roll[termF.Map](Abs("x", Roll[termF.Map](App(
+            Roll[termF.Map](Var("x")), Roll[termF.Map](Var("x"))))))))
     }
 
     val omegaPrime : Term = coerce {
@@ -338,6 +340,8 @@ object TyrannyOfTheDominantFunctor {
     }
 
     class SS3_RegularFunctorsCompileTimeAssertions[N] {
+      // ask Scala compiler to check that `nameF.Map[N]`
+      // is as shown at the end of §3.3.
       implicitly[ nameF.Map[N] =:=
         Fix[({
           type λ[+T] = TermT[
@@ -346,43 +350,85 @@ object TyrannyOfTheDominantFunctor {
         })#λ]
       ]
     }
+
+    object SS3_DuplicationBetweenFunctors {
+      // how to abstract over similarities between functors
+      // using nothing other than composability of regular functors
+      @functor def triF[N, S, T] =
+        TermT { Lit (number = Int)
+          Var (name = N)
+          Abs (param = N, body = T)
+          App (operator = S, operand = T)
+        }
+
+      @functor def nameF_alt[N] = Fix(T => triF apply (N, T, T))
+      @functor def termF_alt[T] = triF apply (String, T, T)
+      @functor def   opF_alt[S] = triF apply (String, S, Term)
+
+      // ask Scala compiler to check that alternative definitions
+      // of nameF, termF and opF have unchanged type constructors
+      implicitly[ nameF.Map[Any] =:= nameF_alt.Map[Any] ]
+      implicitly[ termF.Map[Any] =:= termF_alt.Map[Any] ]
+      implicitly[   opF.Map[Any] =:=   opF_alt.Map[Any] ]
+    }
   }
 
-  object S4_ModularityBenefits {
+  object S4_Encoding {
+    // encoding programming techniques
 
-    object SS1_RecursionSchemes {
-      @functor def opF[A] = TermT {
-        Lit (number = Int)
-        Var (name = String)
-        Abs (param = String, body = Term)
-        App (operator = A, operand = Term)
+    val SS1_Banana  = Banana  // main/Banana.scala
+    val SS1_Origami = Origami // main/Origami.scala
+
+    object SS2_Traversable {
+      // identity functors are applicative
+      object Identity extends Applicative {
+        type Map[+A] = A
+        def pure[A](x : A): A = x
+        def call[A, B](f: A => B, x: A): B = f(x)
       }
-
-      def getOperator(t : Term) : Term =
-        cata[Term](opF)({
-          case App(op, s) => op
-          case op         => coerce { op }
-        })(coerce {t})
     }
 
-    object SS2_ContainerViews {
-      def listMonoid[A] = new Applicative {
-        type Map[+X] = List[A]
-        def pure[X](x : X) = List.empty
-        def call[X,Y](xs:List[A],ys:List[A])= xs ++ ys
+    val SS3_Compos  = Compos  // main/Compos.scala
+
+    // TODO: Put this in its own file
+    object SS4_Uniplate {
+      // uniplate typeclass
+      trait Uniplate[T] {
+        def uniplate(t: T): (List[T], List[T] => T)
       }
 
-      trait MyTraversableBounded extends TraversableBounded {
+      // the constant applicative functor into
+      // the monoid of lists (or, the free monoid of things)
+      def listMonoid[A] = Applicative.FreeMonoid[A]
+      //                = Applicative.Const[List[A]](List.empty, _ ++ _)
 
-        def toList[A <: Cat0](t: Map[A]): List[A] =
-          traverse(listMonoid[A])((x: A) => List(x))(t)
+      // reimplementation of toList and crush outside
+      // the trait Traversable
+      def toList_alt[A](F: Traversable): F.Map[A] => List[A] =
+        F.traverse(listMonoid[A])((x: A) => List(x))
 
-        def crush[A <: Cat0](z: A, s: (A, A) => A)(t: Map[A]) =
-          toList(t).fold(z)(s)
-      }
+      def crush_alt[A](F: Traversable)(z: A, s: (A, A) => A)(t: F.Map[A]): A =
+        toList_alt(F)(t).fold(z)(s)
 
-      // see main/Fresh.scala for the refreshM example
-      val refreshExample = Fresh
+      import Monad.State._
+
+      // reimplementation of fromList outside the trait Traversable
+      def fromList[A](F: Traversable)(children: List[A])(t: F.Map[A]): F.Map[A] =
+        evalState(
+          F.traverse(stateMonad[List[A]])({
+            (oldChild: A) => for {
+              children <- readState
+              _        <- writeState(children.tail)
+            }
+            yield children.head
+          })(t),
+
+          children
+        )
     }
+
+    val SS5_Scrap   = Scrap   // main/Scrap.scala
+
+    val SS6_Almost  = Fresh   // main/Fresh.scala
   }
 }

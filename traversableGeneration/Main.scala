@@ -422,6 +422,9 @@ object Main {
        |      def call[X, Y](f: A, x: A): A = combine(f, x)
        |    }
        |
+       |  def FreeMonoid[A]: Applicative { type Map[+X] = List[A] } =
+       |    Const[List[A]](Nil, _ ++ _)
+       |
        |  def Maybe[A]: Applicative { type Map[+X] = Option[X] } =
        |    new Applicative {
        |      type Map[+A] = Option[A]

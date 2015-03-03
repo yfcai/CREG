@@ -5,8 +5,10 @@ import creg.lib._
 import creg.functors._
 
 object Fresh {
-  import Compos.{stateMonad, StateMonadView, getNameStream}
+  import Monad.State
+  import Monad.State.stateMonad
   import Banana.cata
+  import Compos.getNameStream
 
   private[this] // necessary to make inner type λ covariant
   type State[S] = {
@@ -48,8 +50,8 @@ object Fresh {
   def local[A](f: (Subst => Subst))(m: FreshM[A]): FreshM[A] =
     m compose f
 
-  def readState: FreshM[Names] = env => Compos.readState
-  def writeState(names: Names): FreshM[Unit] = env => Compos writeState names
+  def readState: FreshM[Names] = env => State.readState
+  def writeState(names: Names): FreshM[Unit] = env => State writeState names
 
   implicit class FreshMonadView[T](x: FreshM.Map[T])
       extends Monad.View[FreshM, T](x)

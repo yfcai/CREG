@@ -12,7 +12,7 @@ import creg.lib._
 import language.higherKinds
 
 object Origami {
-  type Bifunctor = Traversable2
+  type Bifunctor = Functor2
 
   type Fix2[F[+_, +_], T] = Fix[ ({ type λ[+X] = F[T, X] })#λ ]
 
@@ -20,7 +20,7 @@ object Origami {
     Roll[ ({ type λ[+X] = F[T, X] })#λ ](unrolled)
 
   def bimap[A, B, C, D](F: Bifunctor)(f: A => B, g: C => D): F.Map[A, C] => F.Map[B, D] =
-    xs => F(xs) map (f, g)
+    F.fmap(f, g)
 
   def fmap2[A, C, D](F: Bifunctor)(g: C => D): F.Map[A, C] => F.Map[A, D] = bimap(F)(identity, g)
 

@@ -10,7 +10,7 @@
 // 
 
 import creg.lib._
-import Compos._ // for stateMonad
+import Monad.State._
 
 object StrangeTraverse extends Traversable {
   type Map[+A] = A
