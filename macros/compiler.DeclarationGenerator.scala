@@ -204,7 +204,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     }
 
     // trait to extend
-    val traversableN = getBoundedTraversableBase(c, n)
+    val traversableN = getTraversableBounded(c, n)
 
     // subcategory bounds
     val cats = bounds.zipWithIndex map {
@@ -281,7 +281,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     val n = record.fields.length
     val termName = TermName(record.name)
     val typeName = TypeName(record.name)
-    val traversableN = getTraversableBaseEndofunctor(c, n)
+    val traversableN = getTraversableEndofunctor(c, n)
     val typeMap = mkTypeMap(c, n) { params =>
       if (params.nonEmpty) tq"$typeName[..$params]" else tq"$typeName"
     }

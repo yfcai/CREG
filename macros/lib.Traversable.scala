@@ -3,45 +3,25 @@ package lib
 
 import language.higherKinds
 
-object TraversableBase {
-  type Endofunctor = TraversableBase {
+object TraversableBounded {
+
+  // TODO: Delete these synonyms
+  type Endofunctor = TraversableBounded {
     type Cat0 = Any
     type Map[+X]
   }
 
-  type Endofunctor2 = TraversableBase2 {
+  type Endofunctor2 = TraversableBounded2 {
     type Cat0 = Any ; type Cat1 = Any
     type Map[+A, +B]
   }
 
-  type Endofunctor3 = TraversableBase3 {
+  type Endofunctor3 = TraversableBounded3 {
     type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any
     type Map[+A, +B, +C]
   }
 
-  type Endofunctor4 = TraversableBase4 {
-    type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any ; type Cat3 = Any
-    type Map[+A, +B, +C, +D]
-  }
-
-  trait EndofunctorTrait0 extends TraversableBase0
-
-  trait EndofunctorTrait extends TraversableBase {
-    type Cat0 = Any
-    type Map[+A]
-  }
-
-  trait EndofunctorTrait2 extends TraversableBase2 {
-    type Cat0 = Any ; type Cat1 = Any
-    type Map[+A, +B]
-  }
-
-  trait EndofunctorTrait3 extends TraversableBase3 {
-    type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any
-    type Map[+A, +B, +C]
-  }
-
-  trait EndofunctorTrait4 extends TraversableBase4 {
+  type Endofunctor4 = TraversableBounded4 {
     type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any ; type Cat3 = Any
     type Map[+A, +B, +C, +D]
   }
@@ -53,13 +33,36 @@ object TraversableBase {
   type EndofunctorOf4[F[+_, +_, +_, +_]] = Endofunctor4 { type Map[+X1, +X2, +X3, +X4] = F[X1, X2, X3, X4] }
 }
 
-trait TraversableBase0 {
+trait Traversable0 extends TraversableBounded0
+
+trait Traversable extends TraversableBounded with Functor {
+  type Cat0 = Any
+  type Map[+A]
+}
+
+trait Traversable2 extends TraversableBounded2 {
+  type Cat0 = Any ; type Cat1 = Any
+  type Map[+A, +B]
+}
+
+trait Traversable3 extends TraversableBounded3 {
+  type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any
+  type Map[+A, +B, +C]
+}
+
+trait Traversable4 extends TraversableBounded4 {
+  type Cat0 = Any ; type Cat1 = Any ; type Cat2 = Any ; type Cat3 = Any
+  type Map[+A, +B, +C, +D]
+}
+
+
+trait TraversableBounded0 {
   type Map >: this.type
   type Range = Map
   def traverse(G: Applicative)(): Map => G.Map[Map] = G pure _
 }
 
-trait TraversableBase { thisFunctor =>
+trait TraversableBounded { thisFunctor =>
   // traversable functors can be defined on a subcategory
   type Cat0
   type Map[+A <: Cat0]
@@ -86,7 +89,7 @@ trait TraversableBase { thisFunctor =>
 
     def traverse(G: Applicative): Traversal[G.Map] = new Traversal[G.Map] {
       def apply[B <: Cat0](f: A => G.Map[B]): G.Map[Map[B]] =
-        TraversableBase.this.traverse(G)(f)(mA)
+        TraversableBounded.this.traverse(G)(f)(mA)
     }
 
     // fmap
@@ -106,8 +109,8 @@ trait TraversableBase { thisFunctor =>
   // def apply(t: Fix[Map]): Foldable[Map] = new Foldable[Map](t)(this)
 
   // compose with another functor
-  def compose(that: TraversableBase { type Map[+X] <: thisFunctor.Cat0 }) =
-    new TraversableBase {
+  def compose(that: TraversableBounded { type Map[+X] <: thisFunctor.Cat0 }) =
+    new TraversableBounded {
       type Cat0 = that.Cat0
       type Map[+A <: Cat0] = thisFunctor.Map[that.Map[A]]
       def traverse[A <: Cat0, B <: Cat0](G: Applicative)(f: A => G.Map[B]): this.Map[A] => G.Map[this.Map[B]] =
@@ -115,8 +118,8 @@ trait TraversableBase { thisFunctor =>
     }
 }
 
-// TraversableBase2, TraversableBase3, TraversableBase4, ..., TraversableBase22
-trait TraversableBase2 {
+// TraversableBounded2, TraversableBounded3, TraversableBounded4, ..., TraversableBounded22
+trait TraversableBounded2 {
   type Cat0
   type Cat1
   type Map[+A <: Cat0, +B <: Cat1]
@@ -139,7 +142,7 @@ trait TraversableBase2 {
     def traverse[C <: Cat0, D <: Cat1]
                 (G: Applicative)
                 (f: A => G.Map[C], g: B => G.Map[D]): G.Map[Map[C, D]] =
-      TraversableBase2.this.traverse(G)(f, g)(mAB)
+      TraversableBounded2.this.traverse(G)(f, g)(mAB)
 
     def map[C <: Cat0, D <: Cat1](f: A => C, g: B => D): Map[C, D] = this.traverse(Applicative.Identity)(f, g)
 
@@ -148,7 +151,7 @@ trait TraversableBase2 {
   }
 }
 
-trait TraversableBase3 {
+trait TraversableBounded3 {
   type Cat0
   type Cat1
   type Cat2
@@ -165,14 +168,14 @@ trait TraversableBase3 {
     def traverse[C <: Cat0, D <: Cat1, Y <: Cat2]
       (G: Applicative)
       (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y]): G.Map[Map[C, D, Y]] =
-      TraversableBase3.this.traverse(G)(f, g, h)(mAB)
+      TraversableBounded3.this.traverse(G)(f, g, h)(mAB)
 
     def map[C <: Cat0, D <: Cat1, Y <: Cat2](f: A => C, g: B => D, h: W => Y): Map[C, D, Y] =
       this.traverse(Applicative.Identity)(f, g, h)
   }
 }
 
-trait TraversableBase4 {
+trait TraversableBounded4 {
   type Cat0
   type Cat1
   type Cat2
@@ -193,7 +196,7 @@ trait TraversableBase4 {
       (G: Applicative)
       (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y], k: X => G.Map[Z]):
         G.Map[Map[C, D, Y, Z]] =
-      TraversableBase4.this.traverse(G)(f, g, h, k)(mAB)
+      TraversableBounded4.this.traverse(G)(f, g, h, k)(mAB)
 
     def map[C <: Cat0, D <: Cat1, Y <: Cat2, Z <: Cat3](f: A => C, g: B => D, h: W => Y, k: X => Z): Map[C, D, Y, Z] =
       this.traverse(Applicative.Identity)(f, g, h, k)

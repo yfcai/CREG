@@ -12,7 +12,7 @@
 import creg.lib._
 import Compos._ // for stateMonad
 
-object StrangeTraverse extends TraversableBase.EndofunctorTrait {
+object StrangeTraverse extends Traversable {
   type Map[+A] = A
 
   def traverse[A, B](G: Applicative)(f: A => G.Map[B]): A => G.Map[B] =

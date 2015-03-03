@@ -211,7 +211,7 @@ object TyrannyOfTheDominantFunctor {
 
     // copy of S2_Tyranny.SS3_FreeVariables.cata
     // some types are subtly different
-    def cata[A](F : TraversableBase.Endofunctor)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
+    def cata[A](F : TraversableBounded.Endofunctor)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
       t => {
         val loop = cata[A](F)(visitor)
         visitor(F.fmap(loop)(t.unroll))
@@ -317,7 +317,7 @@ object TyrannyOfTheDominantFunctor {
         def call[X,Y](xs:List[A],ys:List[A])= xs ++ ys
       }
 
-      trait MyTraversableBase extends TraversableBase {
+      trait MyTraversableBounded extends TraversableBounded {
 
         def toList[A <: Cat0](t: Map[A]): List[A] =
           traverse(listMonoid[A])((x: A) => List(x))(t)

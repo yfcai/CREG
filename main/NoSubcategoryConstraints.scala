@@ -16,9 +16,9 @@ object NoSubcategoryConstraints {
     App(s = T, t = T)
   })
 
-  import TraversableBase._
+  import TraversableBounded._
 
-  val termT: EndofunctorOf4[TermT] = new EndofunctorTrait4 {
+  val termT: EndofunctorOf4[TermT] = new Traversable4 {
     type Map[+A, +B, +C, +D] = TermT[A, B, C, D]
 
     def traverse[A, B, W, X, C, D, Y, Z]

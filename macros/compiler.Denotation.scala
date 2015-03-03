@@ -42,33 +42,39 @@ import DatatypeRepresentation._
 trait Denotation extends UniverseConstruction with util.Traverse {
   private[this] type Env = Many[Name]
 
-  def evalFunctor(c: Context)(functor: DataConstructor): c.Tree =
-    evalData(c)(functor.body)(functor.params.map(_.name))
+  /* @param bounded if true , always generate TraversableBoundedN
+   *                if false, always generate TraversableN <: Functor
+   */
+  def evalFunctor(c: Context)(functor: DataConstructor, bounded: Boolean):
+      c.Tree =
+    evalData(c)(functor.body, bounded)(functor.params.map(_.name))
 
-  def evalData(c: Context)(data: Datatype): Env => c.Tree = data match {
+  def evalData(c: Context)(data: Datatype, bounded: Boolean):
+      Env => c.Tree = data match {
     case typeVar: TypeVar =>
-      evalTypeVar(c)(typeVar)
+      evalTypeVar(c)(typeVar, bounded)
 
     case typeConst: TypeConst =>
-      evalTypeConst(c)(typeConst)
+      evalTypeConst(c)(typeConst, bounded)
 
     case fixedpoint: FixedPoint =>
-      evalFixedPoint(c)(fixedpoint)
+      evalFixedPoint(c)(fixedpoint, bounded)
 
     case record: Record =>
-      evalRecord(c)(record)
+      evalRecord(c)(record, bounded)
 
     case variant: Variant =>
-      evalVariant(c)(variant)
+      evalVariant(c)(variant, bounded)
 
     case functorApp: FunctorApplication =>
-      evalFunctorApplication(c)(functorApp)
+      evalFunctorApplication(c)(functorApp, bounded)
 
     case LetBinding(lhs, rhs) =>
-      evalData(c)(rhs)
+      evalData(c)(rhs, bounded)
   }
 
-  def evalTypeVar(c: Context)(typeVar: TypeVar): Env => c.Tree = env => {
+  def evalTypeVar(c: Context)(typeVar: TypeVar, bounded: Boolean):
+      Env => c.Tree = env => {
     import c.universe._
     val x = typeVar.name
     val n = env.length
@@ -77,7 +83,8 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     evalProj(c, i, n)
   }
 
-  def evalTypeConst(c: Context)(typeConst: TypeConst): Env => c.Tree = env => {
+  def evalTypeConst(c: Context)(typeConst: TypeConst, bounded: Boolean):
+      Env => c.Tree = env => {
     import c.universe._
     val x = typeConst.code
     val n = env.length
@@ -89,7 +96,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
   /** n-nary traversable functor mapping everything to tau */
   def evalConst(c: Context, x: Name, n: Int): c.Tree = {
     import c.universe._
-    newTraversableBaseEndofunctor(c, n)(_ => tq"${TypeName(x)}") {
+    newTraversableEndofunctor(c, n)(_ => tq"${TypeName(x)}") {
       case (applicative, fs, as, bs) =>
         etaExpand(c)(q"$applicative.pure")
     }
@@ -98,20 +105,21 @@ trait Denotation extends UniverseConstruction with util.Traverse {
   /** n-nary traversable functor returning its i-th argument */
   def evalProj(c: Context, i: Int, n: Int): c.Tree = {
     import c.universe._
-    newTraversableBaseEndofunctor(c, n)(params => tq"${params(i)}") {
+    newTraversableEndofunctor(c, n)(params => tq"${params(i)}") {
       case (applicative, fs, as, bs) =>
         q"${fs(i)}"
     }
   }
 
   /** applying an unknown functor */
-  def evalFunctorApplication(c: Context)(functorApp: FunctorApplication):
+  def evalFunctorApplication(c: Context)(
+    functorApp: FunctorApplication, bounded: Boolean):
       Env => c.Tree = {
     import c.universe._
 
     val functorCode = c parse functorApp.functor.code
     val n = functorApp.functorArity
-    evalComposite(c)("functor", functorApp, functorCode)
+    evalComposite(c)("functor", functorApp, functorCode, bounded)
 
     /* Use implicits so as to interoperate with built-in functors
      * (Seems unnecessary)
@@ -121,23 +129,26 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     // to figure that out & throw tantrums
     val functor = meaning(c)(functorApp.functor)
     val n = functorApp.functorArity
-    val functorCode = getImplicitly(c)(tq"${getTraversableBaseEndofunctorOf(c, n)}[$functor]")
+    val functorCode = getImplicitly(c)(tq"${getTraversableEndofunctorOf(c, n)}[$functor]")
     evalComposite(c)("functor", functorApp, functorCode)
      */
   }
 
-  def evalRecord(c: Context)(record: Record): Env => c.Tree = {
+  def evalRecord(c: Context)(record: Record, bounded: Boolean):
+      Env => c.Tree = {
     import c.universe._
-    evalComposite(c)(record.name, record, q"${TermName(record.name)}")
+    evalComposite(c)(record.name, record, q"${TermName(record.name)}", bounded)
   }
 
-  def evalVariant(c: Context)(variant: Variant): Env => c.Tree = {
+  def evalVariant(c: Context)(variant: Variant, bounded: Boolean):
+      Env => c.Tree = {
     import c.universe._
-    evalComposite(c)(variant.name, variant, q"${TermName(variant.name)}")
+    evalComposite(c)(variant.name, variant, q"${TermName(variant.name)}", bounded)
   }
 
   def evalComposite(c: Context)(
-    parentName: Name, parentData: Datatype, parentCode: c.Tree):
+    parentName: Name, parentData: Datatype, parentCode: c.Tree,
+    bounded: Boolean):
       Env => c.Tree = env => {
     import c.universe._
 
@@ -153,23 +164,24 @@ trait Denotation extends UniverseConstruction with util.Traverse {
 
     val namedSubfunctors = parentData.children.toSeq.zipWithIndex.map {
       case (data, i) =>
-        (TermName(c freshName s"_$i"), evalData(c)(data)(env))
+        (TermName(c freshName s"_$i"), evalData(c)(data, bounded)(env))
     }
 
     val subfunctorDefs = namedSubfunctors.map {
       case (x, xdef) => q"val $x = $xdef"
     }
 
-    // construct dummy functor application as far as bounds are concerned
-    val bounds = getBounds(c)(parentData, env)
+    val dfns = parentDef +: subfunctorDefs
 
-    def mangle(as: Many[TypeName]) = Map((env zip (as.map(_.toString))): _*)
+    val typeMap = (as: Many[TypeName]) => {
+      meaning(c)(parentData rename {
+        Map((env zip (as.map(_.toString))): _*)
+      })
+    }
 
-    newBoundedTraversableBaseWith(c, env.length)(
-      boundsToCats(c)(bounds),
-      parentDef +: subfunctorDefs,
-      as => meaning(c)(parentData rename mangle(as))
-    ) {
+    val body:
+        (TermName, Many[TermName], Many[TypeName], Many[TypeName]) => c.Tree =
+    {
       case (applicative, fs, as, bs) =>
         val names = namedSubfunctors.map(_._1)
         val travParams =
@@ -178,16 +190,26 @@ trait Denotation extends UniverseConstruction with util.Traverse {
         val traversals = names map (f => q"$f.traverse($applicative)(..$fs)")
         q"$parent.traverse[..$travParams]($applicative)(..$traversals)"
     }
+
+    if (bounded) {
+      // construct dummy functor application as far as bounds are concerned
+      val bounds = getBounds(c)(parentData, env)
+      val cats = boundsToCats(c)(bounds)
+      newTraversableBoundedWith(c, env.length)(cats, dfns, typeMap)(body)
+    }
+    else
+      newTraversableEndofunctorWith(c, env.length)(dfns, typeMap)(body)
+
   }
 
-  def evalFixedPoint(c: Context)(fixedpoint: FixedPoint): Env => c.Tree = env => {
+  def evalFixedPoint(c: Context)(fixedpoint: FixedPoint, bounded: Boolean):
+      Env => c.Tree = env => {
     import c.universe._
     val FixedPoint(x, body) = fixedpoint
     val bodyEnv  = x +: env
-    val bodyCode = evalData(c)(body)(bodyEnv)
+    val bodyCode = evalData(c)(body, bounded)(bodyEnv)
     val bodyName = TermName(c freshName "body")
     val bodyDef  = q"val $bodyName = $bodyCode"
-    val bodyBds  = getBounds(c)(fixedpoint, env)
 
     // create mapping on objects
     val lambda = TypeName(c freshName "lambda")
@@ -199,10 +221,14 @@ trait Denotation extends UniverseConstruction with util.Traverse {
       tq"({ type $lambda[$xdef] = $rhs })#$lambda"
     }
 
+    val dfns = Many(bodyDef)
+
     val mapping: Many[TypeName] => c.Tree =
       params => tq"${getFix(c)}[${patternF(params)}]"
 
-    newBoundedTraversableBaseWith(c, env.length)(boundsToCats(c)(bodyBds), Many(bodyDef), mapping) {
+    val bodyImpl:
+        (TermName, Many[TermName], Many[TypeName], Many[TypeName]) => c.Tree =
+    {
       case (applicative, fs, as, bs) =>
         val x        = TermName(c freshName "x")
         val loop     = TermName(c freshName "loop")
@@ -228,6 +254,14 @@ trait Denotation extends UniverseConstruction with util.Traverse {
           $loop
         """
     }
+
+    if (bounded) {
+      val bodyBds  = getBounds(c)(fixedpoint, env)
+      val cats = boundsToCats(c)(bodyBds)
+      newTraversableBoundedWith(c, env.length)(cats, dfns, mapping)(bodyImpl)
+    }
+    else
+      newTraversableEndofunctorWith(c, env.length)(dfns, mapping)(bodyImpl)
   }
 
   def boundsToCats(c: Context)(bounds: Many[Option[c.Tree]]): Many[c.Tree] =

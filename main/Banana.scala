@@ -7,7 +7,7 @@
 import language.higherKinds
 import creg.functors._
 import creg.lib._
-import creg.lib.TraversableBase.Endofunctor
+import creg.lib.TraversableBounded.Endofunctor
 
 object Banana {
   @struct def ListT { Nil ; Cons(head, tail) }

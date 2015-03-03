@@ -198,7 +198,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
               // requires traversable for now
               // may switch to require functor instead later
-              val travTrait = getBoundedTraversableBase(c, n)
+              val travTrait = getTraversableBounded(c, n)
 
               val typeMap = mkTypeMap(c, n) { types => tq"$cons[..$types]" }
 

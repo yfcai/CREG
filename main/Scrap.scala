@@ -68,7 +68,7 @@ object Scrap extends Scrap {
       case cons => coerce(cons)
     }
 
-  val elemF: TraversableBase.EndofunctorOf[List] = List // a bit confusing to write List(xs).
+  val elemF: TraversableBounded.EndofunctorOf[List] = List // a bit confusing to write List(xs).
 
   def concatMap[A, B](f: A => List[B], xs: List[A]): List[B] =
     elemF(xs).mapReduce(f)(coerce(Nil), concat)

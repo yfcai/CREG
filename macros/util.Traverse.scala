@@ -26,21 +26,21 @@ trait Traverse extends Paths {
     *
     * @param body mapping (applicative, function names, input type params, output type params) to body of `traverse` method
     *
-    * @return q"new TraversableBaseN { def traverse[...](...) = body(...) }"
+    * @return q"new TraversableBoundedN { def traverse[...](...) = body(...) }"
     */
-  def newTraversableBaseEndofunctor(c: Context, n: Int)
+  def newTraversableEndofunctor(c: Context, n: Int)
     (mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree =
-    newTraversableBaseEndofunctorWith(c, n)(Many.empty, mapping)(body)
+    newTraversableEndofunctorWith(c, n)(Many.empty, mapping)(body)
 
-  def newTraversableBaseEndofunctorWith(c: Context, n: Int)
+  def newTraversableEndofunctorWith(c: Context, n: Int)
     (valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree =
-    newTraversableBaseTrait(c, n)(getTraversableBaseEndofunctor(c, n), valDefs, mapping)(body)
+    newTraversableBoundedTrait(c, n)(getTraversableEndofunctor(c, n), valDefs, mapping)(body)
 
-  def newBoundedTraversableBaseWith(c: Context, n: Int)
+  def newTraversableBoundedWith(c: Context, n: Int)
     (bounds: Many[c.Tree], valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree = {
@@ -49,10 +49,10 @@ trait Traverse extends Paths {
       case (bound, i) =>
         q"type ${typeNameCat(c, i)} = $bound"
     }
-    newTraversableBaseTrait(c, n)(getBoundedTraversableBase(c, n), cats ++ valDefs, mapping)(body)
+    newTraversableBoundedTrait(c, n)(getTraversableBounded(c, n), cats ++ valDefs, mapping)(body)
   }
 
-  def newTraversableBaseTrait(c: Context, n: Int)
+  def newTraversableBoundedTrait(c: Context, n: Int)
     (theTrait: c.Tree, valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree): c.Tree =
   {

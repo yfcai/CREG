@@ -8,7 +8,7 @@
 import creg.functors._
 import creg.lib._
 import creg.lib.Applicative._
-import creg.lib.TraversableBase.Endofunctor
+import creg.lib.TraversableBounded.Endofunctor
 
 object FoldM {
   def foldM[A](F: Endofunctor)(M: Monad)(algM: F.Map[A] => M.Map[A]):

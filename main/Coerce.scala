@@ -54,7 +54,7 @@ object Coerce {
 
   // possible slowdowns
   import Banana._ // for lists & *-morphisms
-  import TraversableBase.Endofunctor
+  import TraversableBounded.Endofunctor
 
   // pattern functor of
   // incompatible representation of lists:

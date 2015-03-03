@@ -3,7 +3,7 @@ package lib
 
 import language.higherKinds
 
-trait Applicative { self =>
+trait Applicative extends Functor { self =>
   // Applicative functors are only defined on the entire Scala category.
   // It's hard to define applicative functors on subcategories because
   // a subcategory may not have exponentials (used in `call`).
@@ -38,7 +38,7 @@ trait Applicative { self =>
 // specific applicative functors
 // beware SI-2089
 object Applicative {
-  type Endofunctor[F[+_]] = Applicative { type Map[+X] = F[X] }
+  type Of[F[+_]] = Applicative { type Map[+X] = F[X] }
 
   // identity applicative functor
   type Identity[+X] = X

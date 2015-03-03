@@ -35,17 +35,17 @@ trait Paths {
     tq"_root_.creg.lib.Fix.Record"
   }
 
-  def getTraversableBaseEndofunctor(c: Context, n: Int): c.Tree =
-    getSomeTraversableBaseTrait(c, n, traversableEndofunctorTrait)
+  def getTraversableEndofunctor(c: Context, n: Int): c.Tree =
+    getSomeTraversableBoundedTrait(c, n, traversableEndofunctorTrait)
 
-  def getTraversableBaseEndofunctorOf(c: Context, n: Int): c.Tree =
-    getSomeTraversableBaseTrait(c, n, traversableEndofunctorOf)
+  def getTraversableEndofunctorOf(c: Context, n: Int): c.Tree =
+    getSomeTraversableBoundedTrait(c, n, traversableEndofunctorOf)
 
-  def getBoundedTraversableBase(c: Context, n: Int): c.Tree =
-    getSomeTraversableBaseTrait(c, n, boundedTraversableBaseTrait)
+  def getTraversableBounded(c: Context, n: Int): c.Tree =
+    getSomeTraversableBoundedTrait(c, n, boundedTraversableBoundedTrait)
 
   private[this]
-  def getSomeTraversableBaseTrait(c: Context, n: Int, traitName: String): c.Tree = {
+  def getSomeTraversableBoundedTrait(c: Context, n: Int, traitName: String): c.Tree = {
     import c.universe._
     val q"??? : $traversableN" =
       c parse "??? : " + traitName + (if (n == 1) "" else n.toString)
@@ -57,9 +57,9 @@ trait Paths {
     tq"_root_.creg.lib.Applicative"
   }
 
-  def traversableEndofunctorTrait: String = "_root_.creg.lib.TraversableBase.EndofunctorTrait"
-  def traversableEndofunctorOf: String = "_root_.creg.lib.TraversableBase.EndofunctorOf"
-  def boundedTraversableBaseTrait: String = "_root_.creg.lib.TraversableBase"
+  def traversableEndofunctorTrait: String = "_root_.creg.lib.Traversable"
+  def traversableEndofunctorOf: String = "_root_.creg.lib.TraversableBounded.EndofunctorOf"
+  def boundedTraversableBoundedTrait: String = "_root_.creg.lib.TraversableBounded"
 
   def mappingOnObjects: String = "Map"
 
