@@ -34,6 +34,8 @@ access to our unpublished super secret manuscript.
 
 4. Document [implementation][macros] better.
 
+5. Improve error messages.
+
 
 [sbt]:      http://www.scala-sbt.org/
 [tyranny]:  main/TyrannyOfTheDominantFunctor.scala
