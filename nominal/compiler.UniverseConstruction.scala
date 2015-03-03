@@ -44,9 +44,6 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
           })#$innerType]
         """
 
-      case RecordAssignment(rcd, tvar) =>
-        meaning(c)(tvar)
-
       case LetBinding(lhs, rhs) =>
         meaning(c)(rhs)
 

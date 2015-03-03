@@ -40,11 +40,6 @@ class FunctorSpec extends FlatSpec {
     assert(tailLength == 3)
   }
 
-  it should "handle summand positions" in {
-    @functor def consF[C] = ListT { Nil ; Cons(head, tail) = C }
-    assert(consF(x14.unroll).map(c => c.copy(tail = length(c.tail))) == Cons(1, 3))
-  }
-
   it should "permit interspersing with built-in functors" in {
     import BuiltInFunctors.seqF
 

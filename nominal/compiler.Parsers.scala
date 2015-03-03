@@ -167,7 +167,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
   }
 
   lazy val CaseP: Parser[Set[Name], VariantCase] =
-    RecordP orElse VariantP orElse AssignmentP orElse LetBindingP
+    RecordP orElse VariantP orElse LetBindingP
 
   lazy val StructRecordP = RecordWithoutFieldsP orElse StructRecordWithFieldsP
 
@@ -213,37 +213,6 @@ trait Parsers extends util.AbortWithError with util.Paths {
 
         case _ =>
           Failure(input.pos, "expect record with fields")
-      }
-    }
-  }
-
-  lazy val AssignmentP: ParserC[RecordAssignment] = new ParserC[RecordAssignment] {
-    def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[RecordAssignment, c.Position] = {
-      import c.universe._
-      input match {
-        case q"$recordIdent(..$fieldIdents) = $typeVarIdent" =>
-
-          def failure[T](r: Result[T, c.Position]): Boolean = r match {
-            case Failure(_, _) => true
-            case Success(_)    => false
-          }
-
-          for {
-            rcdName <- UnboundNameP.parse(c, gamma)(recordIdent)
-            typevar <- TypeVarP.parse(c, gamma)(typeVarIdent)
-            fieldNames = fieldIdents map (ident => WhateverNameP.parse(c, gamma)(ident))
-            result <- {
-              if (fieldNames exists failure)
-                fieldNames.view.filter(failure).head.map(_ => sys error "IS_CAST")
-              else
-                Success(RecordAssignment(
-                  Record(rcdName, fieldNames.map(r => Field(r.get, TypeConst(anyType)))),
-                  typevar))
-            }
-          } yield result
-
-        case _ =>
-          Failure(input.pos, s"expect record assignment like Cons(head, tail) = tau, got $input")
       }
     }
   }

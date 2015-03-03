@@ -24,9 +24,6 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
       case TypeVar(_) | TypeConst(_) =>
         Many.empty
 
-      case RecordAssignment(lhs, rhs) =>
-        generateClasses(c)(lhs, supers)
-
       case LetBinding(lhs, rhs) =>
         generateClasses(c)(rhs, supers)
 
@@ -126,9 +123,6 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
         val newSuper = tq"$template[..$templateParams]"
         generateVariants(c)(variant, Many(newSuper))
 
-      case RecordAssignment(lhs, typeVar) =>
-        generateVariantCase(c)(template, lhs, i, n)
-
       case LetBinding(lhs, rhs) =>
         generateVariantCase(c)(template, rhs, i, n)
     }
@@ -190,7 +184,6 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     variantCase match {
       case x: Record => Many(generateRecordPrototype(c)(x))
       case x: Variant => generateVariantPrimitives(c)(x)
-      case RecordAssignment(lhs, rhs) => generateVariantCasePrimitives(c)(lhs)
       case LetBinding(lhs, rhs) => generateVariantCasePrimitives(c)(rhs)
     }
 
@@ -249,7 +242,6 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
       case variant: Variant =>
         variant.cases.flatMap { vcase => mkDefTraverseVariantCase(c)(g, f, a, bs, vcase) }
 
-      case RecordAssignment(lhs, rhs) => mkDefTraverseVariantCase(c)(g, f, a, bs, lhs)
       case LetBinding(lhs, rhs) => mkDefTraverseVariantCase(c)(g, f, a, bs, rhs)
     }
   }

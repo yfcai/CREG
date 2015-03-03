@@ -64,9 +64,6 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     case functorApp: FunctorApplication =>
       evalFunctorApplication(c)(functorApp)
 
-    case RecordAssignment(record, x) =>
-      evalData(c)(x)
-
     case LetBinding(lhs, rhs) =>
       evalData(c)(rhs)
   }
@@ -277,9 +274,6 @@ trait Denotation extends UniverseConstruction with util.Traverse {
         val projBounds = env map {
           case x =>
             val xSummands = cases flatMap {
-              case RecordAssignment(record, TypeVar(y)) if x == y =>
-                Some(meaning(c)(record))
-
               case _ =>
                 None
             }
@@ -293,9 +287,6 @@ trait Denotation extends UniverseConstruction with util.Traverse {
         val bodyBounds = getBounds(c)(body, x +: env)
         // require(bodyBounds.head.isEmpty) // `x` must be unconstrained, but we let scalac check that.
         bodyBounds.tail
-
-      case RecordAssignment(lhs, rhs) =>
-        getBounds(c)(rhs, env)
 
       case LetBinding(lhs, rhs) =>
         getBounds(c)(rhs, env)
