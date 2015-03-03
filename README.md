@@ -20,16 +20,24 @@ by [Yufei Cai et al.][project]
 There are various interesting usage examples in the [main folder][main].
 [Banana][banana] is a good starting point for innocent people,
 and [Tyranny][tyranny] is a good starting point for those who has
-access to our unpublished manuscript in one way or another.
+access to our unpublished super secret manuscript.
 
 #### Plan
 
-1. Upload a jar to some binary distribution service so that
+1. Create package object `creg.package` so that users can import
+   everything in one go.
+
+2. Upload a jar to some binary distribution service so that
    installation would not traumatize innocent people.
+
+3. Document examples in [main][main] better.
+
+4. Document [implementation][macros] better.
 
 
 [sbt]:      http://www.scala-sbt.org/
 [tyranny]:  main/TyrannyOfTheDominantFunctor.scala
 [main]:     main/
 [project]:  http://ps.informatik.uni-tuebingen.de/research/functors/
-[banana]:   https://github.com/yfcai/Creg/blob/master/main/Banana.scala
+[banana]:   main/Banana.scala
+[macros]:   macros
