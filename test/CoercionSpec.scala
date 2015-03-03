@@ -11,6 +11,9 @@ class CoercionSpec extends FlatSpec {
     Leaf(i = Int)
     Branch(_1 = A, _2 = B)
   }
+  // equivalent to:
+  // @struct def ForkT { Leaf(i) ; Branch(_1, _2) }
+  // type Fork[+A, +B] = ForkT[Leaf[Int], Branch[A, B]]
 
   type F1[+A] = Fork[A, A]
   type F2[+A] = Fork[A, Fix[F1]]
