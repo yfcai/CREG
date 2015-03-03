@@ -10,7 +10,7 @@
 // 
 
 import nominal.lib._
-import Compos2._ // for stateMonad
+import Compos._ // for stateMonad
 
 object StrangeTraverse extends Traversable.EndofunctorTrait {
   type Map[+A] = A

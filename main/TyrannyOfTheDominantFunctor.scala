@@ -8,16 +8,16 @@ object TyrannyOfTheDominantFunctor {
 
   object S1_Introduction {
     sealed trait Term
-    case class Lit(number: Int) extends Term
-    case class Var(name: String) extends Term
-    case class Abs(param: String, body: Term) extends Term
+    case class Lit(number: Int)                   extends Term
+    case class Var(name: String)                  extends Term
+    case class Abs(param: String, body: Term)     extends Term
     case class App(operator: Term, operand: Term) extends Term
 
-    def rename(f: String ⇒ String): Term ⇒ Term = {
-      case Lit(n)      ⇒ Lit(n)
-      case Var(x)      ⇒ Var(f(x))
-      case Abs(x, t)   ⇒ Abs(f(x), rename(f)(t))
-      case App(t1, t2) ⇒ App(rename(f)(t1), rename(f)(t2))
+    def rename(f: String => String): Term => Term = {
+      case Lit(n)      => Lit(n)
+      case Var(x)      => Var(f(x))
+      case Abs(x, t)   => Abs(f(x), rename(f)(t))
+      case App(t1, t2) => App(rename(f)(t1), rename(f)(t2))
     }
   }
 
@@ -26,7 +26,7 @@ object TyrannyOfTheDominantFunctor {
     object SS1_Functors {
       trait Functor {
         type Map[+A]
-        def fmap[A, B](f : A ⇒ B) : Map[A] ⇒ Map[B]
+        def fmap[A, B](f : A => B) : Map[A] => Map[B]
       }
     }
 
@@ -43,25 +43,25 @@ object TyrannyOfTheDominantFunctor {
 
       val nameF = new Functor {
         type Map[+A] = NameF[A]
-        def fmap[A,B](f : A ⇒ B) : Map[A] ⇒ Map[B] = {
-          case Lit(n)      ⇒ Lit(n)
-          case Var(x)      ⇒ Var(f(x))
-          case Abs(x, t)   ⇒ Abs(f(x), fmap(f)(t))
-          case App(t1, t2) ⇒ App(fmap(f)(t1), fmap(f)(t2))
+        def fmap[A,B](f : A => B) : Map[A] => Map[B] = {
+          case Lit(n)      => Lit(n)
+          case Var(x)      => Var(f(x))
+          case Abs(x, t)   => Abs(f(x), fmap(f)(t))
+          case App(t1, t2) => App(fmap(f)(t1), fmap(f)(t2))
         }
       }
 
       type Term2 = nameF.Map[String]
-      def rename(f : String ⇒ String) : Term2 ⇒ Term2 = nameF.fmap(f)
+      def rename(f : String => String) : Term2 => Term2 = nameF.fmap(f)
     }
 
     object SS3_0_FreevarsWithBoilerplate {
       import S1_Introduction._
-      def freevars : Term ⇒ Set[String] = {
-        case Lit(n)      ⇒ Set.empty
-        case Var(x)      ⇒ Set(x)
-        case Abs(x, t)   ⇒ freevars(t) - x
-        case App(t1, t2) ⇒ freevars(t1) ++ freevars(t2)
+      def freevars : Term => Set[String] = {
+        case Lit(n)      => Set.empty
+        case Var(x)      => Set(x)
+        case Abs(x, t)   => freevars(t) - x
+        case App(t1, t2) => freevars(t1) ++ freevars(t2)
       }
     }
 
@@ -76,11 +76,11 @@ object TyrannyOfTheDominantFunctor {
 
       val termF = new Functor {
         type Map[+A] = TermF[A]
-        def fmap[A,B](f : A ⇒ B) : Map[A] ⇒ Map[B] = {
-          case Lit(n)      ⇒ Lit(n)
-          case Var(x)      ⇒ Var(x)
-          case Abs(x, t)   ⇒ Abs(x, f(t))
-          case App(t1, t2) ⇒ App(f(t1), f(t2))
+        def fmap[A,B](f : A => B) : Map[A] => Map[B] = {
+          case Lit(n)      => Lit(n)
+          case Var(x)      => Var(x)
+          case Abs(x, t)   => Abs(x, f(t))
+          case App(t1, t2) => App(f(t1), f(t2))
         }
       }
 
@@ -88,18 +88,18 @@ object TyrannyOfTheDominantFunctor {
       case class Roll[+F [+_ ]](unroll : F[Fix[F]]) extends Fix[F]
       type Term3 = Fix[TermF]
 
-      def cata[A](F : Functor)(visitor : F.Map [A] ⇒ A) : Fix[F.Map] ⇒ A =
-        t ⇒ {
+      def cata[A](F : Functor)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
+        t => {
           val loop = cata[A](F)(visitor)
           visitor(F.fmap(loop)(t.unroll))
         }
 
-      val freevars : Term3 ⇒ Set[String] =
+      val freevars : Term3 => Set[String] =
         cata[Set[String]](termF) {
-          case Lit(n)      ⇒ Set.empty
-          case Var(x)      ⇒ Set(x)
-          case Abs(x, t)   ⇒ t - x
-          case App(t1, t2) ⇒ t1 ++ t2
+          case Lit(n)      => Set.empty
+          case Var(x)      => Set(x)
+          case Abs(x, t)   => t - x
+          case App(t1, t2) => t1 ++ t2
         }
     }
 
@@ -188,7 +188,7 @@ object TyrannyOfTheDominantFunctor {
       App(operator = Nothing, operand = Nothing)
     }
 
-    @functor def nameF[N] = Fix (T ⇒ TermT {
+    @functor def nameF[N] = Fix (T => TermT {
       Lit (number = Int)
       Var (name = N)
       Abs (param = N, body = T)
@@ -206,22 +206,22 @@ object TyrannyOfTheDominantFunctor {
     //        = Fix[termF.Map]
     implicitly[ Term =:= Fix[termF.Map] ]
 
-    def rename(f : String ⇒ String) : Term ⇒ Term =
+    def rename(f : String => String) : Term => Term =
       nameF.fmap(f)
 
     // copy of S2_Tyranny.SS3_FreeVariables.cata
     // some types are subtly different
-    def cata[A](F : Traversable.Endofunctor)(visitor : F.Map [A] ⇒ A) : Fix[F.Map] ⇒ A =
-      t ⇒ {
+    def cata[A](F : Traversable.Endofunctor)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
+      t => {
         val loop = cata[A](F)(visitor)
         visitor(F.fmap(loop)(t.unroll))
       }
 
-    val freevars : Term ⇒ Set[String] =
+    val freevars : Term => Set[String] =
       cata[Set[String]](termF) {
-        case Var (x)   ⇒ Set(x)
-        case Abs (x,t) ⇒ t - x
-        case other     ⇒ termF.crush[Set[String]](Set.empty , _ ++ _ )(other)
+        case Var (x)   => Set(x)
+        case Abs (x,t) => t - x
+        case other     => termF.crush[Set[String]](Set.empty , _ ++ _ )(other)
       }
 
     //t = λf.f (g 1)(h 2)
@@ -305,8 +305,8 @@ object TyrannyOfTheDominantFunctor {
 
       def getOperator (t : Term) : Term =
         cata[Term](opF)({
-          case App(op, s) ⇒ op
-          case op         ⇒ coerce { op }
+          case App(op, s) => op
+          case op         => coerce { op }
         })(coerce {t})
     }
 
@@ -334,7 +334,7 @@ object TyrannyOfTheDominantFunctor {
 
   /** old examples for reference. include evaluation contexts */
   object Lambda {
-    import Banana.cataWith
+    import Banana.cata
 
     @data def Term = Fix(term => TermT {
       Lit(n = Int)
@@ -384,7 +384,7 @@ object TyrannyOfTheDominantFunctor {
     val rename: Term => Term = nameF.fmap("_" ++ _)
 
     def rename2(f: String => String): Term => Term =
-      cataWith[Term](termF) {
+      cata[Term](termF) {
         case Var(x) => Roll[termF.Map](Var(f(x)))
         case t      => Roll[termF.Map](t)
       }
@@ -550,7 +550,7 @@ object TyrannyOfTheDominantFunctor {
         None
     }
 
-    import Banana.{ Pair, cakeWith, paraWith }
+    import Banana.{ Pair, cakeWith, para }
 
     // this needs paramorphism. needs arg to reconstruct term in eval context.
     val evalContext: Term => Option[(Term, Term => Term)] =
@@ -577,7 +577,7 @@ object TyrannyOfTheDominantFunctor {
 
     // present this after paramorphism
     val evalContext2: Term => Option[(Term, Term => Term)] =
-      t => paraWith[Option[(Term, Term => Term)]](cbvF)({
+      t => para[Option[(Term, Term => Term)]](cbvF)({
         case App(Pair(op, opCtx), Pair(arg, argCtx)) => op.unroll match {
           case Abs(_, _) =>
             Some((coerce { App(coerce(op): Term, coerce(arg): Term) }, identity))
@@ -621,7 +621,7 @@ object TyrannyOfTheDominantFunctor {
     }
 
     def params(t: Term): Seq[String] =
-      cataWith[Seq[String]](bodyF)({
+      cata[Seq[String]](bodyF)({
         case Abs(x, innerParams) => x +: innerParams
         case _ => Seq.empty
       })(coerce { t })

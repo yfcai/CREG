@@ -1,7 +1,9 @@
-/** Console demo script for:
+/** Alternative console demo script for:
   *
   * Bringert and Ranta.
   * A pattern for almost compositional functions.
+  *
+  * The type of Exp is different.
   */
 
 import language.higherKinds
@@ -11,76 +13,31 @@ import nominal.lib._
 import nominal.lib.Applicative._
 
 object Compos {
-  import BuiltInFunctors._
+  import Banana.{List, Nil, Cons}
 
-  // BUG: DataDecl doesn't know to resolve imports.
-  //      If I import List from Scrap instead of redefining them here,
-  //      then get error "not found: type Nil".
-  @data def List[A] = Fix(list => ListT {
-    Nil
-    Cons(head = A, tail = list)
-  })
+  @data def Var = V(name = String)
+  // @data is shorthand for:
+  // @struct def <anonymous> { V(name = String) }
+  // type Var = V[String]
 
-  @functor implicit def List[a] = Fix(list => ListT { Nil ; Cons(head = a, tail = list) })
 
-  @data def Syntax = SyntaxT {
+  @struct def StmT { Assign(lhs, rhs) ; Return(exp) }
+  type StmF[Exp] = StmT[Assign[Var, Exp], Return[Exp]]
+  type Stm       = StmF[Exp]
+  // Alternatively:
+  // @data def Stm = StmT { Assign(lhs = Var, rhs = Exp) ; Return(exp = Exp) }
 
-    def Exp = ExpT {
-      def Identifier = Ident(x = Var)
-      def Abstraction = Abs(param = Var, body = Fix[ExpF])
-      def Application = App(operator = Fix[ExpF], operand = Fix[ExpF])
-      def BlockExpression = Block(stms = List apply Stm)
-    }
-
-    def Stm = StmT {
-      Assign(lhs = Var, rhs = Fix[ExpF])
-      Return(exp = Fix[ExpF])
-    }
-
-    def Var = V(name = String)
-  }
-
-  implicit def stringToVar(x: String): Var = V(x)
-  implicit def stringToFixExp(x: String): Fix[ExpF] = coerce { Ident(x) }
-
-  val fst: Exp = coerce { Abs("x", Abs("y", "x")) }
-
-  @synonym def ExpF[exp] = ExpT {
+  @data def Exp = Fix(exp => ExpT {
     Ident(x = Var)
     Abs(param = Var, body = exp)
-    App(operator = exp, operand = exp)
+    App(op = exp, arg = exp)
+    Block(stms = List[StmF[exp]])
+  })
 
-    Block(stms = List apply StmT {
-      Assign(lhs = Var, rhs = exp)
-      Return(exp = exp)
-    })
-  }
+  implicit def stringToVar(x: String): Var = V(x)
+  implicit def stringToFixExp(x: String): Exp = coerce { Ident(x) }
 
-  // COMPOS TYPE CLASS //
-
-  // This version of `prependUnderscore` looks good,
-  // but scalac doesn't do enough type refinement
-  // to typecheck it.
-  //
-  // Scalac is missing the following knowledge: Since
-  // the trait SyntaxT is sealed and the case class V
-  // is final, whatever matches V(x: T) has the exact
-  // type V[T].
-  //
-  //   trait Op[Family, F[_]] {
-  //     def apply[A <: Family](x: A): F[A]
-  //   }
-  //
-  //   val prependUnderscore: Op[Syntax, Identity] =
-  //     new Op[Identity, Syntax] {
-  //       def apply[A <: Syntax](x: A): A = x match {
-  //         case V(y: String) => V("_" + y)
-  //         case _            => ???
-  //       }
-  //     }
-  //
-  // We help scalac by encoding type families with
-  // heavier notations.
+  val fst: Exp = coerce { Abs("x", Abs("y", "x")) }
 
   sealed trait Syntactic[_]
   implicit case object Exp extends Syntactic[Exp]
@@ -143,23 +100,22 @@ object Compos {
     def compos[A: Syntactic](G: Applicative)(f: Op[Syntactic, G.Map], syntax: A): G.Map[A] =
       implicitly[Syntactic[A]] match {
         case Exp =>
-          expC(syntax).traverse(G)(
-            muExp => G.roll[ExpF] { f(muExp.unroll) },
-            f.etaExpand[Stm],
-            f.etaExpand[Var])
+          G.roll[ExpF] {
+            expC(syntax.unroll).traverse(G)(
+              f.etaExpand[Exp],
+              f.etaExpand[Stm],
+              f.etaExpand[Var])
+          }
 
         case Stm =>
           stmC(syntax).traverse(G)(
-            muExp => G.roll[ExpF] { f(muExp.unroll) },
+            f.etaExpand[Exp],
             f.etaExpand[Var])
 
         case Var =>
           G pure syntax
       }
   }
-
-
-  // PREPEND UNDERSCORE EXAMPLE //
 
   val prependUnderscore: Op[Syntactic, Identity] = new  Op[Syntactic, Identity] {
     def apply[A: Syntactic](syntax: A): A = implicitly[Syntactic[A]] match {
@@ -172,22 +128,17 @@ object Compos {
     }
   }
 
-  @functor implicit def nameStmF[name, exp] = StmT {
-    Assign(lhs = V(name = name), rhs = exp)
+  @functor def nameExpInStmF[name, exp] = StmT {
+    Assign(lhs = V apply name, rhs = exp)
     Return(exp = exp)
   }
 
-  @functor implicit def nameExpF[name, exp] = ExpT {
-    Ident(x = V(name = name))
-
-    Abs(param = V(name = name), body = exp)
-
-    App(operator = exp, operand = exp)
-
-    Block(stms = List apply (nameStmF apply (name, exp)))
-  }
-
-  @functor def nameF[name] = nameExpF apply (name, Fix(exp => nameExpF apply (name, exp)))
+  @functor def nameF[name] = Fix(exp => ExpT {
+    Ident(x = V apply name)
+    Abs(param = V apply name, body = exp)
+    App(op = exp, arg = exp)
+    Block(stms = List apply (nameExpInStmF apply (name, exp)))
+  })
 
   def prependUnderscore2(e: Exp): Exp = nameF(e) map ("_" + _)
 
@@ -230,64 +181,28 @@ object Compos {
 
     def f(subst: Subst): Op[Syntactic, State[Names]#λ] = new Op[Syntactic, State[Names]#λ] {
       def apply[A: Syntactic](e: A): State[Names]#λ[A] =
-        (implicitly[Syntactic[A]], e) match {
-          case (Exp, Abs(V(x), b)) =>
-            for {
-              freshNames <- readState[Names]
-              _ <- writeState(freshNames.tail)
-              x2 = freshNames.head
-              b2 <- f(subst updated (x, x2))(b.unroll)
-            }
-            yield coerce { Abs(V(x2), b2) }: Exp
+        implicitly[Syntactic[A]] match {
+          case Var =>
+            stateMonad[Names].pure(V(subst(e.name)))
 
-          case (Var, V(x)) =>
-            stateMonad[Names].pure(V(subst(x)))
+          case Exp => e.unroll match {
+            case Abs(V(x), b) =>
+              for {
+                freshNames <- readState[Names]
+                _ <- writeState(freshNames.tail)
+                x2 = freshNames.head
+                b2 <- f(subst updated (x, x2))(b)
+              }
+              yield coerce { Abs(V(x2), b2) }: Exp
+
+            case _ =>
+              composM[Syntactic, State[Names]#λ, A](this, e)
+          }
 
           case _ =>
             composM[Syntactic, State[Names]#λ, A](this, e)
         }
     }
-
-    evalState(f(Subst.empty)(e), getNameStream)
-  }
-
-  @functor implicit def freshExpF[abs, name, exp] = ExpT {
-    Ident(x = V(name = name))
-    Abs(param, body) = abs // `abs` overrides abstractions
-    App(operator = exp, operand = exp)
-    Block(stms = List apply (nameStmF apply (name, exp)))
-  }
-
-
-  @functor def freshF[abs, name] =
-    freshExpF apply (abs, name, Fix(exp => freshExpF apply (abs, name, exp)))
-
-  // this monster may compile for 10 minutes or more.
-  def fresh2(e: Exp): Exp = {
-    val stateM = stateMonad[Names]
-
-    def f(subst: Subst)(e: Exp): State[Names]#λ[Exp] = names =>
-      freshF[Abstraction, String](
-        coerce { e }
-      ).traverse[Abstraction, String](stateM)(
-        // Abstraction => Names => Abstraction
-        {
-          case Abs(V(x), b) =>
-            for {
-              freshNames <- readState[Names]
-              _ <- writeState(freshNames.tail)
-              x2 = freshNames.head
-              b2 <- f(subst updated (x, x2))(b.unroll)
-            }
-            yield coerce { Abs(V(x2), b2) }
-        },
-
-        // String => Names => String
-        x => stateM pure subst(x)
-      )(names) match {
-        case (result, newNames) =>
-          (coerce { result }, newNames)
-      }
 
     evalState(f(Subst.empty)(e), getNameStream)
   }
@@ -305,7 +220,8 @@ object Compos {
           Return("x"), Nil))))))
   }
 
-  def vars(e: Exp): Set[String] = nameF(nameF(e) map (x => Set(x))) reduce (Set.empty, _ ++ _)
+  def vars(e: Exp): Set[String] =
+    nameF(nameF(e) map (x => Set(x))) reduce (Set.empty, _ ++ _)
 
   // vars(assignExp)
   // vars(prependUnderscore(assignExp))

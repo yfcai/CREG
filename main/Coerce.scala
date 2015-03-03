@@ -72,7 +72,7 @@ object Coerce {
 
   // list constructed from listF2 by anamorphism
   val pairs: Int => Ints2 =
-    anaWith[Int](intsF2) { i =>
+    ana[Int](intsF2) { i =>
       if (i <= 0)
         Nil
       else

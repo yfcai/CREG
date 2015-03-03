@@ -68,7 +68,7 @@ class CoercionSpec extends FlatSpec {
 
   // binary tree with a couple hundred nodes
   val tree7: Fix[F3] =
-    anaWith[Int](f3)({ i =>
+    ana[Int](f3)({ i =>
       if (i <= 0)
         Leaf(i)
       else

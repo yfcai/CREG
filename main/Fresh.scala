@@ -5,9 +5,8 @@ import nominal.lib._
 import nominal.functors._
 
 object Fresh {
-  import Compos2.{stateMonad, StateMonadView, getNameStream}
-
-  import Banana.{cataWith => cata}
+  import Compos.{stateMonad, StateMonadView, getNameStream}
+  import Banana.cata
 
   private[this] // necessary to make inner type λ covariant
   type State[S] = {
@@ -49,8 +48,8 @@ object Fresh {
   def local[A](f: (Subst => Subst))(m: FreshM[A]): FreshM[A] =
     m compose f
 
-  def readState: FreshM[Names] = env => Compos2.readState
-  def writeState(names: Names): FreshM[Unit] = env => Compos2 writeState names
+  def readState: FreshM[Names] = env => Compos.readState
+  def writeState(names: Names): FreshM[Unit] = env => Compos writeState names
 
   implicit class FreshMonadView[T](x: FreshM.Map[T])
       extends Monad.View[FreshM, T](x)

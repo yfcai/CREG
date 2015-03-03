@@ -49,13 +49,13 @@ class CaseStudiesSpec extends FlatSpec {
   }
 
   "Compos-pattern" should "work" in {
+    import Banana.{List, ListT, Nil, Cons}
     import Compos._
 
     assert(prependUnderscore(fst) == (coerce { Abs("_x", Abs("_y", "_x")) }: Exp))
     assert(prependUnderscore2(fst) == prependUnderscore(fst))
 
     assert(fresh(fst) == (coerce { Abs("_0", Abs("_1", "_0")) }: Exp))
-    assert(fresh(fst) == fresh2(fst))
 
     assert(prependUnderscore(assignExp) == (coerce {
       Abs("_x", Abs("_y", Abs("_z",
@@ -72,7 +72,6 @@ class CaseStudiesSpec extends FlatSpec {
     assert(prependUnderscore2(assignExp) == prependUnderscore(assignExp))
 
     assert(vars(fresh(assignExp)) == Set("_0", "_1", "_2"))
-    assert(fresh2(assignExp) == fresh(assignExp))
   }
 
   "De-Bruijn indices" should "work" in {

@@ -19,7 +19,7 @@ object FoldM {
     )
 
   import Scrap.{List, Nil, Cons}
-  import Compos2._ // for state monad methods
+  import Compos._ // for state monad methods
 
   @data def Tree[A] = Fix(tree => TreeT {
     Leaf(get = A)
