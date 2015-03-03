@@ -1,4 +1,9 @@
-/** All the code in paper */
+/** All the code in paper, with typos corrected
+  *
+  * Interesting things:
+  * - F3_Preview is Figure 3 (rename, freevars, getOperator)
+  * - F4_Grammar is Figure 4 (grammar of regular functors)
+  */
 
 import language.{higherKinds, implicitConversions}
 import creg.functors._
@@ -259,6 +264,41 @@ object TyrannyOfTheDominantFunctor {
 
   F3_Preview.runAssertions()
   import F3_Preview._
+
+  object F4_Grammar {
+    val caption =
+      "The grammar of regular functors and the corresponding syntax in Creg."
+
+    // constant functors are regular.
+    @functor def intF[A, B, C] = Int
+
+    // extractions (functors returning one of their arguments) are regular.
+    @functor def fstF[A, B, C] = A
+
+    // disjoint-union functors are regular.
+    @struct  def EitherT { Left(get) ; Right(get) }
+    @functor def eitherF[A, B] = EitherT { Left(get = A) ; Right(get = B) }
+
+    // tupling functors are regular.
+    @struct  def PairT { Pair(_1, _2) }
+    @functor def pairF[A, B] = Pair(_1 = A, _2 = B)
+
+    // compositions of regular functors are regular.
+    @functor def compositeF[A, B, C] =
+      pairF apply (
+        intF apply (A, B, C),
+        fstF apply (A, B, C)
+      )
+
+    // taking the fixed point of a regular functor with respect to
+    // an argument results in a regular functor
+
+    // bottomF.Map[B, C] is uninhabited
+    @functor def bottomF[B, C] = Fix(A => fstF apply (A, B, C))
+
+    // isoIntF.Map[A, B] is isomorphic to Int
+    @functor def isoIntF[A, B] = Fix(C => intF apply (A, B, C))
+  }
 
   object S3_Emancipation {
     object SS1_PolymorphicRecords {
