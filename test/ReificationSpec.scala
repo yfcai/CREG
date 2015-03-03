@@ -1,9 +1,9 @@
 import language.implicitConversions
 import org.scalatest._
-import nominal.functors._
-import nominal.lib._
-import nominal.compiler.UniverseConstruction.Tests._
-import nominal.compiler.DatatypeRepresentation._
+import creg.functors._
+import creg.lib._
+import creg.compiler.UniverseConstruction.Tests._
+import creg.compiler.DatatypeRepresentation._
 
 class ReificationSpec extends FlatSpec {
   @data def List[A] = Fix(list => ListT {
@@ -28,13 +28,13 @@ class ReificationSpec extends FlatSpec {
   }
 
   it should "never create types with unbound names" in {
-    assert(unrollFix[Fix[({ type λ[+A] = A })#λ]] == "nominal.lib.Fix[[+A]A]")
+    assert(unrollFix[Fix[({ type λ[+A] = A })#λ]] == "creg.lib.Fix[[+A]A]")
 
     assert(unrollFix[Fix[({ type λ[+A] = Fix[({ type λ[+B] = A })#λ] })#λ]] ==
-      "nominal.lib.Fix[[+B]nominal.lib.Fix[[+A]nominal.lib.Fix[[+B]A]]]")
+      "creg.lib.Fix[[+B]creg.lib.Fix[[+A]creg.lib.Fix[[+B]A]]]")
 
     assert(unrollFix[Fix[({ type λ[+A] = Array[A] })#λ]] ==
-      "Array[nominal.lib.Fix[[+A]Array[A]]]")
+      "Array[creg.lib.Fix[[+A]Array[A]]]")
   }
 
   it should "dealias properly" in {

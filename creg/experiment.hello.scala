@@ -1,4 +1,4 @@
-package nominal
+package creg
 package experiment
 
 import scala.reflect.macros.blackbox.Context

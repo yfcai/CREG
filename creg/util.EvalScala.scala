@@ -1,4 +1,4 @@
-package nominal
+package creg
 package util
 
 import scala.reflect.runtime.universe

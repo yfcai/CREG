@@ -9,10 +9,10 @@
 //
 // 
 
-import nominal.lib._
+import creg.lib._
 import Compos._ // for stateMonad
 
-object StrangeTraverse extends Traversable.EndofunctorTrait {
+object StrangeTraverse extends TraversableBase.EndofunctorTrait {
   type Map[+A] = A
 
   def traverse[A, B](G: Applicative)(f: A => G.Map[B]): A => G.Map[B] =

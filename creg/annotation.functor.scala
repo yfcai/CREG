@@ -4,7 +4,7 @@
   *
   * Upside   = easy to parse
   *            straightforward denotational semantics
-  *            (see nominal.compiler.Denotation)
+  *            (see creg.compiler.Denotation)
   * 
   * Downside = declaration of functors does NOT mimic use:
   *            variants are declared using braces { } but
@@ -12,7 +12,7 @@
   *            like records with parentheses ( )
   */
 
-package nominal
+package creg
 package annotation
 
 import scala.reflect.macros.blackbox.Context

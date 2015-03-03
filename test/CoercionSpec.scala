@@ -1,7 +1,7 @@
 import language.implicitConversions
 import org.scalatest._
-import nominal.functors._
-import nominal.lib._
+import creg.functors._
+import creg.lib._
 
 import Coercion.Test._
 import Applicative._

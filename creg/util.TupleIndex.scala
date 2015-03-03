@@ -1,4 +1,4 @@
-package nominal
+package creg
 package util
 
 import java.util.regex.{Pattern, Matcher}

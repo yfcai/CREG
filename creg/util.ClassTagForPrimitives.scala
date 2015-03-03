@@ -5,7 +5,7 @@
   * I don't know if this case is plus or minus.
   *                                         ---som-snytt
   */
-package nominal.util
+package creg.util
 
 import reflect._
 

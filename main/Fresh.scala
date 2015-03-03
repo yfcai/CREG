@@ -1,8 +1,8 @@
 // how to thread a monad correctly
 // (global name refreshment)
 
-import nominal.lib._
-import nominal.functors._
+import creg.lib._
+import creg.functors._
 
 object Fresh {
   import Compos.{stateMonad, StateMonadView, getNameStream}

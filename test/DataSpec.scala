@@ -1,6 +1,6 @@
 import org.scalatest._
-import nominal.functors._
-import nominal.lib._
+import creg.functors._
+import creg.lib._
 
 class DataSpec extends FlatSpec {
   it should "generate enough scala types for the list example" in {
@@ -9,9 +9,9 @@ class DataSpec extends FlatSpec {
     type List[+A] = Fix[({ type λ[+L] = ListF[A, L] })#λ]
     type ListF[+A, +L] = ListT[Nil, Cons[A, L]]
 
-    def listF[A]: Traversable.Endofunctor {
+    def listF[A]: TraversableBase.Endofunctor {
       type Map[+L] = ListF[A, L]
-    } = new Traversable.EndofunctorTrait {
+    } = new TraversableBase.EndofunctorTrait {
       type Map[+L] = ListF[A, L]
 
       def traverse[M, N](G: Applicative)(f: M => G.Map[N]):

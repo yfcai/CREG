@@ -1,4 +1,4 @@
-package nominal
+package creg
 package compiler
 
 import scala.reflect.macros.blackbox.Context
@@ -204,7 +204,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     }
 
     // trait to extend
-    val traversableN = getBoundedTraversable(c, n)
+    val traversableN = getBoundedTraversableBase(c, n)
 
     // subcategory bounds
     val cats = bounds.zipWithIndex map {
@@ -281,7 +281,7 @@ trait DeclarationGenerator extends UniverseConstruction with util.Traverse with 
     val n = record.fields.length
     val termName = TermName(record.name)
     val typeName = TypeName(record.name)
-    val traversableN = getTraversableEndofunctor(c, n)
+    val traversableN = getTraversableBaseEndofunctor(c, n)
     val typeMap = mkTypeMap(c, n) { params =>
       if (params.nonEmpty) tq"$typeName[..$params]" else tq"$typeName"
     }

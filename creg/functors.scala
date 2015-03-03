@@ -1,6 +1,6 @@
-/** Public interface of nominal functors */
+/** Public interface of creg functors */
 
-package nominal
+package creg
 package functors
 
 import scala.language.experimental.macros

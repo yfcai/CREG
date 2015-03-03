@@ -1,6 +1,6 @@
 /** Type coercion a la TAPL (Pierce) §21.9 */
 
-package nominal
+package creg
 package lib
 
 import scala.language.higherKinds
@@ -198,7 +198,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
               // requires traversable for now
               // may switch to require functor instead later
-              val travTrait = getBoundedTraversable(c, n)
+              val travTrait = getBoundedTraversableBase(c, n)
 
               val typeMap = mkTypeMap(c, n) { types => tq"$cons[..$types]" }
 

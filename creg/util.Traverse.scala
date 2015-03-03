@@ -1,4 +1,4 @@
-package nominal
+package creg
 package util
 
 import scala.reflect.macros.blackbox.Context
@@ -26,21 +26,21 @@ trait Traverse extends Paths {
     *
     * @param body mapping (applicative, function names, input type params, output type params) to body of `traverse` method
     *
-    * @return q"new TraversableN { def traverse[...](...) = body(...) }"
+    * @return q"new TraversableBaseN { def traverse[...](...) = body(...) }"
     */
-  def newTraversableEndofunctor(c: Context, n: Int)
+  def newTraversableBaseEndofunctor(c: Context, n: Int)
     (mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree =
-    newTraversableEndofunctorWith(c, n)(Many.empty, mapping)(body)
+    newTraversableBaseEndofunctorWith(c, n)(Many.empty, mapping)(body)
 
-  def newTraversableEndofunctorWith(c: Context, n: Int)
+  def newTraversableBaseEndofunctorWith(c: Context, n: Int)
     (valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree =
-    newTraversableTrait(c, n)(getTraversableEndofunctor(c, n), valDefs, mapping)(body)
+    newTraversableBaseTrait(c, n)(getTraversableBaseEndofunctor(c, n), valDefs, mapping)(body)
 
-  def newBoundedTraversableWith(c: Context, n: Int)
+  def newBoundedTraversableBaseWith(c: Context, n: Int)
     (bounds: Many[c.Tree], valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree):
       c.Tree = {
@@ -49,10 +49,10 @@ trait Traverse extends Paths {
       case (bound, i) =>
         q"type ${typeNameCat(c, i)} = $bound"
     }
-    newTraversableTrait(c, n)(getBoundedTraversable(c, n), cats ++ valDefs, mapping)(body)
+    newTraversableBaseTrait(c, n)(getBoundedTraversableBase(c, n), cats ++ valDefs, mapping)(body)
   }
 
-  def newTraversableTrait(c: Context, n: Int)
+  def newTraversableBaseTrait(c: Context, n: Int)
     (theTrait: c.Tree, valDefs: Many[c.Tree], mapping: Many[c.TypeName] => c.Tree)
     (body: (c.TermName, Many[c.TermName], Many[c.TypeName], Many[c.TypeName]) => c.Tree): c.Tree =
   {

@@ -7,12 +7,12 @@
   * Scala for generic programmers.
   */
 
-import nominal.functors._
-import nominal.lib._
+import creg.functors._
+import creg.lib._
 import language.higherKinds
 
 object Origami {
-  type Bifunctor = Traversable2 { type Cat0 = Any ; type Cat1 = Any ; type Map[+X, +Y] }
+  type Bifunctor = TraversableBase2 { type Cat0 = Any ; type Cat1 = Any ; type Map[+X, +Y] }
 
   type Fix2[F[+_, +_], T] = Fix[ ({ type λ[+X] = F[T, X] })#λ ]
 
@@ -44,7 +44,7 @@ object Origami {
 
   trait Church[F[+_]] { def apply[T](algebra: F[T] => T): T }
 
-  def churchDecode(F: Traversable.Endofunctor)(fold: Church[F.Map]): Fix[F.Map] = fold(Roll.apply)
+  def churchDecode(F: TraversableBase.Endofunctor)(fold: Church[F.Map]): Fix[F.Map] = fold(Roll.apply)
 
   @data def List[A] = Fix(list => ListT {
     Nil

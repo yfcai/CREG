@@ -3,9 +3,9 @@ val sversion = "2.11.1"
 resolvers ++= List("releases").map(Resolver.sonatypeRepo)
 
 
-// nominal macro
+// creg macro
 
-lazy val nominal = project in file("nominal") settings (
+lazy val creg = project in file("creg") settings (
   scalaVersion := sversion,
   scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
   libraryDependencies ++= List(
@@ -19,7 +19,7 @@ lazy val nominal = project in file("nominal") settings (
 
 // tests
 
-lazy val test = project in file(".") dependsOn nominal settings (
+lazy val test = project in file(".") dependsOn creg settings (
   fork := true, // otherwise cannot deserialize
   scalaVersion := sversion,
   scalaSource in Compile := new File(baseDirectory.value, "main"),

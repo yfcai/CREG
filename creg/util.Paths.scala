@@ -1,4 +1,4 @@
-package nominal
+package creg
 package util
 
 import scala.reflect.macros.blackbox.Context
@@ -13,39 +13,39 @@ trait Paths {
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._
-    tq"_root_.nominal.lib.Fix"
+    tq"_root_.creg.lib.Fix"
   }
 
-  def getFixWithoutRoot: String = "nominal.lib.Fix"
+  def getFixWithoutRoot: String = "creg.lib.Fix"
 
-  def getRoll(c: Context) = c parse "_root_.nominal.lib.Roll"
+  def getRoll(c: Context) = c parse "_root_.creg.lib.Roll"
 
   def getRecordOrVariant(c: Context): c.Tree = {
     import c.universe._
-    tq"_root_.nominal.lib.Fix.RecordOrVariant"
+    tq"_root_.creg.lib.Fix.RecordOrVariant"
   }
 
   def getVariant(c: Context) = {
     import c.universe._
-    tq"_root_.nominal.lib.Fix.Variant"
+    tq"_root_.creg.lib.Fix.Variant"
   }
 
   def getRecord(c: Context) = {
     import c.universe._
-    tq"_root_.nominal.lib.Fix.Record"
+    tq"_root_.creg.lib.Fix.Record"
   }
 
-  def getTraversableEndofunctor(c: Context, n: Int): c.Tree =
-    getSomeTraversableTrait(c, n, traversableEndofunctorTrait)
+  def getTraversableBaseEndofunctor(c: Context, n: Int): c.Tree =
+    getSomeTraversableBaseTrait(c, n, traversableEndofunctorTrait)
 
-  def getTraversableEndofunctorOf(c: Context, n: Int): c.Tree =
-    getSomeTraversableTrait(c, n, traversableEndofunctorOf)
+  def getTraversableBaseEndofunctorOf(c: Context, n: Int): c.Tree =
+    getSomeTraversableBaseTrait(c, n, traversableEndofunctorOf)
 
-  def getBoundedTraversable(c: Context, n: Int): c.Tree =
-    getSomeTraversableTrait(c, n, boundedTraversableTrait)
+  def getBoundedTraversableBase(c: Context, n: Int): c.Tree =
+    getSomeTraversableBaseTrait(c, n, boundedTraversableBaseTrait)
 
   private[this]
-  def getSomeTraversableTrait(c: Context, n: Int, traitName: String): c.Tree = {
+  def getSomeTraversableBaseTrait(c: Context, n: Int, traitName: String): c.Tree = {
     import c.universe._
     val q"??? : $traversableN" =
       c parse "??? : " + traitName + (if (n == 1) "" else n.toString)
@@ -54,12 +54,12 @@ trait Paths {
 
   def getApplicative(c: Context): c.Tree = {
     import c.universe._
-    tq"_root_.nominal.lib.Applicative"
+    tq"_root_.creg.lib.Applicative"
   }
 
-  def traversableEndofunctorTrait: String = "_root_.nominal.lib.Traversable.EndofunctorTrait"
-  def traversableEndofunctorOf: String = "_root_.nominal.lib.Traversable.EndofunctorOf"
-  def boundedTraversableTrait: String = "_root_.nominal.lib.Traversable"
+  def traversableEndofunctorTrait: String = "_root_.creg.lib.TraversableBase.EndofunctorTrait"
+  def traversableEndofunctorOf: String = "_root_.creg.lib.TraversableBase.EndofunctorOf"
+  def boundedTraversableBaseTrait: String = "_root_.creg.lib.TraversableBase"
 
   def mappingOnObjects: String = "Map"
 
@@ -110,11 +110,11 @@ trait Paths {
 
   def typeNameRange(c: Context): c.TypeName = c.universe.TypeName("Range")
 
-  def identityFunctorLocationString: String = "_root_.nominal.lib.Applicative.Identity"
+  def identityFunctorLocationString: String = "_root_.creg.lib.Applicative.Identity"
 
   def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
     import c.universe._
-    val q"??? : $tpe" = q"??? : _root_.nominal.lib.Applicative.Endofunctor[$f]"
+    val q"??? : $tpe" = q"??? : _root_.creg.lib.Applicative.Endofunctor[$f]"
     tpe
   }
 

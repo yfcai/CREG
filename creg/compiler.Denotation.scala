@@ -33,7 +33,7 @@
   *     n = length params
   */
 
-package nominal
+package creg
 package compiler
 
 import scala.reflect.macros.blackbox.Context
@@ -89,7 +89,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
   /** n-nary traversable functor mapping everything to tau */
   def evalConst(c: Context, x: Name, n: Int): c.Tree = {
     import c.universe._
-    newTraversableEndofunctor(c, n)(_ => tq"${TypeName(x)}") {
+    newTraversableBaseEndofunctor(c, n)(_ => tq"${TypeName(x)}") {
       case (applicative, fs, as, bs) =>
         etaExpand(c)(q"$applicative.pure")
     }
@@ -98,7 +98,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
   /** n-nary traversable functor returning its i-th argument */
   def evalProj(c: Context, i: Int, n: Int): c.Tree = {
     import c.universe._
-    newTraversableEndofunctor(c, n)(params => tq"${params(i)}") {
+    newTraversableBaseEndofunctor(c, n)(params => tq"${params(i)}") {
       case (applicative, fs, as, bs) =>
         q"${fs(i)}"
     }
@@ -121,7 +121,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     // to figure that out & throw tantrums
     val functor = meaning(c)(functorApp.functor)
     val n = functorApp.functorArity
-    val functorCode = getImplicitly(c)(tq"${getTraversableEndofunctorOf(c, n)}[$functor]")
+    val functorCode = getImplicitly(c)(tq"${getTraversableBaseEndofunctorOf(c, n)}[$functor]")
     evalComposite(c)("functor", functorApp, functorCode)
      */
   }
@@ -165,7 +165,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
 
     def mangle(as: Many[TypeName]) = Map((env zip (as.map(_.toString))): _*)
 
-    newBoundedTraversableWith(c, env.length)(
+    newBoundedTraversableBaseWith(c, env.length)(
       boundsToCats(c)(bounds),
       parentDef +: subfunctorDefs,
       as => meaning(c)(parentData rename mangle(as))
@@ -202,7 +202,7 @@ trait Denotation extends UniverseConstruction with util.Traverse {
     val mapping: Many[TypeName] => c.Tree =
       params => tq"${getFix(c)}[${patternF(params)}]"
 
-    newBoundedTraversableWith(c, env.length)(boundsToCats(c)(bodyBds), Many(bodyDef), mapping) {
+    newBoundedTraversableBaseWith(c, env.length)(boundsToCats(c)(bodyBds), Many(bodyDef), mapping) {
       case (applicative, fs, as, bs) =>
         val x        = TermName(c freshName "x")
         val loop     = TermName(c freshName "loop")

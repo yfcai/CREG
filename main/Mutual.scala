@@ -1,7 +1,7 @@
 /** Encoding mutually recursive datatypes as mu-types */
 
-import nominal.functors._
-import nominal.lib._
+import creg.functors._
+import creg.lib._
 
 object Mutual {
   // tree+forest: easy.

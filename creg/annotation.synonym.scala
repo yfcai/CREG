@@ -1,4 +1,4 @@
-package nominal
+package creg
 package annotation
 
 import scala.language.experimental.macros

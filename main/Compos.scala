@@ -8,9 +8,9 @@
 
 import language.higherKinds
 import language.implicitConversions
-import nominal.functors._
-import nominal.lib._
-import nominal.lib.Applicative._
+import creg.functors._
+import creg.lib._
+import creg.lib.Applicative._
 
 object Compos {
   import Banana.{List, Nil, Cons}

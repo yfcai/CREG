@@ -1,7 +1,7 @@
 import org.scalatest._
-import nominal.compiler._
-import nominal.lib._
-import nominal.functors._
+import creg.compiler._
+import creg.lib._
+import creg.functors._
 
 class FunctorSpec extends FlatSpec {
   @data def List[A] = Fix(list => ListT { Nil ; Cons(head = A, tail = list) })

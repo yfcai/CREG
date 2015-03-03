@@ -5,8 +5,8 @@
   * Doing it with standard case classes result in type-unsoundness.
   */
 
-import nominal.functors._
-import nominal.lib._
+import creg.functors._
+import creg.lib._
 
 object NoSubcategoryConstraints {
   @data def Term = Fix(T => TermT {
@@ -16,7 +16,7 @@ object NoSubcategoryConstraints {
     App(s = T, t = T)
   })
 
-  import Traversable._
+  import TraversableBase._
 
   val termT: EndofunctorOf4[TermT] = new EndofunctorTrait4 {
     type Map[+A, +B, +C, +D] = TermT[A, B, C, D]

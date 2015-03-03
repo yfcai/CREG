@@ -5,9 +5,9 @@
   */
 
 import language.higherKinds
-import nominal.functors._
-import nominal.lib._
-import nominal.lib.Traversable.Endofunctor
+import creg.functors._
+import creg.lib._
+import creg.lib.TraversableBase.Endofunctor
 
 object Banana {
   @struct def ListT { Nil ; Cons(head, tail) }

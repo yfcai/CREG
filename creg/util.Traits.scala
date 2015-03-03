@@ -1,6 +1,6 @@
 /** Extract bits and pieces from a trait declaration */
 
-package nominal
+package creg
 package util
 
 import scala.reflect.macros.blackbox.Context

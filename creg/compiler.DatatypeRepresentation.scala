@@ -1,4 +1,4 @@
-package nominal
+package creg
 package compiler
 
 import lib.Applicative

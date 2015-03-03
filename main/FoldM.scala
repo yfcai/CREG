@@ -5,10 +5,10 @@
   * Participants: Jona, Paolo, Tillmann, Cai
   */
 
-import nominal.functors._
-import nominal.lib._
-import nominal.lib.Applicative._
-import nominal.lib.Traversable.Endofunctor
+import creg.functors._
+import creg.lib._
+import creg.lib.Applicative._
+import creg.lib.TraversableBase.Endofunctor
 
 object FoldM {
   def foldM[A](F: Endofunctor)(M: Monad)(algM: F.Map[A] => M.Map[A]):

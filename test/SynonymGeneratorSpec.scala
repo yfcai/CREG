@@ -1,8 +1,8 @@
 import org.scalatest._
-import nominal.functors._
+import creg.functors._
 
 class SynonymGeneratorSpec extends FlatSpec {
-  import nominal.lib._
+  import creg.lib._
 
   "SynonymGenerator" should "generate a synonym for flat datatypes" in {
     @data def Person = PersonT {
@@ -59,7 +59,7 @@ class SynonymGeneratorSpec extends FlatSpec {
     }
 
     // test that the constructors are properly tagged `Record` or `Variant`
-    import nominal.lib.Fix.{Record, Variant}
+    import creg.lib.Fix.{Record, Variant}
     implicitly[EvenT[Any, Any] <:< Variant]
     implicitly[ESuc[Any] <:< Record]
     implicitly[OSuc[Any] <:< Record]
