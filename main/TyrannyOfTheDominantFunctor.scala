@@ -6,6 +6,19 @@ import creg.lib._
 
 object TyrannyOfTheDominantFunctor {
 
+  def main(args: Array[String]) {
+    {
+      import F3_Preview._
+      println()
+      println(caption)
+      println(s"""|                       t = ${pretty(t)}
+                  |rename(_.toUpperCase)(t) = ${pretty(rename(_.toUpperCase)(t))}
+                  |             freevars(t) = ${freevars(t)}
+                  |          getOperator(t) = ${pretty(getOperator(t))}
+                  |""".stripMargin)
+    }
+  }
+
   object S1_Introduction {
     sealed trait Term
     case class Lit(number: Int)                   extends Term
@@ -55,7 +68,7 @@ object TyrannyOfTheDominantFunctor {
       def rename(f : String => String) : Term2 => Term2 = nameF.fmap(f)
     }
 
-    object SS3_0_FreevarsWithBoilerplate {
+    object SS3_0_FreeVariablesWithBoilerplate {
       import S1_Introduction._
       def freevars : Term => Set[String] = {
         case Lit(n)      => Set.empty
@@ -103,16 +116,7 @@ object TyrannyOfTheDominantFunctor {
         }
     }
 
-    object SS4_0_NormalFormWithRecursion {
-      import S1_Introduction._
-
-      def getOperator(t: Term): Term = t match {
-        case App(op, _) => getOperator(op)
-        case t          => t
-      }
-    }
-
-    object SS4_GetOperator {
+    object SS4_OperatorExtraction {
       import SS3_FreeVariables.{Fix, Roll, cata}
 
       sealed trait OpF[+T]
@@ -139,53 +143,20 @@ object TyrannyOfTheDominantFunctor {
           case op         => Roll[OpF](op)
         }
     }
-
-    object SS4_alt_NormalForm {
-
-      // Challenge: Capture the recursion scheme in the test
-      // whether a term is in call-by-value beta-normal-form
-      // or not.
-
-      import SS3_FreeVariables.{Fix, Roll, cata}
-
-      sealed trait CbvF[+S, +T]
-      case class Lit[+S, +T](number: Int) extends CbvF[S, T]
-      case class Var[+S, +T](name: String) extends CbvF[S, T]
-      case class Abs[+S, +T](param: String, body: Term4) extends CbvF[S, T]
-      case class App[+S, +T](operator: S, operand: T) extends CbvF[S, T]
-
-      type Term4 = Fix[({ type λ[+T] = Fix[({ type λ[+S] = CbvF[S, T] })#λ] })#λ]
-
-      private[this] type ArgF[+T] = Fix[OpF[T]#λ]
-      private[this] type OpF [+T] = { type λ[+S] = CbvF[S, T] }
-
-      val argF = new Functor {
-        type Map[+A] = ArgF[A]
-        def fmap[A,B](f : A => B) : Map[A] => Map[B] = ???
-      }
-
-      def opF[T] = new Functor {
-        type Map[+S] = OpF[T]#λ[S]
-        def fmap[A,B](f : A => B) : Map[A] => Map[B] = ???
-      }
-
-      def isNormalForm: Term4 => Boolean =
-        cata[Boolean](argF) { _.unroll match {
-          case App(op, arg) =>
-            val testOp: Any => Boolean = ???
-            arg && testOp(op)
-
-          case _ => true
-        }}
-    }
   }
 
-  object F1_RenamingFreeVariables {
-    @data def TermStruct = TermT {
-      Lit(number = Nothing)
-      Var(name = Nothing)
-      Abs(param = Nothing, body = Nothing)
-      App(operator = Nothing, operand = Nothing)
+  object F3_Preview {
+    val caption =
+      """|Figure 3:
+         |Renaming, free-variable computation and operator
+         |extraction in Creg.
+         |""".stripMargin
+
+    @struct def TermT {
+      Lit(number)
+      Var(name)
+      Abs(param, body)
+      App(operator, operand)
     }
 
     @functor def nameF[N] = Fix (T => TermT {
@@ -202,6 +173,14 @@ object TyrannyOfTheDominantFunctor {
       App (operator = T, operand = T)
     }
 
+    @functor def opF[T] =
+      TermT {
+        Lit(number = Int)
+        Var(name = String)
+        Abs(param = String, body = Term)
+        App(operator = T, operand = Term)
+      }
+
     type Term = nameF.Map[String]
     //        = Fix[termF.Map]
     implicitly[ Term =:= Fix[termF.Map] ]
@@ -211,7 +190,7 @@ object TyrannyOfTheDominantFunctor {
 
     // copy of S2_Tyranny.SS3_FreeVariables.cata
     // some types are subtly different
-    def cata[A](F : Traversable)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
+    def cata[A](F : Functor)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
       t => {
         val loop = cata[A](F)(visitor)
         visitor(F.fmap(loop)(t.unroll))
@@ -224,26 +203,62 @@ object TyrannyOfTheDominantFunctor {
         case other     => termF.crush[Set[String]](Set.empty , _ ++ _ )(other)
       }
 
-    //t = λf.f (g 1)(h 2)
-    val t:Term = coerce {
-      Abs("f",
-        App(App(Var("f"), App(Var("g"), Lit(1))),
-          App(Var("h"), Lit(2))))
+    def getOperator(t : Term): Term =
+      cata[Term](opF)({
+        case App(op, s) => op
+        case op         => coerce { op }
+      })(coerce { t })
+
+    //t = f (g 1) (λh. h 2)
+    val t : Term = coerce {
+      App(App(Var("f"), App(Var("g"), Lit(1))),
+        Abs("h", App (Var("h"), Lit(2))))
     }
 
+    // assertions in figure
     def runAssertions(): Unit = {
-      assert(freevars(t) == Set("g","h"))
+      assert(freevars(t) == Set("f","g"))
+      assert(freevars(rename(_.toUpperCase)(t)) == Set("F", "G"))
+
       assert(rename(_.toUpperCase)(t) == (
         coerce {
-          Abs("F",
-            App(App(Var("F"), App(Var("G"), Lit(1))),
-              App(Var("H"), Lit(2)))) }:Term
+          App(App(Var("F"), App(Var("G"), Lit(1))),
+            Abs("H", App (Var("H"), Lit(2))))
+        }:Term
       ))
+
+      assert(getOperator(t) == (coerce { Var("f") }: Term))
+    }
+
+    // pretty printer for fun
+    def pretty(t: Term): String = {
+
+      def paren(child: (String, Int), myPrecedence: Int): String =
+        if (child._2 > myPrecedence)
+          child._1
+        else
+          s"(${child._1})"
+
+      cata[(String, Int)](termF)({
+        case Lit(n) => (n.toString, Int.MaxValue)
+        case Var(x) => (x,          Int.MaxValue)
+
+        case Abs(x, body) =>
+          val precedence = 0
+          (s"\\$x -> ${paren(body, precedence)}", precedence)
+
+        case App(operator, operand) =>
+          val precedence = 10
+          ( paren(operator, precedence - 1) + " " +
+            paren(operand , precedence),
+            precedence
+          )
+      })(t)._1
     }
   }
 
-  F1_RenamingFreeVariables.runAssertions()
-  import F1_RenamingFreeVariables._
+  F3_Preview.runAssertions()
+  import F3_Preview._
 
   object S3_Emancipation {
     object SS1_PolymorphicRecords {
@@ -303,7 +318,7 @@ object TyrannyOfTheDominantFunctor {
         App (operator = A, operand = Term)
       }
 
-      def getOperator (t : Term) : Term =
+      def getOperator(t : Term) : Term =
         cata[Term](opF)({
           case App(op, s) => op
           case op         => coerce { op }
