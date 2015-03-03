@@ -90,10 +90,7 @@ object Coerce {
   // expected time: constant
   //   actual time: linear
   def isEmpty2_slow(ns: Ints2): Boolean =
-
-    // isEmpty( coerce(ns) )
-
-    ??? // triggers bug in `coerce`!
+    isEmpty( coerce(ns) )
 
 
   // non-solution: duplicate `isEmpty`
@@ -109,10 +106,7 @@ object Coerce {
   // drawback: lose expressive power: can't express
   // "lists of even length" as a datatype
   val pairs_canon: Int => List[Int] =
-
-    // n => coerce[Ints2, List[Int]] { pairs(n) }
-
-    ??? // triggers bug in `coerce`!
+    n => coerce { pairs(n) }
 
 
   // solution: make precondition of isEmpty the weakest possible
