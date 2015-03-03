@@ -1,6 +1,6 @@
 /** Console demo script for:
   *
-  * Lämmel, Jones.
+  * Lämmel, Peyton Jones.
   * Scrap your boilerplate: a practical design pattern for generic programming.
   *
   * Show examples first, implementations later.
