@@ -425,6 +425,13 @@ object TyrannyOfTheDominantFunctor {
 
           children
         )
+
+      class UniplateInstance[F[+_]](
+        val F: Traversable { type Map[+A] = F[A] }
+      ) extends Uniplate[Fix[F]] {
+        def uniplate(t: Fix[F]) =
+          (F.toList(t.unroll), xs => coerce { F.fromList(xs)(t.unroll) })
+      }
     }
 
     val SS5_Scrap   = Scrap   // main/Scrap.scala
