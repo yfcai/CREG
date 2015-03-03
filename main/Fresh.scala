@@ -34,9 +34,15 @@ object Fresh {
 
   implicit object FreshM extends MonadWithBind {
     type Map[+T] = FreshM[T]
-    def pure[A](x: A): Map[A] = _ => stateMonad pure x
+
+    def pure[A](x: A): Map[A] =
+      subst => names => (x, names)
+
     def bind[A, B](m: Map[A], f: A => Map[B]): Map[B] =
-      env => for { x <- m(env) ; y <- f(x)(env) } yield y
+      subst => names => {
+        val (x, newNames) = m(subst)(names)
+        f(x)(subst)(newNames)
+      }
   }
 
   def ask: FreshM[Subst] = env => stateMonad pure env
@@ -69,15 +75,15 @@ object Fresh {
         for { t <- termF(s).traverse(FreshM)(x => x) } yield coerce(t)
     }
 
+  val omega: Term = coerce {
+    App(
+      Abs("x", App(Var("x"), Var("x"))),
+      Abs("x", App(Var("x"), Var("x"))))
+  }
+
+  val omg: Term = refresh(omega)(Map.empty)(getNameStream)._1
+
   def run() {
-    val omega: Term = coerce {
-      App(
-        Abs("x", App(Var("x"), Var("x"))),
-        Abs("x", App(Var("x"), Var("x"))))
-    }
-
-    val omg: Term = refresh(omega)(Map.empty)(getNameStream)._1
-
     println(omg)
   }
 }

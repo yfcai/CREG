@@ -76,6 +76,8 @@ trait Traversable { thisFunctor =>
       Map[A] => B =
     traverse[A, B](Applicative.Const(default, combine))(f)
 
+  def crush[A <: Cat0](z: A, op: (A, A) => A): Map[A] => A = mapReduce(identity[A])(z, op)
+
   // reinterpret `x` in the light of `Map` being a traversable functor
   def apply[A <: Cat0](mA: Map[A]): View[A] = new View(mA)
 

@@ -49,6 +49,27 @@ trait Parsers extends util.AbortWithError with util.Paths {
     }
   }
 
+  lazy val StructVariantP: ParserC[Variant] =
+    new ParserC[Variant]
+  {
+    lazy val CasesP = OneOrMore("variant cases", StructRecordP)
+
+    def parse(c: Context, gamma: Set[Name])(input: c.Tree):
+        Result[Variant, c.Position] =
+      {
+        import c.universe._
+        input match {
+        case DefDef(mods, name, params, args, returnType, q"{ ..$body }") =>
+          val newGamma = gamma ++ getInitialGamma(c)(params)
+            for { records <- CasesP.parse(c, newGamma)(body) }
+            yield Variant(name.toString, records)
+
+          case _ =>
+            Failure(input.pos, "expect variant with records with field names")
+        }
+      }
+  }
+
   lazy val DataDeclP: ParserC[DataConstructor] = new ParserC[DataConstructor] {
     def parse(c: Context, gamma: Set[Name])(input: c.Tree): Result[DataConstructor, c.Position] = {
       import c.universe._
@@ -146,6 +167,31 @@ trait Parsers extends util.AbortWithError with util.Paths {
 
   lazy val CaseP: Parser[Set[Name], VariantCase] =
     RecordP orElse VariantP orElse AssignmentP orElse LetBindingP
+
+  lazy val StructRecordP = RecordWithoutFieldsP orElse StructRecordWithFieldsP
+
+  lazy val StructRecordWithFieldsP: ParserC[Record] = new ParserC[Record] {
+    val FieldsP = OneOrMore("fields", WhateverNameP)
+
+    def parse(c: Context, gamma: Set[Name])(input: c.Tree):
+        Result[Record, c.Position] =
+    {
+      import c.universe._
+      input match {
+        case q"$recordName(..$fields)" =>
+          for {
+            name <- UnboundNameP.parse(c, gamma)(recordName)
+            fields <- FieldsP.parse(c, gamma)(fields)
+          }
+          yield Record(name, fields map { x =>
+            Field(x, TypeConst("Nothing"))
+          })
+
+        case _ =>
+          Failure(input.pos, "expect record with field names")
+      }
+    }
+  }
 
   lazy val RecordP = RecordWithoutFieldsP orElse RecordWithFieldsP
 
@@ -378,6 +424,17 @@ object Parsers extends util.Persist with Parsers {
   def dataImpl(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
     val actual = parseOrAbort(c)(DataDeclP, annottees.head)
+    q"val ${TermName(actual.name)} = ${persist(c)(actual)}"
+  }
+
+  /** parse a struct decl */
+  class struct extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro structImpl
+  }
+
+  def structImpl(c: Context)(annottees: c.Tree*): c.Tree = {
+    import c.universe._
+    val actual = parseOrAbort(c)(StructVariantP, annottees.head)
     q"val ${TermName(actual.name)} = ${persist(c)(actual)}"
   }
 

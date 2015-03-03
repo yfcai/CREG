@@ -19,6 +19,6 @@ class synonym extends StaticAnnotation {
 }
 
 object coerce {
-  def apply[S, T](arg: S)(implicit witness: lib.Fix.TypeWitness[T]): T =
+  def apply[S, T](arg: S)(implicit tagT: lib.Fix.TypeWitness[T]): T =
     macro lib.Coercion.coerceImpl[S, T]
 }
