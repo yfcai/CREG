@@ -28,8 +28,8 @@ access to our unpublished manuscript in one way or another.
    installation would not traumatize innocent people.
 
 
-[sbt]     : http://www.scala-sbt.org/
-[tyranny] : main/TyrannyOfTheDominantFunctor.scala
-[main]    : main/
-[project] : http://ps.informatik.uni-tuebingen.de/research/functors/
-[banana]  : https://github.com/yfcai/Creg/blob/master/main/Banana.scala
+[sbt]:      http://www.scala-sbt.org/
+[tyranny]:  main/TyrannyOfTheDominantFunctor.scala
+[main]:     main/
+[project]:  http://ps.informatik.uni-tuebingen.de/research/functors/
+[banana]:   https://github.com/yfcai/Creg/blob/master/main/Banana.scala
