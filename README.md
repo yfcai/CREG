@@ -19,7 +19,7 @@ by [Yufei Cai et al.][project]
 
 There are various interesting usage examples in the [main folder][main].
 [Banana][banana] is a good starting point for innocent people,
-and [Tyranny][tyranny] is a good starting point for those who has
+and [Tyranny][tyranny] is a good starting point for those who have
 access to our unpublished super secret manuscript.
 
 #### Plan
