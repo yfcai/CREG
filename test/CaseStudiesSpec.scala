@@ -90,46 +90,6 @@ class CaseStudiesSpec extends FlatSpec {
     assert(ap == _abs("f", _abs("x", _app(_bdd(1), _bdd(0)))))
   }
 
-  "Lambda" should "compute call-by-name evaluation contexts" in {
-    import TyrannyOfTheDominantFunctor.Lambda._
-
-    val id: Term = coerce { Abs("x", "x") }
-    assert(cbnEvalCtx(id) == None)
-
-    val illTyped: Term = coerce { App(3, 5) }
-    assert(cbnEvalCtx(illTyped) == None)
-
-    val omega: Term = coerce {
-      App(Abs("x", App("x", "x")), Abs("x", App("x", "x")))
-    }
-    val omgctx = cbnEvalCtx(omega)
-    assert(omgctx.nonEmpty)
-    val (redex, putBack) = omgctx.get
-    assert(redex == omega)
-    assert(putBack(id) == id)
-    assert(putBack(omega) == omega)
-    assert(putBack(illTyped) == illTyped)
-
-    val nest: Term => Term = t => coerce {
-      App(App(App(t, 3), id), illTyped)
-    }
-
-    assert(cbnEvalCtx(nest(illTyped)) == None)
-
-    val idctx = cbnEvalCtx(nest(id))
-    assert(idctx.nonEmpty)
-    val (iRedex, iPutBack) = idctx.get
-    assert(iRedex == (coerce(App(id, 3)): Term))
-    assert(iPutBack(42) == (coerce(App(App(42, id), illTyped)): Term))
-
-    val nomctx = cbnEvalCtx(nest(omega))
-    assert(nomctx.nonEmpty)
-    val (nRedex, nPutBack) = nomctx.get
-    assert(nRedex == omega)
-    assert(nPutBack(id) == nest(id))
-    assert(nPutBack(5) == nest(5))
-  }
-
   "Fresh" should "work" in {
     import Fresh._
     assert(omg == (coerce {
