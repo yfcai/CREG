@@ -35,7 +35,7 @@ object Main {
 
   // export paths only, do not generate anything
   def exportOnly(base: File) = {
-    Console.err.println(s"Keeping old sources.")
+    Console.err.println(s"Keeping old sources:")
     filesToGenerate.foreach {
       case (filename, generator) => export(new File(base, filename).getCanonicalPath)
     }
