@@ -1,4 +1,10 @@
-/** All the code in paper, with typos corrected
+/** Most of the code in the unpublished manuscript
+  *   "Datatype-generic programming without
+  *    the tyranny of the dominant functor"
+  * with typos corrected.
+  *
+  * Abstract:
+  * http://ps.informatik.uni-tuebingen.de/research/functors/
   *
   * Interesting things:
   * - F3_Preview is Figure 3 (rename, freevars, getOperator)
