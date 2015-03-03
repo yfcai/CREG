@@ -16,15 +16,14 @@ object NoSubcategoryConstraints {
     App(s = T, t = T)
   })
 
-  import TraversableBounded._
+  val termT: Traversable4 { type Map[+A, +B, +C, +D] = TermT[A, B, C, D] } =
+    new Traversable4 {
+      type Map[+A, +B, +C, +D] = TermT[A, B, C, D]
 
-  val termT: EndofunctorOf4[TermT] = new Traversable4 {
-    type Map[+A, +B, +C, +D] = TermT[A, B, C, D]
-
-    def traverse[A, B, W, X, C, D, Y, Z]
-      (G: Applicative)
-      (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y], k: X => G.Map[Z]):
-        Map[A, B, W, X] => G.Map[Map[C, D, Y, Z]] =
+      def traverse[A, B, W, X, C, D, Y, Z]
+        (G: Applicative)
+        (f: A => G.Map[C], g: B => G.Map[D], h: W => G.Map[Y], k: X => G.Map[Z]):
+          Map[A, B, W, X] => G.Map[Map[C, D, Y, Z]] =
       {
         def cast[A](x: A) = x.asInstanceOf[G.Map[Map[C, D, Y, Z]]]
 
@@ -35,7 +34,7 @@ object NoSubcategoryConstraints {
           case a @ App(_, _) => cast(k(a))
         }
       }
-  }
+    }
 
   // The type TermT[Int, Int, Int, Int] is uninhabited.
   // However, the following method typechecks and will

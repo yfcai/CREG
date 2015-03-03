@@ -211,7 +211,7 @@ object TyrannyOfTheDominantFunctor {
 
     // copy of S2_Tyranny.SS3_FreeVariables.cata
     // some types are subtly different
-    def cata[A](F : TraversableBounded.Endofunctor)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
+    def cata[A](F : Traversable)(visitor : F.Map [A] => A) : Fix[F.Map] => A =
       t => {
         val loop = cata[A](F)(visitor)
         visitor(F.fmap(loop)(t.unroll))

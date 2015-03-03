@@ -7,7 +7,6 @@
 import language.higherKinds
 import creg.functors._
 import creg.lib._
-import creg.lib.TraversableBounded.Endofunctor
 
 object Banana {
   @struct def ListT { Nil ; Cons(head, tail) }
@@ -39,7 +38,7 @@ object Banana {
 
   // type List[A] = Fix[listF[A].Map]
 
-  def cata[T](fun: Endofunctor)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
+  def cata[T](fun: Traversable)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
     xs => algebra( fun(xs.unroll) map cata(fun)(algebra) )
 
   implicit class ListIsFoldable[A](xs: List[A]) {
@@ -54,7 +53,7 @@ object Banana {
     case Cons(head, tail) => head + tail
   }
 
-  def ana[T](fun: Endofunctor)(coalgebra: T => fun.Map[T]): T => Fix[fun.Map] =
+  def ana[T](fun: Traversable)(coalgebra: T => fun.Map[T]): T => Fix[fun.Map] =
     seed => Roll[fun.Map]( fun(coalgebra(seed)) map ana(fun)(coalgebra) )
 
   def mkList[A, T](seed: T)(coalgebra: T => ListF[A, T]): List[A] =
@@ -69,7 +68,7 @@ object Banana {
   def upTo(n: Int): List[Int] =
     mkList[Int, Int](1)(incrementCoalgebra(n))
 
-  def hyloWith[T, R](fun: Endofunctor)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
+  def hyloWith[T, R](fun: Traversable)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
     cata(fun)(algebra) compose ana(fun)(coalgebra)
 
   def hylo[A, T, R](seed: T)(coalgebra: T => ListF[A, T])(algebra: ListF[A, R] => R): R = {
@@ -88,7 +87,7 @@ object Banana {
   // show this after the type signature of `para`
   @data def _Pair[A, B] = Pair(_1 = A, _2 = B)
 
-  def para0[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
+  def para0[T](fun: Traversable)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
     type F[+X] = fun.Map[X]
     xs => cata[Pair[Fix[fun.Map], T]](fun)({
       (input: F[Pair[Fix[F], T]]) => Pair(
@@ -100,7 +99,7 @@ object Banana {
     }
   }
 
-  def para[T](fun: Endofunctor)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
+  def para[T](fun: Traversable)(psi: fun.Map[Pair[Fix[fun.Map], T]] => T): Fix[fun.Map] => T = {
     type F[+X]      = fun.Map[X]
     type Paired[+X] = F[Pair[Fix[F], X]]
     type FixedPoint = Fix[F]
@@ -115,7 +114,7 @@ object Banana {
     hyloWith(pairingF)(pairingCoalgebra)(psi)
   }
 
-  def cakeWith[T](fun: Endofunctor)(psi: Pair[Fix[fun.Map], fun.Map[T]] => T): Fix[fun.Map] => T = {
+  def cakeWith[T](fun: Traversable)(psi: Pair[Fix[fun.Map], fun.Map[T]] => T): Fix[fun.Map] => T = {
     type F[+X]      = fun.Map[X]
     type FixedPoint = Fix[F]
 

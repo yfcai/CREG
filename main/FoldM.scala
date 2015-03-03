@@ -8,10 +8,9 @@
 import creg.functors._
 import creg.lib._
 import creg.lib.Applicative._
-import creg.lib.TraversableBounded.Endofunctor
 
 object FoldM {
-  def foldM[A](F: Endofunctor)(M: Monad)(algM: F.Map[A] => M.Map[A]):
+  def foldM[A](F: Traversable)(M: Monad)(algM: F.Map[A] => M.Map[A]):
       Fix[F.Map] => M.Map[A] =
     t => M.bind(
       F(t.unroll).traverse(M)( foldM(F)(M)(algM) ),

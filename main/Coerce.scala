@@ -54,12 +54,11 @@ object Coerce {
 
   // possible slowdowns
   import Banana._ // for lists & *-morphisms
-  import TraversableBounded.Endofunctor
 
   // pattern functor of
   // incompatible representation of lists:
   // μX. listF (listF X)
-  def listF2[A]: Endofunctor { type Map[+L] = ListF[A, ListF[A, L]] } = {
+  def listF2[A]: Traversable { type Map[+L] = ListF[A, ListF[A, L]] } = {
     val F = listF[A]
     F compose F
   }

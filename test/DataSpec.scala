@@ -9,7 +9,7 @@ class DataSpec extends FlatSpec {
     type List[+A] = Fix[({ type λ[+L] = ListF[A, L] })#λ]
     type ListF[+A, +L] = ListT[Nil, Cons[A, L]]
 
-    def listF[A]: TraversableBounded.Endofunctor {
+    def listF[A]: Traversable {
       type Map[+L] = ListF[A, L]
     } = new Traversable {
       type Map[+L] = ListF[A, L]
