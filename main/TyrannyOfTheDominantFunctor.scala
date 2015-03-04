@@ -419,7 +419,7 @@ object TyrannyOfTheDominantFunctor {
       import Monad.State._
 
       // reimplementation of fromList outside the trait Traversable
-      def fromList[A](F: Traversable)(children: List[A])(t: F.Map[A]): F.Map[A] =
+      def fromList_alt[A](F: Traversable)(children: List[A])(t: F.Map[A]): F.Map[A] =
         evalState(
           F.traverse(stateMonad[List[A]])({
             (oldChild: A) => for {
@@ -435,8 +435,13 @@ object TyrannyOfTheDominantFunctor {
       class UniplateInstance[F[+_]](
         val F: Traversable { type Map[+A] = F[A] }
       ) extends Uniplate[Fix[F]] {
-        def uniplate(t: Fix[F]) =
+        def uniplate(t: Fix[F]): (List[Fix[F]], List[Fix[F]] => Fix[F]) =
           (F.toList(t.unroll), xs => coerce { F.fromList(xs)(t.unroll) })
+
+        def uniplate_alt(t: Fix[F]): (List[Fix[F]], List[Fix[F]] => Fix[F]) =
+          ( toList_alt(F)(t.unroll),
+            xs => coerce { fromList_alt(F)(xs)(t.unroll) }
+          )
       }
     }
 
