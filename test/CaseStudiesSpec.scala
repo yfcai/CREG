@@ -11,9 +11,10 @@ class CaseStudiesSpec extends FlatSpec {
       Cons(1, Cons(2, Cons(6, Cons(24, Nil))))
     }
 
-    assert(xs1.map(hyloFactorial)  == factorials)
-    assert(xs1.map(paraFactorial)  == factorials)
-    assert(xs1.map(paraFactorial0) == factorials)
+    assert(xs1.map(hyloFactorial)           == factorials)
+    assert(xs1.map(paraFactorial)           == factorials)
+    assert(xs1.map(paraFactorial0)          == factorials)
+    assert(xs1.map(cakeWithCoerceFactorial) == factorials)
   }
 
   "Scrap-your-boilerplate" should "work" in {

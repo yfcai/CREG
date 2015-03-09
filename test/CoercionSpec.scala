@@ -60,7 +60,7 @@ class CoercionSpec extends FlatSpec {
   }
 
 
-  import Banana._
+  import Banana.ana
 
   @functor def f1[A] = ForkT {
     Leaf(i = Int)
@@ -86,5 +86,28 @@ class CoercionSpec extends FlatSpec {
     coerce { t } : Fix[F4]
     coerce { t } : Fix[F5]
     coerce { t } : Fix[F6]
+  }
+
+  it should "handle abstract functors in the implicit scope" in {
+    // uncomment to see funny error message:
+    //   both `natF` and `F` matches expected [implicit] type
+    //   TraversableBounded { type Map[+A] = <error> }
+    //
+    // import Banana.natF
+
+    // converting F[F[Fix[F]]] to F[Fix[F]]
+    // requires calling fmap on F
+    def c1[F[+_]](
+      t: F[F[Fix[F]]]
+    )(implicit F: Traversable { type Map[+A] = F[A] }):
+        F[Fix[F]] =
+      coerce(t)
+
+    // converting Fix[X => F[F[X]]] to Fix[F]
+    def c2[F[+_]](
+      t: Fix[({ type λ[+A] = F[F[A]] })#λ]
+    )(implicit F: Traversable { type Map[+A] = F[A] }):
+        Fix[F] =
+      coerce(t)
   }
 }

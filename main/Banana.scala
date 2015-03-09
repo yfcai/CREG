@@ -121,9 +121,26 @@ object Banana {
     hylo(pairingF)(pairingCoalgebra)(psi)
   }
 
+  def cakeWithCoerce[F[+_]](implicit F: Traversable { type Map[+A] = F[A] }) = new {
+    type FixedPoint = Fix[F]
+
+    // BUG: does not work if inline FixedPoint here.
+    @functor def pairingF[x] = Pair(_1 = FixedPoint, _2 = F apply x)
+
+    // coercion works with an abstract functor if it is in the implicit
+    // scope and its type constructor is bounded by a type parameter.
+    // (the inner coercion is superfluous; it's there to ensure that
+    // F.fmap is called.)
+    val pairingCoalgebra: Fix[F] => pairingF.Map[Fix[F]] =
+      xs => coerce { Pair(xs, coerce { xs } : F[Fix[F]]) }
+
+    def apply[T](psi: Pair[Fix[F], F[T]] => T): Fix[F] => T =
+      hylo(pairingF)(pairingCoalgebra)(psi)
+  }
+
   @data def Nat = Fix(nat => NatT { Zero ; Succ(pred = nat) })
 
-  @functor def natF[n] = NatT { Zero ; Succ(pred = n) }
+  @functor implicit def natF[n] = NatT { Zero ; Succ(pred = n) }
 
   val natToInt: Nat => Int =
     cata[Int](natF) {
@@ -149,6 +166,13 @@ object Banana {
     para[Int](natF) {
       case Zero => 1
       case Succ(Pair(n, i)) => (natToInt(n) + 1) * i
+    } compose intToNat
+
+  import language.reflectiveCalls
+  def cakeWithCoerceFactorial: Int => Int =
+    cakeWithCoerce[natF.Map].apply[Int] {
+      case Pair(zero, Zero) => 1
+      case Pair(n, Succ(nMinusOneFactorial)) => natToInt(n) * nMinusOneFactorial
     } compose intToNat
 }
 
