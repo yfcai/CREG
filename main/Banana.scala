@@ -68,19 +68,14 @@ object Banana {
   def upTo(n: Int): List[Int] =
     mkList[Int, Int](1)(incrementCoalgebra(n))
 
-  def hyloWith[T, R](fun: Traversable)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
+  def hylo[T, R](fun: Traversable)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
     cata(fun)(algebra) compose ana(fun)(coalgebra)
 
-  def hylo[A, T, R](seed: T)(coalgebra: T => ListF[A, T])(algebra: ListF[A, R] => R): R = {
-    val functor = listF[A]
-    hyloWith(functor)(coalgebra)(algebra)(seed)
-  }
-
   def hyloFactorial(n: Int): Int =
-    hylo[Int, Int, Int](1)(incrementCoalgebra(n)) {
+    hylo[Int, Int](listF[Int])(incrementCoalgebra(n))({
       case Nil => 1
       case Cons(m, n) => m * n
-    }
+    })(1)
 
   // paramorphism is just a hylomorphism
 
@@ -111,18 +106,19 @@ object Banana {
     val pairingCoalgebra: Fix[F] => Paired[Fix[F]] =
       xs => fun(xs.unroll) map { child => Pair(child, child) }
 
-    hyloWith(pairingF)(pairingCoalgebra)(psi)
+    hylo(pairingF)(pairingCoalgebra)(psi)
   }
 
-  def cakeWith[T](fun: Traversable)(psi: Pair[Fix[fun.Map], fun.Map[T]] => T): Fix[fun.Map] => T = {
+  def cake[T](fun: Traversable)(psi: Pair[Fix[fun.Map], fun.Map[T]] => T): Fix[fun.Map] => T = {
     type F[+X]      = fun.Map[X]
     type FixedPoint = Fix[F]
 
     @functor def pairingF[x] = Pair(_1 = FixedPoint, _2 = fun apply x)
 
-    val pairingCoalgebra = (xs: Fix[F]) => Pair(xs, xs.unroll)
+    val pairingCoalgebra: Fix[F] => pairingF.Map[Fix[F]] =
+      xs => Pair(xs, coerce { xs })
 
-    hyloWith(pairingF)(pairingCoalgebra)(psi)
+    hylo(pairingF)(pairingCoalgebra)(psi)
   }
 
   @data def Nat = Fix(nat => NatT { Zero ; Succ(pred = nat) })
