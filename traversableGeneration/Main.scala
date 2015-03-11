@@ -222,7 +222,7 @@ object Main {
     val (from, to)       = (fromRaw.comma, toRaw.comma)
     val baseMap          = traverseDomain(n)
     val fs               = mkIdentifiers(n).comma
-    s"""|  class View[$from]($mA : ${traverseDomain(n)}) {
+    s"""|class View[$from]($mA : ${traverseDomain(n)}) {
         |    def traverse[$to]($applicative : Applicative)(${traverseArgs(n)}):
         |        ${traverseCodomain(n)} =
         |      $bounded.this.traverse($applicative)($fs)($mA)
@@ -531,8 +531,7 @@ object Main {
        |""".stripMargin
 
   def extraTraversableMethodSource: String =
-    """|
-       |  def mapReduce[A <: Cat0, B <: Cat0](f: A => B)(
+    """|def mapReduce[A <: Cat0, B <: Cat0](f: A => B)(
        |    default: B, combine: (B, B) => B):
        |      Map[A] => B =
        |    traverse[A, B](Applicative.Const(default, combine))(f)
@@ -562,8 +561,7 @@ object Main {
     """|    // McBride & Paterson's reduce
        |    def reduce(monoidId: A, monoidOp: (A, A) => A): A =
        |      mapReduce(identity)(monoidId, monoidOp)
-       |    
+       |
        |    def mapReduce[B <: Cat0](f: A => B)(monoidId: B, monoidOp: (B, B) => B): B =
-       |      traverse(Applicative.Const(monoidId, monoidOp))(f)
-       |""".stripMargin
+       |      traverse(Applicative.Const(monoidId, monoidOp))(f)""".stripMargin
 }
