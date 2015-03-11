@@ -22,6 +22,10 @@ There are various interesting usage examples in the [main folder][main].
 and [Tyranny][tyranny] is a good starting point for those who have
 access to our unpublished super secret manuscript.
 
+The interfaces [Functor][functor], [Applicative][appl],
+[Traversable][trav] and [Fix][fix] are generated. They can be
+found in the folder for [managed source files][managed].
+
 #### Plan
 
 1. Create package object `creg.package` so that users can import
@@ -41,5 +45,10 @@ access to our unpublished super secret manuscript.
 [tyranny]:  main/TyrannyOfTheDominantFunctor.scala
 [main]:     main/
 [project]:  http://ps.informatik.uni-tuebingen.de/research/functors/
+[appl]:     traversableGeneration/target/scala-2.11/src_managed/test/Applicative.scala
 [banana]:   main/Banana.scala
+[fix]:      traversableGeneration/target/scala-2.11/src_managed/test/Fix.scala
+[functor]:  traversableGeneration/target/scala-2.11/src_managed/test/Functors.scala
 [macros]:   macros
+[managed]:  traversableGeneration/target/scala-2.11/src_managed/test
+[trav]:     traversableGeneration/target/scala-2.11/src_managed/test/Traversable.scala
