@@ -40,8 +40,8 @@ object Banana {
 
   // type List[A] = Fix[listF[A].Map]
 
-  def cata[T](fun: Traversable)(algebra: fun.Map[T] => T): Fix[fun.Map] => T =
-    xs => algebra( fun(xs.unroll) map cata(fun)(algebra) )
+  def cata[T](F: Functor)(algebra: F.Map[T] => T): Fix[F.Map] => T =
+    xs => algebra( F.fmap(cata(F)(algebra))(xs.unroll) )
 
   implicit class ListIsFoldable[A](xs: List[A]) {
     val patternFunctor = listF[A]
@@ -55,8 +55,8 @@ object Banana {
     case Cons(head, tail) => head + tail
   }
 
-  def ana[T](fun: Traversable)(coalgebra: T => fun.Map[T]): T => Fix[fun.Map] =
-    seed => Roll[fun.Map]( fun(coalgebra(seed)) map ana(fun)(coalgebra) )
+  def ana[T](F: Functor)(coalgebra: T => F.Map[T]): T => Fix[F.Map] =
+    seed => Roll[F.Map]( F.fmap(ana(F)(coalgebra))(coalgebra(seed)) )
 
   def mkList[A, T](seed: T)(coalgebra: T => ListF[A, T]): List[A] =
     ana(listF[A])(coalgebra)(seed)
@@ -70,8 +70,8 @@ object Banana {
   def upTo(n: Int): List[Int] =
     mkList[Int, Int](1)(incrementCoalgebra(n))
 
-  def hylo[T, R](fun: Traversable)(coalgebra: T => fun.Map[T])(algebra: fun.Map[R] => R): T => R =
-    cata(fun)(algebra) compose ana(fun)(coalgebra)
+  def hylo[T, R](F: Functor)(coalgebra: T => F.Map[T])(algebra: F.Map[R] => R): T => R =
+    cata(F)(algebra) compose ana(F)(coalgebra)
 
   def hyloFactorial(n: Int): Int =
     hylo[Int, Int](listF[Int])(incrementCoalgebra(n))({
