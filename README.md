@@ -17,7 +17,7 @@ by [Yufei Cai et al.][project]
 
 #### Navigation
 
-There are various interesting usage examples in the [main folder][main].
+There are various interesting usage [examples][main].
 [Banana][banana] is a good starting point for innocent people,
 and [Tyranny][tyranny] is a good starting point for those who have
 access to our unpublished super secret manuscript.
@@ -31,7 +31,7 @@ found in the folder for [managed source files][managed].
 2. Upload a jar to some binary distribution service so that
    installation would not traumatize innocent people.
 
-3. Document examples in [main][main] better.
+3. Document [examples][main] better.
 
 4. Document [implementation][macros] better.
 
@@ -39,11 +39,11 @@ found in the folder for [managed source files][managed].
 
 
 [sbt]:      http://www.scala-sbt.org/
-[tyranny]:  main/TyrannyOfTheDominantFunctor.scala
-[main]:     main/
+[tyranny]:  example/TyrannyOfTheDominantFunctor.scala
+[main]:     example/
 [project]:  http://ps.informatik.uni-tuebingen.de/research/functors/
 [appl]:     traversableGeneration/target/scala-2.11/src_managed/test/Applicative.scala
-[banana]:   main/Banana.scala
+[banana]:   example/Banana.scala
 [fix]:      traversableGeneration/target/scala-2.11/src_managed/test/Fix.scala
 [functor]:  traversableGeneration/target/scala-2.11/src_managed/test/Functors.scala
 [macros]:   macros
