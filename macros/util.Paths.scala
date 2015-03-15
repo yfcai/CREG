@@ -13,26 +13,26 @@ trait Paths {
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._
-    tq"_root_.creg.lib.Fix"
+    tq"_root_.creg.Fix"
   }
 
-  def getFixWithoutRoot: String = "creg.lib.Fix"
+  def getFixWithoutRoot: String = "creg.Fix"
 
-  def getRoll(c: Context) = c parse "_root_.creg.lib.Roll"
+  def getRoll(c: Context) = c parse "_root_.creg.Roll"
 
   def getRecordOrVariant(c: Context): c.Tree = {
     import c.universe._
-    tq"_root_.creg.lib.Fix.RecordOrVariant"
+    tq"_root_.creg.Fix.RecordOrVariant"
   }
 
   def getVariant(c: Context) = {
     import c.universe._
-    tq"_root_.creg.lib.Fix.Variant"
+    tq"_root_.creg.Fix.Variant"
   }
 
   def getRecord(c: Context) = {
     import c.universe._
-    tq"_root_.creg.lib.Fix.Record"
+    tq"_root_.creg.Fix.Record"
   }
 
   def getTraversableEndofunctor(c: Context, n: Int): c.Tree =
@@ -54,12 +54,12 @@ trait Paths {
 
   def getApplicative(c: Context): c.Tree = {
     import c.universe._
-    tq"_root_.creg.lib.Applicative"
+    tq"_root_.creg.Applicative"
   }
 
-  def traversableEndofunctorTrait: String = "_root_.creg.lib.Traversable"
-  def traversableEndofunctorOf: String = "_root_.creg.lib.TraversableBounded.EndofunctorOf"
-  def boundedTraversableBoundedTrait: String = "_root_.creg.lib.TraversableBounded"
+  def traversableEndofunctorTrait: String = "_root_.creg.Traversable"
+  def traversableEndofunctorOf: String = "_root_.creg.TraversableBounded.EndofunctorOf"
+  def boundedTraversableBoundedTrait: String = "_root_.creg.TraversableBounded"
 
   def mappingOnObjects: String = "Map"
 
@@ -110,11 +110,11 @@ trait Paths {
 
   def typeNameRange(c: Context): c.TypeName = c.universe.TypeName("Range")
 
-  def identityFunctorLocationString: String = "_root_.creg.lib.Applicative.Identity"
+  def identityFunctorLocationString: String = "_root_.creg.Applicative.Identity"
 
   def applicativeEndofunctor(c: Context)(f: c.TypeName): c.Tree = {
     import c.universe._
-    val q"??? : $tpe" = q"??? : _root_.creg.lib.Applicative.Endofunctor[$f]"
+    val q"??? : $tpe" = q"??? : _root_.creg.Applicative.Endofunctor[$f]"
     tpe
   }
 

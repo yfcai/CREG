@@ -1,7 +1,7 @@
 package creg.example
 
 import org.scalatest._
-import creg.functors._
+import creg._
 
 class CaseStudiesSpec extends FlatSpec {
   "Banana" should "work" in {
@@ -80,7 +80,6 @@ class CaseStudiesSpec extends FlatSpec {
   "De-Bruijn indices" should "work" in {
     // manual syntax tree construction
     import DeBruijn._
-    import creg.lib._
     val roll = Roll[TermF] _
     val _abs = (x: String, body: Term) => roll(Abs(x, body))
     val _app = (op: Term, arg: Term) => roll(App(op, arg))

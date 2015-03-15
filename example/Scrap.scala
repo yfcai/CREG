@@ -9,8 +9,7 @@
 package creg.example
 
 import language.higherKinds
-import creg.functors._
-import creg.lib._
+import creg._
 
 import reflect.runtime.universe.{TypeTag, typeTag}
 

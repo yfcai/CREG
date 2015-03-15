@@ -1,6 +1,5 @@
 import org.scalatest._
-import creg.functors._
-import creg.lib._
+import creg._
 
 class DataSpec extends FlatSpec {
   it should "generate enough scala types for the list example" in {

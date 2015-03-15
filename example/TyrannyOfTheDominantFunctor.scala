@@ -14,8 +14,7 @@
 package creg.example
 
 import language.{higherKinds, implicitConversions}
-import creg.functors._
-import creg.lib._
+import creg._
 
 object TyrannyOfTheDominantFunctor {
 

@@ -1,5 +1,4 @@
 package creg
-package lib
 
 import language.higherKinds
 

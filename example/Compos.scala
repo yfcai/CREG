@@ -10,9 +10,8 @@ package creg.example
 
 import language.higherKinds
 import language.implicitConversions
-import creg.functors._
-import creg.lib._
-import creg.lib.Applicative._
+import creg._
+import Applicative._
 
 object Compos {
   import Banana.{List, Nil, Cons}

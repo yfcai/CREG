@@ -1,5 +1,6 @@
 package creg
-package lib
+
+import functors._
 import language.higherKinds
 
 trait Applicative extends Functor { self =>

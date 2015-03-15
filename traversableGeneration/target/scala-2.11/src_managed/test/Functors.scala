@@ -1,6 +1,31 @@
 package creg
-package lib
+package functors
 import language.higherKinds
+
+trait Functors {
+  type Functor = creg.functors.Functor
+  type Functor2 = creg.functors.Functor2
+  type Functor3 = creg.functors.Functor3
+  type Functor4 = creg.functors.Functor4
+  type Functor5 = creg.functors.Functor5
+  type Functor6 = creg.functors.Functor6
+  type Functor7 = creg.functors.Functor7
+  type Functor8 = creg.functors.Functor8
+  type Functor9 = creg.functors.Functor9
+  type Functor10 = creg.functors.Functor10
+  type Functor11 = creg.functors.Functor11
+  type Functor12 = creg.functors.Functor12
+  type Functor13 = creg.functors.Functor13
+  type Functor14 = creg.functors.Functor14
+  type Functor15 = creg.functors.Functor15
+  type Functor16 = creg.functors.Functor16
+  type Functor17 = creg.functors.Functor17
+  type Functor18 = creg.functors.Functor18
+  type Functor19 = creg.functors.Functor19
+  type Functor20 = creg.functors.Functor20
+  type Functor21 = creg.functors.Functor21
+  type Functor22 = creg.functors.Functor22
+}
 
 trait Functor {
   type Map[+A]

@@ -1,8 +1,7 @@
 package creg
 package compiler
 
-import lib.Applicative
-import lib.Applicative._
+import Applicative._
 
 object DatatypeRepresentation {
   // name of records, variants, fields

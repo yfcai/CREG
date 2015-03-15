@@ -9,8 +9,7 @@
 
 package creg.example
 
-import creg.functors._
-import creg.lib._
+import creg._
 import language.higherKinds
 
 object Origami {

@@ -4,8 +4,6 @@ package coercion
 import language.implicitConversions
 import org.scalatest._
 
-import lib._
-
 import Coercion.Test._
 import Applicative._
 

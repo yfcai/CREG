@@ -3,8 +3,6 @@
 package creg
 package coercion
 
-import lib._
-
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.language.experimental.macros

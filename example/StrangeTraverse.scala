@@ -11,7 +11,7 @@
 
 package creg.example
 
-import creg.lib._
+import creg._
 import Monad.State._
 
 object StrangeTraverse extends Traversable {

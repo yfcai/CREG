@@ -8,7 +8,6 @@ package creg.example
 
 import language.higherKinds
 import creg._
-import lib._
 
 object Banana {
   @struct def ListT { Nil ; Cons(head, tail) }

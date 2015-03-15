@@ -2,8 +2,7 @@
 
 package creg.example
 
-import creg.functors._
-import creg.lib._
+import creg._
 
 object Coerce {
   // the binary tree datatype

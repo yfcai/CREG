@@ -1,6 +1,6 @@
 package creg
-package lib
 import language.higherKinds
+import functors._
 
 trait Traversable0 {
   type Map >: this.type

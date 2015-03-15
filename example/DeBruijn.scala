@@ -1,7 +1,6 @@
 package creg.example
 
-import creg.functors._
-import creg.lib._
+import creg._
 
 import scala.language.{implicitConversions}
 

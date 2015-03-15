@@ -7,9 +7,8 @@
 
 package creg.example
 
-import creg.functors._
-import creg.lib._
-import creg.lib.Applicative._
+import creg._
+import Applicative._
 
 object FoldM {
   def foldM[A](F: Traversable)(M: Monad)(algM: F.Map[A] => M.Map[A]):

@@ -7,8 +7,7 @@
 
 package creg.example
 
-import creg.functors._
-import creg.lib._
+import creg._
 
 object NoSubcategoryConstraints {
   @data def Term = Fix(T => TermT {

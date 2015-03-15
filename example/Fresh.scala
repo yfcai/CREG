@@ -3,8 +3,7 @@
 
 package creg.example
 
-import creg.lib._
-import creg.functors._
+import creg._
 
 object Fresh {
   import Monad.State

@@ -23,7 +23,8 @@ object Main {
     ("Monad.scala"      , exportMonad),
     ("Functors.scala"   , exportFunctors),
     ("Applicative.scala", exportApplicative),
-    ("Traversable.scala", exportTraversables)
+    ("Traversable.scala", exportTraversables),
+    ("Foldable.scala"   , exportFoldable)
   )
 
   // regenerate files and export their paths
@@ -47,17 +48,17 @@ object Main {
   // keeps `sbt` from frivolous recompilations and also from looping
   // on `~test`
   def shouldGenerate(base: File): Boolean = {
-      val thisTimestamp       = new File(__FILE__).lastModified
-      val generatedTimestamps = filesToGenerate.map {
-        case (filename, generator) =>
-          val file = new File(base, filename)
-          if (file.exists) file.lastModified else -1
-      }
-      if (generatedTimestamps.isEmpty)
-        false // no file to generate anyway
-      else
-        thisTimestamp >= generatedTimestamps.min
+    val thisTimestamp       = new File(__FILE__).lastModified
+    val generatedTimestamps = filesToGenerate.map {
+      case (filename, generator) =>
+        val file = new File(base, filename)
+        if (file.exists) file.lastModified else -1
     }
+    if (generatedTimestamps.isEmpty)
+      false // no file to generate anyway
+    else
+      thisTimestamp >= generatedTimestamps.min
+  }
 
   def deleteIrrelevantFiles(base: File) {
     if (base.exists) {
@@ -96,6 +97,9 @@ object Main {
 
   def exportApplicative(base: File, filename: String) =
     exportFunctorLike(base, filename, _ => applicativeSource)
+
+  def exportFoldable(base: File, filename: String) =
+    exportFunctorLike(base, filename, _ => foldableSource)
 
   // generate Functor, Functor2, ...
   def exportFunctors(base: File, filename: String) =
@@ -139,12 +143,30 @@ object Main {
     val individualFunctors =
       Range.inclusive(1, maxArity).map(generateFunctorTrait).mkString("\n")
 
+    val functorsIndex = generateFunctorsTableOfContents(maxArity)
+
     s"""|package creg
-        |package lib
+        |package functors
         |import language.higherKinds
         |
+        |$functorsIndex
         |$individualFunctors
         |""".stripMargin
+  }
+
+  def generateFunctorsTableOfContents(maxArity: Int): String = {
+    val synonyms =
+      Range.inclusive(1, maxArity).map(generateFunctorSynonym).mkString("\n")
+
+    s"""|trait Functors {
+        |$synonyms
+        |}
+        |""".stripMargin
+  }
+
+  def generateFunctorSynonym(n: Int): String = {
+    val functor = mkFunctorLike("Functor", n)
+    s"  type $functor = creg.functors.$functor"
   }
 
   def generateTraversables(maxArity: Int): String = {
@@ -153,8 +175,8 @@ object Main {
         map(generateTraversableTraits).mkString("\n")
 
     s"""|package creg
-        |package lib
         |import language.higherKinds
+        |import functors._
         |
         |$traversable0Source
         |$individualTraversables
@@ -207,7 +229,7 @@ object Main {
 
   def traverseDef(n: Int): String =
     s"def traverse[${traverseParams(n)}]($applicative : Applicative)" +
-      s"(${traverseArgs(n)}): ${traverseResult(n)}"
+  s"(${traverseArgs(n)}): ${traverseResult(n)}"
 
   def viewDef(n: Int): String = {
     val params = mkTraverseParams(n)._1.comma
@@ -282,7 +304,7 @@ object Main {
 
   def fmapParams(n: Int): String = {
     val (fromParams, toParams) = mkUnzippedParams(n)
-    (fromParams ++ toParams).comma
+      (fromParams ++ toParams).comma
   }
 
   def mkTraverseParams(n: Int): (List[String], List[String]) = {
@@ -296,7 +318,7 @@ object Main {
 
   def traverseParams(n: Int): String = {
     val (fromParams, toParams) = mkTraverseParams(n)
-    (fromParams ++ toParams).comma
+      (fromParams ++ toParams).comma
   }
 
   def fmapCodomain(n: Int): String =
@@ -330,7 +352,6 @@ object Main {
 
   def fixSource: String =
     """|package creg
-       |package lib
        |
        |import language.higherKinds
        |
@@ -370,7 +391,8 @@ object Main {
 
   def applicativeSource: String =
     """|package creg
-       |package lib
+       |
+       |import functors._
        |import language.higherKinds
        |
        |trait Applicative extends Functor { self =>
@@ -446,7 +468,6 @@ object Main {
 
   def monadSource: String =
     """|package creg
-       |package lib
        |
        |import language.higherKinds
        |
@@ -566,4 +587,27 @@ object Main {
        |
        |    def mapReduce[B <: Cat0](f: A => B)(monoidId: B, monoidOp: (B, B) => B): B =
        |      traverse(Applicative.Const(monoidId, monoidOp))(f)""".stripMargin
+
+  def foldableSource: String =
+    """|package creg
+       |
+       |import language.higherKinds
+       |
+       |// constructor can't be path-dependent. this won't work:
+       |//
+       |//   class Foldable(F: TraversableBounded.Endofunctor)(t: Fix[F.Map]) { ... }
+       |//
+       |// implicit argument gives us at least the option not to write
+       |//
+       |//   new Foldable[TermF](t)(termF)
+       |//
+       |class Foldable[F[+_]](term: Fix[F])(implicit F: Traversable { type Map[+A] = F[A] }) {
+       |  def fold[T](f: F[T] => T): T = {
+       |    object cata extends (Fix[F] => T) {
+       |      def apply(x: Fix[F]): T = f(F(x.unroll) map this)
+       |    }
+       |    cata(term)
+       |  }
+       |}
+       |""".stripMargin
 }
