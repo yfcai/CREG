@@ -71,6 +71,8 @@ object Main {
         new File(base, file).delete()
       }
     }
+    else
+      base.mkdirs()
   }
 
   def __FILE__ : String =
