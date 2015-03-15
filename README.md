@@ -28,9 +28,6 @@ found in the folder for [managed source files][managed].
 
 #### Plan
 
-1. Create package object `creg.package` so that users can import
-   everything in one go.
-
 2. Upload a jar to some binary distribution service so that
    installation would not traumatize innocent people.
 
