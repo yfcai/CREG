@@ -6,6 +6,8 @@
   * The type of Exp is different.
   */
 
+package creg.example
+
 import language.higherKinds
 import language.implicitConversions
 import creg.functors._

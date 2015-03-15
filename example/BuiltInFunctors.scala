@@ -3,7 +3,10 @@
   * Which package is appropriate for this object?
   */
 
-import creg.lib._
+package creg.example
+
+import creg._
+import lib._
 
 object BuiltInFunctors {
   // Open problem: How to interact with Scala collection library without code duplication?

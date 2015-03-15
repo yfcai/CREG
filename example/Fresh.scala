@@ -1,6 +1,8 @@
 // how to thread a monad correctly
 // (global name refreshment)
 
+package creg.example
+
 import creg.lib._
 import creg.functors._
 

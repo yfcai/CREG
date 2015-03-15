@@ -1,7 +1,10 @@
+package creg // to access private members
+package coercion
+
 import language.implicitConversions
 import org.scalatest._
-import creg.functors._
-import creg.lib._
+
+import lib._
 
 import Coercion.Test._
 import Applicative._
@@ -60,7 +63,7 @@ class CoercionSpec extends FlatSpec {
   }
 
 
-  import Banana.ana
+  import creg.example.Banana.ana
 
   @functor def f1[A] = ForkT {
     Leaf(i = Int)

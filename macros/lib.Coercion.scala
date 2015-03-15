@@ -1,7 +1,9 @@
 /** Type coercion a la TAPL (Pierce) §21.9 */
 
 package creg
-package lib
+package coercion
+
+import lib._
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
@@ -12,7 +14,7 @@ import scala.reflect.macros.blackbox.Context
 import compiler._
 import DatatypeRepresentation._
 
-object Coercion extends UniverseConstruction with util.Traverse {
+private[creg] object Coercion extends UniverseConstruction with util.Traverse {
   import Fix.TypeWitness
 
   def coerceImpl[Actual, Expected]
@@ -598,7 +600,7 @@ object Coercion extends UniverseConstruction with util.Traverse {
 
 
   // testing macros
-  object Test {
+  private[coercion] object Test {
     // test if there's a cast at top level or not
     def hasCast[S, T]: Boolean =
       macro hasCastImpl[S, T]

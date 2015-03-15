@@ -7,7 +7,9 @@
 // traverse is ill-formed and does not correspond to any finitary
 // container.
 //
-// 
+//
+
+package creg.example
 
 import creg.lib._
 import Monad.State._

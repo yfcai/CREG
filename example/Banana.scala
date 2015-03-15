@@ -4,9 +4,11 @@
   * Functional programming with bananas, lenses, envelopes and barbed wire.
   */
 
+package creg.example
+
 import language.higherKinds
-import creg.functors._
-import creg.lib._
+import creg._
+import lib._
 
 object Banana {
   @struct def ListT { Nil ; Cons(head, tail) }

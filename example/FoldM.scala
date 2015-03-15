@@ -5,6 +5,8 @@
   * Participants: Jona, Paolo, Tillmann, Cai
   */
 
+package creg.example
+
 import creg.functors._
 import creg.lib._
 import creg.lib.Applicative._

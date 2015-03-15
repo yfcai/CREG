@@ -1,3 +1,5 @@
+package creg.example
+
 import creg.functors._
 import creg.lib._
 

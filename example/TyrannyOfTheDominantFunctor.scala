@@ -11,6 +11,8 @@
   * - F4_Grammar is Figure 4 (grammar of regular functors)
   */
 
+package creg.example
+
 import language.{higherKinds, implicitConversions}
 import creg.functors._
 import creg.lib._

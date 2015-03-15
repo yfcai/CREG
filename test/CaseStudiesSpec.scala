@@ -1,3 +1,5 @@
+package creg.example
+
 import org.scalatest._
 import creg.functors._
 

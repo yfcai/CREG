@@ -7,6 +7,8 @@
   * Scala for generic programmers.
   */
 
+package creg.example
+
 import creg.functors._
 import creg.lib._
 import language.higherKinds

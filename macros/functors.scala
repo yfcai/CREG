@@ -3,6 +3,8 @@
 package creg
 package functors
 
+import lib._
+
 import scala.language.experimental.macros
 import scala.annotation.StaticAnnotation
 
@@ -23,6 +25,6 @@ class synonym extends StaticAnnotation {
 }
 
 object coerce {
-  def apply[S, T](arg: S)(implicit tagT: lib.Fix.TypeWitness[T]): T =
-    macro lib.Coercion.coerceImpl[S, T]
+  def apply[S, T](arg: S)(implicit tagT: Fix.TypeWitness[T]): T =
+    macro coercion.Coercion.coerceImpl[S, T]
 }

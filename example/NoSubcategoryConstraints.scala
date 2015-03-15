@@ -5,6 +5,8 @@
   * Doing it with standard case classes result in type-unsoundness.
   */
 
+package creg.example
+
 import creg.functors._
 import creg.lib._
 

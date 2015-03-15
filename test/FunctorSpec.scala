@@ -41,7 +41,7 @@ class FunctorSpec extends FlatSpec {
   }
 
   it should "permit interspersing with built-in functors" in {
-    import BuiltInFunctors.seqF
+    import creg.example.BuiltInFunctors.seqF
 
     @functor def elemSeqF[x] = List apply (seqF apply x)
 

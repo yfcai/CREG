@@ -6,6 +6,8 @@
   * Show examples first, implementations later.
   */
 
+package creg.example
+
 import language.higherKinds
 import creg.functors._
 import creg.lib._
