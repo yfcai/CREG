@@ -1,6 +1,14 @@
 package creg
+package lib
+package fix
 
 import language.higherKinds
+
+trait Index {
+  type Fix[+F[+_]] = fix.Fix[F]
+  val  Fix : fix.Fix.type  = fix.Fix
+  val  Roll: fix.Roll.type = fix.Roll
+}
 
 // much as I would like to make `Fix` path-dependent
 // on some functor, we need the type param `F` for

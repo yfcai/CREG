@@ -1,9 +1,15 @@
 package creg
+package lib
+package applicative
 
-import functors._
+trait Index {
+  type Applicative = applicative.Applicative
+  val  Applicative: applicative.Applicative.type = applicative.Applicative
+}
+
 import language.higherKinds
 
-trait Applicative extends Functor { self =>
+trait Applicative extends functor.Functor { self =>
   // Applicative functors are only defined on the entire Scala category.
   // It's hard to define applicative functors on subcategories because
   // a subcategory may not have exponentials (used in `call`).
@@ -13,9 +19,9 @@ trait Applicative extends Functor { self =>
 
   def fmap[A, B](f: A => B): Map[A] => Map[B] = x => call(pure(f), x)
 
-  def roll[F[+_]](x: Map[F[Fix[F]]]): Map[Fix[F]] =
+  def roll[F[+_]](x: Map[F[fix.Fix[F]]]): Map[fix.Fix[F]] =
     call(
-      pure[F[Fix[F]] => Fix[F]](y => Roll(y)),
+      pure[F[fix.Fix[F]] => fix.Fix[F]](y => fix.Roll(y)),
       x)
 
   def compose(that: Applicative):

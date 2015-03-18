@@ -1,5 +1,7 @@
 package creg
 
+import lib._
+
 import language.higherKinds
 
 object Monad {
@@ -38,7 +40,7 @@ object Monad {
   type ic[M[+_]] = Monad { type Map[+X] = M[X] }
 }
 
-trait Monad extends Applicative {
+trait Monad extends applicative.Applicative {
   type Map[+X]
 
   // inherited from applicative

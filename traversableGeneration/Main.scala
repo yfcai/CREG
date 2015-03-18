@@ -146,7 +146,8 @@ object Main {
     val functorsIndex = generateFunctorsTableOfContents(maxArity)
 
     s"""|package creg
-        |package functors
+        |package lib
+        |package functor
         |import language.higherKinds
         |
         |$functorsIndex
@@ -158,7 +159,7 @@ object Main {
     val synonyms =
       Range.inclusive(1, maxArity).map(generateFunctorSynonym).mkString("\n")
 
-    s"""|trait Functors {
+    s"""|trait Index {
         |$synonyms
         |}
         |""".stripMargin
@@ -166,7 +167,12 @@ object Main {
 
   def generateFunctorSynonym(n: Int): String = {
     val functor = mkFunctorLike("Functor", n)
-    s"  type $functor = creg.functors.$functor"
+    s"  type $functor = functor.$functor"
+  }
+
+  def generateTraversableSynonym(n: Int): String = {
+    val traversable = mkFunctorLike("Traversable", n)
+    s"  type $traversable = traversable.$traversable"
   }
 
   def generateTraversables(maxArity: Int): String = {
@@ -174,9 +180,18 @@ object Main {
       Range.inclusive(1, maxArity).
         map(generateTraversableTraits).mkString("\n")
 
+    val synonyms =
+      Range.inclusive(1, maxArity).map(generateTraversableSynonym).mkString("\n")
+
     s"""|package creg
+        |package lib
+        |package traversable
+        |
         |import language.higherKinds
-        |import functors._
+        |
+        |trait Index {
+        |$synonyms
+        |}
         |
         |$traversable0Source
         |$individualTraversables
@@ -184,7 +199,7 @@ object Main {
   }
 
   def generateTraversableTraits(n: Int): String = {
-    val functor = mkFunctorLike("Functor", n)
+    val functor = mkFunctorLike("functor.Functor", n)
     val endofun = mkFunctorLike("Traversable", n)
     val bounded = mkFunctorLike("TraversableBounded", n)
     s"""|trait $endofun extends $functor with $bounded {${extraSource(n, extraTraversableHeaderSource)}
@@ -225,10 +240,10 @@ object Main {
     s"def fmap[${traverseParams(n)}](${fmapArgs(n)}): ${fmapResult(n)}"
 
   def traverseFmapImpl(n: Int): String =
-    s"traverse[${fmapParams(n)}](Applicative.Identity)(${mkIdentifiers(n).comma})"
+    s"traverse[${fmapParams(n)}](applicative.Applicative.Identity)(${mkIdentifiers(n).comma})"
 
   def traverseDef(n: Int): String =
-    s"def traverse[${traverseParams(n)}]($applicative : Applicative)" +
+    s"def traverse[${traverseParams(n)}]($applicative : applicative.Applicative)" +
   s"(${traverseArgs(n)}): ${traverseResult(n)}"
 
   def viewDef(n: Int): String = {
@@ -247,7 +262,7 @@ object Main {
     val baseMap          = traverseDomain(n)
     val fs               = mkIdentifiers(n).comma
     s"""|class View[$from]($mA : ${traverseDomain(n)}) {
-        |    def traverse[$to]($applicative : Applicative)(${traverseArgs(n)}):
+        |    def traverse[$to]($applicative : applicative.Applicative)(${traverseArgs(n)}):
         |        ${traverseCodomain(n)} =
         |      $bounded.this.traverse($applicative)($fs)($mA)
         |    def map[$to](${fmapArgs(n)}): ${fmapCodomain(n)} =
@@ -352,8 +367,16 @@ object Main {
 
   def fixSource: String =
     """|package creg
+       |package lib
+       |package fix
        |
        |import language.higherKinds
+       |
+       |trait Index {
+       |  type Fix[+F[+_]] = fix.Fix[F]
+       |  val  Fix : fix.Fix.type  = fix.Fix
+       |  val  Roll: fix.Roll.type = fix.Roll
+       |}
        |
        |// much as I would like to make `Fix` path-dependent
        |// on some functor, we need the type param `F` for
@@ -391,11 +414,17 @@ object Main {
 
   def applicativeSource: String =
     """|package creg
+       |package lib
+       |package applicative
        |
-       |import functors._
+       |trait Index {
+       |  type Applicative = applicative.Applicative
+       |  val  Applicative: applicative.Applicative.type = applicative.Applicative
+       |}
+       |
        |import language.higherKinds
        |
-       |trait Applicative extends Functor { self =>
+       |trait Applicative extends functor.Functor { self =>
        |  // Applicative functors are only defined on the entire Scala category.
        |  // It's hard to define applicative functors on subcategories because
        |  // a subcategory may not have exponentials (used in `call`).
@@ -405,9 +434,9 @@ object Main {
        |
        |  def fmap[A, B](f: A => B): Map[A] => Map[B] = x => call(pure(f), x)
        |
-       |  def roll[F[+_]](x: Map[F[Fix[F]]]): Map[Fix[F]] =
+       |  def roll[F[+_]](x: Map[F[fix.Fix[F]]]): Map[fix.Fix[F]] =
        |    call(
-       |      pure[F[Fix[F]] => Fix[F]](y => Roll(y)),
+       |      pure[F[fix.Fix[F]] => fix.Fix[F]](y => fix.Roll(y)),
        |      x)
        |
        |  def compose(that: Applicative):
@@ -469,6 +498,8 @@ object Main {
   def monadSource: String =
     """|package creg
        |
+       |import lib._
+       |
        |import language.higherKinds
        |
        |object Monad {
@@ -507,7 +538,7 @@ object Main {
        |  type ic[M[+_]] = Monad { type Map[+X] = M[X] }
        |}
        |
-       |trait Monad extends Applicative {
+       |trait Monad extends applicative.Applicative {
        |  type Map[+X]
        |
        |  // inherited from applicative
@@ -535,7 +566,7 @@ object Main {
     """|trait Traversable0 {
        |  type Map >: this.type
        |  type Range = Map
-       |  def traverse(G: Applicative)(): Map => G.Map[Map] = G pure _
+       |  def traverse(G: applicative.Applicative)(): Map => G.Map[Map] = G pure _
        |}
        |""".stripMargin
 
@@ -547,7 +578,7 @@ object Main {
        |  def compose(that: Traversable) =
        |    new Traversable {
        |      type Map[+A] = thisFunctor.Map[that.Map[A]]
-       |      def traverse[A, B](G: Applicative)(f: A => G.Map[B]):
+       |      def traverse[A, B](G: applicative.Applicative)(f: A => G.Map[B]):
        |          this.Map[A] => G.Map[this.Map[B]] =
        |        thisFunctor.traverse[that.Map[A], that.Map[B]](G)(that.traverse(G)(f))
        |    }
@@ -557,12 +588,12 @@ object Main {
     """|def mapReduce[A <: Cat0, B <: Cat0](f: A => B)(
        |    default: B, combine: (B, B) => B):
        |      Map[A] => B =
-       |    traverse[A, B](Applicative.Const(default, combine))(f)
+       |    traverse[A, B](applicative.Applicative.Const(default, combine))(f)
        |
        |  def crush[A <: Cat0](z: A, op: (A, A) => A): Map[A] => A = mapReduce(identity[A])(z, op)
        |
        |  def toList[A <: Cat0]: Map[A] => List[A] =
-       |    traverse(Applicative.FreeMonoid[A])((x: A) => List(x))
+       |    traverse(applicative.Applicative.FreeMonoid[A])((x: A) => List(x))
        |
        |  def fromList[A <: Cat0](children: List[A]): Map[A] => Map[A] =
        |    t => {
@@ -586,25 +617,32 @@ object Main {
        |      mapReduce(identity)(monoidId, monoidOp)
        |
        |    def mapReduce[B <: Cat0](f: A => B)(monoidId: B, monoidOp: (B, B) => B): B =
-       |      traverse(Applicative.Const(monoidId, monoidOp))(f)""".stripMargin
+       |      traverse(applicative.Applicative.Const(monoidId, monoidOp))(f)""".stripMargin
 
+  // TODO: repackage
   def foldableSource: String =
     """|package creg
+       |package lib
+       |package foldable
        |
        |import language.higherKinds
        |
+       |trait Index {
+       |  type Foldable[F[+_]] = foldable.Foldable[F]
+       |}
+       |
        |// constructor can't be path-dependent. this won't work:
        |//
-       |//   class Foldable(F: TraversableBounded.Endofunctor)(t: Fix[F.Map]) { ... }
+       |//   class Foldable(F: TraversableBounded.Endofunctor)(t: fix.Fix[F.Map]) { ... }
        |//
        |// implicit argument gives us at least the option not to write
        |//
        |//   new Foldable[TermF](t)(termF)
        |//
-       |class Foldable[F[+_]](term: Fix[F])(implicit F: Traversable { type Map[+A] = F[A] }) {
+       |class Foldable[F[+_]](term: fix.Fix[F])(implicit F: traversable.Traversable { type Map[+A] = F[A] }) {
        |  def fold[T](f: F[T] => T): T = {
-       |    object cata extends (Fix[F] => T) {
-       |      def apply(x: Fix[F]): T = f(F(x.unroll) map this)
+       |    object cata extends (fix.Fix[F] => T) {
+       |      def apply(x: fix.Fix[F]): T = f(F(x.unroll) map this)
        |    }
        |    cata(term)
        |  }

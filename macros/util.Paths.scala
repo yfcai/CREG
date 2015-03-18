@@ -13,26 +13,26 @@ trait Paths {
   // location of the Fix[_[_]] trait
   def getFix(c: Context) = {
     import c.universe._
-    tq"_root_.creg.Fix"
+    tq"_root_.creg.lib.fix.Fix"
   }
 
-  def getFixWithoutRoot: String = "creg.Fix"
+  def getFixWithoutRoot: String = "creg.lib.fix.Fix"
 
   def getRoll(c: Context) = c parse "_root_.creg.Roll"
 
   def getRecordOrVariant(c: Context): c.Tree = {
     import c.universe._
-    tq"_root_.creg.Fix.RecordOrVariant"
+    tq"_root_.creg.lib.fix.Fix.RecordOrVariant"
   }
 
   def getVariant(c: Context) = {
     import c.universe._
-    tq"_root_.creg.Fix.Variant"
+    tq"_root_.creg.lib.fix.Fix.Variant"
   }
 
   def getRecord(c: Context) = {
     import c.universe._
-    tq"_root_.creg.Fix.Record"
+    tq"_root_.creg.lib.fix.Fix.Record"
   }
 
   def getTraversableEndofunctor(c: Context, n: Int): c.Tree =
@@ -57,9 +57,9 @@ trait Paths {
     tq"_root_.creg.Applicative"
   }
 
-  def traversableEndofunctorTrait: String = "_root_.creg.Traversable"
-  def traversableEndofunctorOf: String = "_root_.creg.TraversableBounded.EndofunctorOf"
-  def boundedTraversableBoundedTrait: String = "_root_.creg.TraversableBounded"
+  def traversableEndofunctorTrait: String = "_root_.creg.lib.traversable.Traversable"
+  def traversableEndofunctorOf: String = "_root_.creg.lib.traversable.TraversableBounded.EndofunctorOf"
+  def boundedTraversableBoundedTrait: String = "_root_.creg.lib.traversable.TraversableBounded"
 
   def mappingOnObjects: String = "Map"
 

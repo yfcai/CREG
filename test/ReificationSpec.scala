@@ -3,7 +3,6 @@ package compiler
 
 import language.implicitConversions
 import org.scalatest._
-import creg._
 import creg.compiler.UniverseConstruction.Tests._
 import creg.compiler.DatatypeRepresentation._
 
@@ -30,13 +29,13 @@ class ReificationSpec extends FlatSpec {
   }
 
   it should "never create types with unbound names" in {
-    assert(unrollFix[Fix[({ type λ[+A] = A })#λ]] == "creg.Fix[[+A]A]")
+    assert(unrollFix[Fix[({ type λ[+A] = A })#λ]] == "creg.lib.fix.Fix[[+A]A]")
 
     assert(unrollFix[Fix[({ type λ[+A] = Fix[({ type λ[+B] = A })#λ] })#λ]] ==
-      "creg.Fix[[+B]creg.Fix[[+A]creg.Fix[[+B]A]]]")
+      "creg.lib.fix.Fix[[+B]creg.lib.fix.Fix[[+A]creg.lib.fix.Fix[[+B]A]]]")
 
     assert(unrollFix[Fix[({ type λ[+A] = Array[A] })#λ]] ==
-      "Array[creg.Fix[[+A]Array[A]]]")
+      "Array[creg.lib.fix.Fix[[+A]Array[A]]]")
   }
 
   it should "dealias properly" in {
