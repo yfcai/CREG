@@ -66,7 +66,6 @@ object Coerce {
 
   val intsF2 = listF2[Int]
 
-  // lists of integers of even length
   // like List[Int], except with half as many Rolls
   type Ints2 = Fix[intsF2.Map]
 
@@ -102,10 +101,9 @@ object Coerce {
 
 
   // non-solution: think of List[Int] as canonical;
-  // never produce incompatible datatypes like Ints
+  // never produce incompatible datatypes like Ints2
   //
-  // drawback: lose expressive power: can't express
-  // "lists of even length" as a datatype
+  // drawback: global restriction is hard to enforce.
   val pairs_canon: Int => List[Int] =
     n => coerce { pairs(n) }
 
