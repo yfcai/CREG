@@ -4,7 +4,7 @@ package traversable
 
 import language.higherKinds
 
-trait Index {
+private[creg] trait Index {
   type Traversable = traversable.Traversable
   type Traversable2 = traversable.Traversable2
   type Traversable3 = traversable.Traversable3

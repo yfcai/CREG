@@ -4,7 +4,7 @@ package foldable
 
 import language.higherKinds
 
-trait Index {
+private[creg] trait Index {
   type Foldable[F[+_]] = foldable.Foldable[F]
 }
 

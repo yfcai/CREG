@@ -4,7 +4,7 @@ package fix
 
 import language.higherKinds
 
-trait Index {
+private[creg] trait Index {
   type Fix[+F[+_]] = fix.Fix[F]
   val  Fix : fix.Fix.type  = fix.Fix
   val  Roll: fix.Roll.type = fix.Roll

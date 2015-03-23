@@ -5,7 +5,7 @@ package monad
 
 import language.higherKinds
 
-trait Index {
+private[creg] trait Index {
   val Monad: monad.Monad.type = monad.Monad
   type Monad = monad.Monad
   type MonadWithBind = monad.MonadWithBind

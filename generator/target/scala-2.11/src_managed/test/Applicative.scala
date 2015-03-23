@@ -2,7 +2,7 @@ package creg
 package lib
 package applicative
 
-trait Index {
+private[creg] trait Index {
   type Applicative = applicative.Applicative
   val  Applicative: applicative.Applicative.type = applicative.Applicative
 }
