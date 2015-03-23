@@ -1,6 +1,7 @@
-val sversion = "2.11.1"
+val sversion = "2.11.3"
 
-val options = Seq("-deprecation", "-feature", "-unchecked", "-Xlint")
+val options = Seq("-deprecation", "-feature", "-unchecked",
+  "-Xlint", "-Xlint:-type-parameter-shadow")
 
 resolvers ++= List("releases").map(Resolver.sonatypeRepo)
 
@@ -17,6 +18,10 @@ lazy val generator =
 )
 
 // creg macros
+
+val paradise = /* "paradise" */ s"paradise_$sversion"
+
+val paradiseVersion = "2.1.0-M5"
 
 // relevant for documentation generation
 val hardcodedGeneratedSourceDirectory: String =
@@ -37,7 +42,7 @@ lazy val macros = (project in file("macros")).dependsOn(
     "org.scala-lang" % "scala-compiler" % sversion,
     //
     // caution: must be a compilerPlugin!
-    compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") 
+    compilerPlugin("org.scalamacros" % paradise % paradiseVersion)
   ),
   //
   // directory of generated source.
@@ -63,6 +68,6 @@ lazy val test = project in file(".") dependsOn macros settings (
     "commons-codec" % "commons-codec" % "1.9",
     "org.scalatest" % "scalatest_2.11" % "2.1.4",
     "org.scala-lang" % "scala-compiler" % sversion, // for scala.tools.reflect.ToolBoxError
-    compilerPlugin("org.scalamacros" % s"paradise_$sversion" % "2.0.0") // caution: must be a compilerPlugin!
+    compilerPlugin("org.scalamacros" % paradise % paradiseVersion) // caution: must be a compilerPlugin!
   )
 )
