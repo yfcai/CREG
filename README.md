@@ -15,6 +15,11 @@ by [Yufei Cai et al.][project]
 5. Type `test` into the console to screen for errors.
 
 
+#### Documentation
+
+The [documentation][doc] is a work in progress.
+
+
 #### Navigation
 
 There are various interesting usage [examples][main].
@@ -38,6 +43,7 @@ found in the folder for [managed source files][managed].
 5. Improve error messages.
 
 
+[doc]:      http://yfcai.github.io/CREG/macros/target/scala-2.11/api/index.html#creg.package
 [sbt]:      http://www.scala-sbt.org/
 [tyranny]:  example/TyrannyOfTheDominantFunctor.scala
 [main]:     example/
