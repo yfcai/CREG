@@ -1,0 +1,156 @@
+<!DOCTYPE html >
+<html>
+        <head>
+          <title>root - _root_</title>
+          <meta name="description" content="root - root " />
+          <meta name="keywords" content="root root " />
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link href="lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="lib/jquery.js" id="jquery-js"></script>
+      <script type="text/javascript" src="lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="lib/template.js"></script>
+      <script type="text/javascript" src="lib/tools.tooltip.js"></script>
+      
+      <script type="text/javascript">
+         if(top === self) {
+            var url = 'index.html';
+            var hash = 'package';
+            var anchor = window.location.hash;
+            var anchor_opt = '';
+            if (anchor.length >= 1)
+              anchor_opt = '@' + anchor.substring(1);
+            window.location.href = url + '#' + hash + anchor_opt;
+         }
+   	  </script>
+    
+        </head>
+        <body class="value">
+      <div id="definition">
+        <img src="lib/package_big.png" />
+        
+        <h1>root package</h1> <span class="permalink">
+      <a href="index.html#package" title="Permalink" target="_top">
+        <img src="lib/permalink.png" />
+      </a>
+    </span>
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">root</span>
+      </span>
+      </h4>
+      
+          <div id="comment" class="fullcommenttop"></div>
+        
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input id="mbrsel-input" type="text" accesskey="/" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        
+
+        
+
+        <div id="values" class="values members">
+              <h3>Value Members</h3>
+              <ol><li name="_root_.creg" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="creg"></a>
+      <a id="creg:creg"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <a href="creg/package.html"><span class="name">creg</span></a>
+      </span>
+      </h4><span class="permalink">
+      <a href="index.html#package@creg" title="Permalink" target="_top">
+        <img src="lib/permalink.png" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Macros to generate regular functors; interfaces for
+applicative, monadic and traversable functors.</p><div class="fullcomment"><div class="comment cmt"><p>Macros to generate regular functors; interfaces for
+applicative, monadic and traversable functors.</p><h4>Usage Example</h4><p>The macro <a href="creg/data.html" class="extype" name="creg.data">@data</a> generates datatypes.
+The syntax is similar to datatype declarations in Haskell
+with record constructors and explicit recursion.</p><pre>@data <span class="kw">def</span> <span class="std">List</span>[A] =
+  Fix(list <span class="kw">=&gt;</span>
+    ListT {
+      Nil
+      Cons(head = A, tail = list)
+    }
+  )
+
+<span class="cmt">// In Haskell:</span>
+<span class="cmt">//</span>
+<span class="cmt">// data List a = Nil</span>
+<span class="cmt">//             | Cons { head :: a, tail :: List a }</span></pre><p>The macro <a href="creg/coerce$.html" class="extype" name="creg.coerce">coerce</a> is used to define datatype literals.
+Type annotation is mandatory for the result type of <a href="creg/coerce$.html" class="extype" name="creg.coerce">coerce</a>.</p><pre><span class="kw">val</span> xs: <span class="std">List</span>[<span class="std">Int</span>] = coerce { Cons(<span class="num">1</span>, Cons(<span class="num">2</span>, Cons(<span class="num">3</span>, Cons(<span class="num">4</span>, Nil)))) }</pre><p>The macro <a href="creg/functor.html" class="extype" name="creg.functor">@functor</a> generates regular functors
+with the interface of
+<a href="creg/lib/traversable/Traversable.html" class="extype" name="creg.lib.traversable.Traversable">Traversable</a> functors.
+The syntax is identical to the declaration of datatypes.</p><pre>@functor <span class="kw">def</span> elemF[A] =
+  Fix(list <span class="kw">=&gt;</span> ListT { Nil ; Cons(head = A, tail = list) })
+
+<span class="cmt">// In Haskell:</span>
+<span class="cmt">//</span>
+<span class="cmt">// instance Functor List where</span>
+<span class="cmt">//   fmap f Nil         = Nil</span>
+<span class="cmt">//   fmap f (Cons x xs) = Cons (f x) (fmap f xs)</span>
+
+<span class="cmt">// instance Traversable List where</span>
+<span class="cmt">//   traverse f Nil         = pure Nil</span>
+<span class="cmt">//   traverse f (Cons x xs) = Cons <$> f x <*> traverse f xs</span></pre><p>Regular functors can be applied to datatype values to view them
+as containers.</p><pre>elemF(xs) map (_ + <span class="num">1</span>) <span class="cmt">// the list 2, 3, 4, 5</span>
+
+elemF(xs) reduce (<span class="num">0</span>, _ + _) <span class="cmt">// 10</span></pre><p>Regular functors have methods
+<a href="creg/lib/functor/Functor.html#fmap[A,B](a:A=&gt;B):Functor.this.Map[A]=&gt;Functor.this.Map[B]" class="extmbr" name="creg.lib.functor.Functor#fmap">fmap</a> and
+<a href="creg/lib/traversable/Traversable.html#traverse[A&lt;:TraversableBounded.this.Cat0,B&lt;:TraversableBounded.this.Cat0](_G:creg.lib.applicative.Applicative)(a:A=&gt;_G.Map[B]):TraversableBounded.this.Map[A]=&gt;_G.Map[TraversableBounded.this.Map[B]]" class="extmbr" name="creg.lib.traversable.Traversable#traverse">traverse</a> similar
+to fmap and traverse in Haskell.</p><pre>elemF.fmap[<span class="std">Int</span>, <span class="std">Int</span>](_ + <span class="num">1</span>)(xs) <span class="cmt">// the list 2, 3, 4, 5</span>
+
+elemF.traverse[<span class="std">Int</span>, <span class="std">Int</span>](Applicative.Const(<span class="num">0</span>, _ + _))(identity)(xs) <span class="cmt">// 10</span></pre></div></div>
+    </li></ol>
+            </div>
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>
