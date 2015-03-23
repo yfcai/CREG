@@ -8,7 +8,7 @@ resolvers ++= List("releases").map(Resolver.sonatypeRepo)
 // generate Traversable, Traversable2, Traversable3, etc
 
 lazy val generator =
-  project in file("traversableGeneration") settings (
+  project in file("generator") settings (
   Seq(
     scalaVersion := sversion,
     scalacOptions := options,
