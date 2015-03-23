@@ -18,8 +18,9 @@ lazy val generator =
 
 // creg macros
 
+// relevant for documentation generation
 val hardcodedGeneratedSourceDirectory: String =
-  "../traversableGeneration/target/scala-2.11/src_managed/test"
+  "../generator/target/scala-2.11/src_managed/test"
 
 lazy val macros = (project in file("macros")).dependsOn(
   generator % "compile->test"
@@ -41,6 +42,8 @@ lazy val macros = (project in file("macros")).dependsOn(
   //
   // directory of generated source.
   // anything better than this hard-coded path?
+  // (only noticeable in documentation generation;
+  // compiles fine also without this line.)
   unmanagedSourceDirectories in Compile <+= baseDirectory {
     _ / hardcodedGeneratedSourceDirectory
   }
