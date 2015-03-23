@@ -67,7 +67,7 @@ trait TraversableBounded {
 
   def fromList[A <: Cat0](children: List[A]): Map[A] => Map[A] =
     t => {
-      import Monad.State._
+      import monad.Monad.State._
       evalState(
         traverse(stateMonad[List[A]])({
           (oldChild: A) => for {

@@ -5,8 +5,9 @@
 import creg.lib._
 
 package object creg
-    extends fix.Index
-    with functor.Index
+    extends applicative.Index
+    with fix.Index
     with foldable.Index
-    with applicative.Index
+    with functor.Index
+    with monad.Index
     with traversable.Index

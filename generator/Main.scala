@@ -497,10 +497,17 @@ object Main {
 
   def monadSource: String =
     """|package creg
+       |package lib
+       |package monad
        |
-       |import lib._
        |
        |import language.higherKinds
+       |
+       |trait Index {
+       |  val Monad: monad.Monad.type = monad.Monad
+       |  type Monad = monad.Monad
+       |  type MonadWithBind = monad.MonadWithBind
+       |}
        |
        |object Monad {
        |  object State {
@@ -597,7 +604,7 @@ object Main {
        |
        |  def fromList[A <: Cat0](children: List[A]): Map[A] => Map[A] =
        |    t => {
-       |      import Monad.State._
+       |      import monad.Monad.State._
        |      evalState(
        |        traverse(stateMonad[List[A]])({
        |          (oldChild: A) => for {
