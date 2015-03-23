@@ -48,12 +48,22 @@ import creg.lib._
   * //   traverse f (Cons x xs) = Cons <$> f x <*> traverse f xs
   * }}}
   *
-  * Functors can be applied to datatype values to view them
+  * Regular functors can be applied to datatype values to view them
   * as containers.
   * {{{
   * elemF(xs) map (_ + 1) // the list 2, 3, 4, 5
   *
   * elemF(xs) reduce (0, _ + _) // 10
+  * }}}
+  *
+  * Regular functors have methods
+  * [[creg.lib.functor.Functor.fmap fmap]] and
+  * [[creg.lib.traversable.Traversable.traverse traverse]] similar
+  * to fmap and traverse in Haskell.
+  * {{{
+  * elemF.fmap[Int, Int](_ + 1)(xs) // the list 2, 3, 4, 5
+  *
+  * elemF.traverse[Int, Int](Applicative.Const(0, _ + _))(identity)(xs) // 10
   * }}}
   */
 package object creg
