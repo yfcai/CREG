@@ -42,10 +42,10 @@ found in the folder for [managed source files][managed].
 [tyranny]:  example/TyrannyOfTheDominantFunctor.scala
 [main]:     example/
 [project]:  http://ps.informatik.uni-tuebingen.de/research/functors/
-[appl]:     traversableGeneration/target/scala-2.11/src_managed/test/Applicative.scala
+[appl]:     generator/target/scala-2.11/src_managed/test/Applicative.scala
 [banana]:   example/Banana.scala
-[fix]:      traversableGeneration/target/scala-2.11/src_managed/test/Fix.scala
-[functor]:  traversableGeneration/target/scala-2.11/src_managed/test/Functors.scala
+[fix]:      generator/target/scala-2.11/src_managed/test/Fix.scala
+[functor]:  generator/target/scala-2.11/src_managed/test/Functors.scala
 [macros]:   macros
-[managed]:  traversableGeneration/target/scala-2.11/src_managed/test
-[trav]:     traversableGeneration/target/scala-2.11/src_managed/test/Traversable.scala
+[managed]:  generator/target/scala-2.11/src_managed/test
+[trav]:     generator/target/scala-2.11/src_managed/test/Traversable.scala
