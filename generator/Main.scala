@@ -8,8 +8,6 @@ object Main {
 
     deleteIrrelevantFiles(base)
 
-    /**
-      */
     if (shouldGenerate(base))
       generateAndExport(base)
     else
@@ -159,7 +157,7 @@ object Main {
     val synonyms =
       Range.inclusive(1, maxArity).map(generateFunctorSynonym).mkString("\n")
 
-    s"""|trait Index {
+    s"""|private[creg] trait Index {
         |$synonyms
         |}
         |""".stripMargin
@@ -189,7 +187,7 @@ object Main {
         |
         |import language.higherKinds
         |
-        |trait Index {
+        |private[creg] trait Index {
         |$synonyms
         |}
         |
@@ -372,7 +370,7 @@ object Main {
        |
        |import language.higherKinds
        |
-       |trait Index {
+       |private[creg] trait Index {
        |  type Fix[+F[+_]] = fix.Fix[F]
        |  val  Fix : fix.Fix.type  = fix.Fix
        |  val  Roll: fix.Roll.type = fix.Roll
@@ -417,7 +415,7 @@ object Main {
        |package lib
        |package applicative
        |
-       |trait Index {
+       |private[creg] trait Index {
        |  type Applicative = applicative.Applicative
        |  val  Applicative: applicative.Applicative.type = applicative.Applicative
        |}
@@ -503,7 +501,7 @@ object Main {
        |
        |import language.higherKinds
        |
-       |trait Index {
+       |private[creg] trait Index {
        |  val Monad: monad.Monad.type = monad.Monad
        |  type Monad = monad.Monad
        |  type MonadWithBind = monad.MonadWithBind
@@ -634,7 +632,7 @@ object Main {
        |
        |import language.higherKinds
        |
-       |trait Index {
+       |private[creg] trait Index {
        |  type Foldable[F[+_]] = foldable.Foldable[F]
        |}
        |

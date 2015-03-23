@@ -3,7 +3,7 @@ package lib
 package functor
 import language.higherKinds
 
-trait Index {
+private[creg] trait Index {
   type Functor = functor.Functor
   type Functor2 = functor.Functor2
   type Functor3 = functor.Functor3
