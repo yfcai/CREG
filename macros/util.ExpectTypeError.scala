@@ -4,6 +4,7 @@ package util
 import scala.reflect.macros.blackbox.Context
 import scala.tools.reflect.ToolBoxError
 
+private[creg]
 trait ExpectCompilerError {
   def expectCompilerError(c: Context)(tree: c.Tree): c.Expr[String] = {
     import c.universe._

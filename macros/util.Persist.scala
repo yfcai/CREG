@@ -11,6 +11,7 @@ import org.apache.commons.codec.binary.Base64
 import scala.reflect.macros.blackbox.Context
 import scala.reflect.runtime.universe.{ TypeTag => Tag }
 
+private[creg]
 trait Persist {
   def persist[T <: Serializable : Tag](c: Context)(obj: T): c.Tree = {
     import c.universe._

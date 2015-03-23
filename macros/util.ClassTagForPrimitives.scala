@@ -9,6 +9,7 @@ package creg.util
 
 import reflect._
 
+private[creg]
 object ClassTagForPrimitives {
   implicit class ClassTagWithPrimitiveUnderConsideration[A](t: ClassTag[A]) extends ClassTag[A] {
     override def runtimeClass = t.runtimeClass

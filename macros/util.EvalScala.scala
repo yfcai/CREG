@@ -4,6 +4,7 @@ package util
 import scala.reflect.runtime.universe
 import scala.tools.reflect.ToolBox
 
+private[creg]
 trait EvalScala {
   def evalScala(scopeObject: Any, scalaCode: String): Any = {
     val toolbox = getToolBox(scopeObject)

@@ -1,3 +1,5 @@
+package creg
+
 import org.scalatest._
 import creg.compiler._
 import creg._

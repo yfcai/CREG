@@ -1,5 +1,6 @@
+package creg.experiment
+
 import org.scalatest._
-import creg.experiment._
 
 import scala.language.experimental.macros
 

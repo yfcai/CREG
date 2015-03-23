@@ -12,11 +12,15 @@ import scala.reflect.macros.blackbox.Context
 // as a type argument. The parse result w.r.t. context c will have
 // type `Result[A, c.Position]`.
 
+private[creg]
 sealed case class Success[+A](get: A) extends Result[A, Nothing]
+
+private[creg]
 sealed case class Failure[+Position](pos: Position, message: String) extends Result[Nothing, Position] {
   def get: Nothing = sys error s"Failure.get\n\n$pos\n\n$message\n"
 }
 
+private[creg]
 sealed trait Result[+A, +Pos] {
   def get: A
 
@@ -43,6 +47,7 @@ sealed trait Result[+A, +Pos] {
   }
 }
 
+private[creg]
 trait Parser[Gamma, +A] {
   self =>
 
@@ -61,10 +66,12 @@ trait Parser[Gamma, +A] {
   }
 }
 
+private[creg]
 trait MultiParser[Gamma, +A] {
   def parse(c: Context, gamma: Gamma)(inputs: List[c.Tree]): Result[List[A], c.Position]
 }
 
+private[creg]
 case class ZeroOrMore[Gamma, +A](parser: Parser[Gamma, A])
     extends MultiParser[Gamma, A]
 {
@@ -84,6 +91,7 @@ case class ZeroOrMore[Gamma, +A](parser: Parser[Gamma, A])
   }
 }
 
+private[creg]
 case class OneOrMore[Gamma, A](things: String, parser: Parser[Gamma, A])
     extends MultiParser[Gamma, A]
 {

@@ -5,6 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import contextReaderParser._
 
+private[creg]
 trait Parsers extends util.AbortWithError with util.Paths {
   /** GRAMMAR FOR DATATYPE DECL WITH EXPLICIT FIXED POINTS
     *
@@ -370,6 +371,7 @@ trait Parsers extends util.AbortWithError with util.Paths {
   }
 }
 
+private[creg]
 object Parsers extends util.Persist with Parsers {
   import scala.language.experimental.macros
   import scala.annotation.StaticAnnotation

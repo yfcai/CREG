@@ -39,6 +39,7 @@ package compiler
 import scala.reflect.macros.blackbox.Context
 import DatatypeRepresentation._
 
+private[creg]
 trait Denotation extends UniverseConstruction with util.Traverse {
   private[this] type Env = Many[Name]
 

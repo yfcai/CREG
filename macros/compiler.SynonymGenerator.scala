@@ -5,6 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
+private[creg]
 trait SynonymGenerator extends UniverseConstruction {
   def generateSynonyms(c: Context)(data: DataConstructor): Many[c.Tree] = {
     Many(generateTopLevelSynonym(c)(data)) ++

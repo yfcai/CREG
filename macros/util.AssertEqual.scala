@@ -5,6 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import compiler.DatatypeRepresentation.Many
 
+private[creg]
 trait AssertEqual {
   def assertEqualBlock(c: Context)(expected: c.Tree, actual: Many[c.Tree]): c.Expr[Any] = {
     import c.universe._

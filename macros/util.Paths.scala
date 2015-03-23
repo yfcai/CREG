@@ -4,6 +4,7 @@ package util
 import scala.reflect.macros.blackbox.Context
 import compiler.DatatypeRepresentation.Many
 
+private[creg]
 trait Paths {
   def getIdentity(c: Context): c.Tree = {
     import c.universe._

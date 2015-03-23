@@ -4,6 +4,7 @@ package util
 import java.util.regex.{Pattern, Matcher}
 import compiler.DatatypeRepresentation.Name
 
+private[creg]
 trait TupleIndex {
   def tupleIndex(name: Name): Option[Int] = {
     val pattern = Pattern compile """_(\d+)"""

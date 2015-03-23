@@ -5,7 +5,8 @@ import scala.reflect.macros.blackbox.Context
 
 import DatatypeRepresentation._
 
-trait DeclarationGenerator extends UniverseConstruction with util.Traverse with util.Traits {
+private[creg] trait DeclarationGenerator
+extends UniverseConstruction with util.Traverse with util.Traits {
   def generateDeclarations(c: Context)(data: Datatype, declaredSupers: Many[c.Tree]):
       Many[c.Tree] =
     generateClasses(c)(data, declaredSupers) ++ generatePrimitives(c)(data)

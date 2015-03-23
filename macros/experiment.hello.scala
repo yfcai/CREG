@@ -7,6 +7,7 @@ import scala.annotation.StaticAnnotation
 
 // hello-world annotation macro, taken from somewhere on the internet
 
+private[experiment]
 object hello {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
@@ -35,6 +36,7 @@ object hello {
   }
 }
 
+private[experiment]
 class hello extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro hello.impl
 }

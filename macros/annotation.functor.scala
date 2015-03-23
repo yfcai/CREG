@@ -18,6 +18,7 @@ package annotation
 import scala.reflect.macros.blackbox.Context
 import compiler._
 
+private[creg]
 object functor extends Parsers with Denotation with util.AbortWithError {
   def impl(c: Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._

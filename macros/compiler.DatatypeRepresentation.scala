@@ -3,6 +3,7 @@ package compiler
 
 import Applicative._
 
+private[creg]
 object DatatypeRepresentation {
   // name of records, variants, fields
   type Name = String

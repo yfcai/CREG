@@ -6,6 +6,7 @@ package util
 import scala.reflect.macros.blackbox.Context
 import compiler.DatatypeRepresentation.{Many, Name}
 
+private[creg]
 trait Traits {
   def nameParamsSupersMembers(c: Context)(tree: c.Tree):
       Option[(c.TypeName, List[c.universe.TypeDef], List[c.Tree], List[c.Tree])] = {

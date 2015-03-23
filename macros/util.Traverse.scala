@@ -5,6 +5,7 @@ import scala.reflect.macros.blackbox.Context
 
 import compiler.DatatypeRepresentation.{Record, Many}
 
+private[creg]
 trait Traverse extends Paths {
   /** from record, create `case recordName @ Record(fieldNames @ _*) => body`
     * where body = mkBody(recordName, fieldNames)

@@ -6,6 +6,7 @@ import scala.reflect.macros.TypecheckException
 
 import DatatypeRepresentation._
 
+private[creg]
 trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with util.Paths {
 
   // ====================== //
@@ -209,6 +210,7 @@ trait UniverseConstruction extends util.AbortWithError with util.TupleIndex with
     getFixWithoutRoot == tpe.typeConstructor.typeSymbol.fullName
 }
 
+private[creg]
 object UniverseConstruction {
   object Tests extends UniverseConstruction with Parsers with util.AssertEqual with util.Persist {
     import language.experimental.macros

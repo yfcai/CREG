@@ -8,6 +8,7 @@ import scala.annotation.StaticAnnotation
 import compiler._
 import DatatypeRepresentation._
 
+private[creg]
 object synonym
 extends Parsers
    with DeclarationGenerator
