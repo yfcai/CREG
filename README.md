@@ -20,7 +20,7 @@ by [Yufei Cai et al.][project]
     )
 
     libraryDependencies ++= Seq(
-      "com.github.yfcai" %% "creg" % "0.1.1",
+      "com.github.yfcai" %% "creg" % "0.1.2",
       compilerPlugin("org.scalamacros" % "paradise_2.11.3" % "2.1.0-M5")
     )
     ```
