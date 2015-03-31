@@ -1,55 +1,6 @@
 import SonatypeKeys._
 
-sonatypeSettings
-
-organization := "ps.informatik.uni-tuebingen.de"
-
-profileName := "com.github.yfcai"
-
-version := "0.1.0"
-
-publishMavenStyle := true
-
-pomIncludeRepository := { _ => false }
-
-publishTo := {
-  val nexus = "https://oss.sonatype.org/"
-  if (isSnapshot.value)
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
-
-pomExtra := {
-  <groupId>com.github.yfcai</groupId>
-  <artifactId>creg</artifactId>
-  <name>CREG</name>
-  <description>Scala library for first-class
-    regular functors, with macros.</description>
-  <url>http://ps.informatik.uni-tuebingen.de/research/functors/</url>
-  <licenses>
-    <license>
-      <name>MIT License</name>
-      <url>http://www.opensource.org/licenses/mit-license.php</url>
-    </license>
-  </licenses>
-  <scm>
-    <connection>scm:git:github.com/yfcai/CREG.git</connection>
-    <developerConnection>scm:git:git@github.com:yfcai/CREG.git</developerConnection>
-    <url>git@github.com/yfcai/CREG/</url>
-  </scm>
-  <developers>
-    <developer>
-      <name>Yufei Cai</name>
-      <email>yufei.cai@uni-tuebingen.de</email>
-      <organization>Lehrstuhl Programmiersprachen und Softwaretechnik,
-         Karl Eberhards Universität Tübingen</organization>
-      <organizationUrl>http://ps.informatik.uni-tuebingen.de/</organizationUrl>
-    </developer>
-  </developers>
-}
-
-
+val cregVersion = "0.1.1"
 
 val sversion = "2.11.3"
 
@@ -82,7 +33,7 @@ val hardcodedGeneratedSourceDirectory: String =
 
 lazy val creg = Project("creg", file("creg")).dependsOn(
   generator % "compile->test"
-).settings(
+).settings(Seq(
   //managedSourceDirectories in Compile <++=
   //  generator.configurations.find(_.name == "")
   scalaVersion := sversion,
@@ -108,8 +59,42 @@ lazy val creg = Project("creg", file("creg")).dependsOn(
   //
   // publish this project
   publishArtifact in Compile := true,
-  publishArtifact in Test := false
-)
+  publishArtifact in Test := false,
+  publishTo := {
+    val nexus = "https://oss.sonatype.org/"
+    if (isSnapshot.value)
+      Some("snapshots" at nexus + "content/repositories/snapshots")
+    else
+      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+  },
+  organization := "com.github.yfcai",
+  version := cregVersion,
+  publishMavenStyle := true,
+  pomIncludeRepository := { _ => false },
+  pomExtra := {
+    <url>http://ps.informatik.uni-tuebingen.de/research/functors/</url>
+        <licenses>
+    <license>
+    <name>MIT License</name>
+    <url>http://www.opensource.org/licenses/mit-license.php</url>
+        </license>
+    </licenses>
+    <scm>
+    <connection>scm:git:github.com/yfcai/CREG.git</connection>
+    <developerConnection>scm:git:git@github.com:yfcai/CREG.git</developerConnection>
+    <url>git@github.com/yfcai/CREG/</url>
+    </scm>
+    <developers>
+    <developer>
+    <name>Yufei Cai</name>
+    <email>yufei.cai@uni-tuebingen.de</email>
+    <organization>Lehrstuhl Programmiersprachen und Softwaretechnik,
+    Karl Eberhards Universitaet Tuebingen</organization>
+    <organizationUrl>http://ps.informatik.uni-tuebingen.de/</organizationUrl>
+        </developer>
+    </developers>
+  }
+) ++ sonatypeSettings : _*)
 
 
 // tests
