@@ -1,11 +1,10 @@
-package traversableGeneration
+package creg
+package generator
 
 import java.io.{ File, FileWriter }
 
-object Main {
-  def main(args: Array[String]) {
-    val Array(base, classOutput) = args take 2 map (new File(_))
-
+object Generator {
+  def run(base: File) {
     deleteIrrelevantFiles(base)
 
     if (shouldGenerate(base))

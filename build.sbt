@@ -10,17 +10,6 @@ val options = Seq("-deprecation", "-feature", "-unchecked",
 resolvers ++= List("releases").map(Resolver.sonatypeRepo)
 
 
-// generate Traversable, Traversable2, Traversable3, etc
-
-lazy val generator =
-  project in file("generator") settings (
-  Seq(
-    scalaVersion := sversion,
-    scalacOptions := options,
-    publishArtifact := false
-  ) ++ generationSettings: _*
-)
-
 // creg macros
 
 val paradise = /* "paradise" */ s"paradise_$sversion"
@@ -28,12 +17,9 @@ val paradise = /* "paradise" */ s"paradise_$sversion"
 val paradiseVersion = "2.1.0-M5"
 
 // relevant for documentation generation
-val hardcodedGeneratedSourceDirectory: String =
-  "../generator/target/scala-2.11/src_managed/test"
+val hardcodedGeneratedSourceDirectory: String = "lib"
 
-lazy val creg = Project("creg", file("creg")).dependsOn(
-  generator % "compile->test"
-).settings(Seq(
+lazy val creg = project in file("creg") settings(Seq(
   //managedSourceDirectories in Compile <++=
   //  generator.configurations.find(_.name == "")
   scalaVersion := sversion,
