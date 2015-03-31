@@ -80,10 +80,10 @@ trait SynonymGenerator extends UniverseConstruction {
 
   def generatePatternFunctorSynonym(c: Context)(genericFixedPoint: DataConstructor): Option[c.Tree] =
     genericFixedPoint match {
-      case DataConstructor(_, genericParams, fixed @ FixedPoint(_, _)) =>
+      case DataConstructor(dataName, genericParams, fixed @ FixedPoint(_, _)) =>
         import c.universe._
         val DataConstructor(lowerCaseName, recursiveParams, datatypeBody) = fixed.patternFunctor
-        val patternFunctorTypeName = TypeName(lowerCaseName.capitalize)
+        val patternFunctorTypeName = TypeName(appendF(dataName))
         val typeParams = mkTypeDefs(c)(genericParams ++ recursiveParams)
         val rhs = generateRHS(c)(datatypeBody)
         Some(q"type $patternFunctorTypeName [ ..$typeParams ] = $rhs")
