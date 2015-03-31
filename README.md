@@ -11,17 +11,19 @@ by [Yufei Cai et al.][project]
 
 2. Create a project directory with the following `build.sbt`:
 
-        scalaVersion := "2.11.3"
+    ```scala
+    scalaVersion := "2.11.3"
 
-        resolvers ++= Seq(
-          Resolver.sonatypeRepo("releases"),
-          Resolver.sonatypeRepo("snapshots")
-        )
+    resolvers ++= Seq(
+      Resolver.sonatypeRepo("releases"),
+      Resolver.sonatypeRepo("snapshots")
+    )
 
-        libraryDependencies ++= Seq(
-          "com.github.yfcai" %% "creg" % "0.1.1",
-          compilerPlugin("org.scalamacros" % "paradise_2.11.3" % "2.1.0-M5")
-        )
+    libraryDependencies ++= Seq(
+      "com.github.yfcai" %% "creg" % "0.1.1",
+      compilerPlugin("org.scalamacros" % "paradise_2.11.3" % "2.1.0-M5")
+    )
+    ```
 
 
 #### Usage example
