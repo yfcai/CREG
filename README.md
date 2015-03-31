@@ -8,11 +8,70 @@ by [Yufei Cai et al.][project]
 #### Installation
 
 1. Download and install [simple-build-tool][sbt].
-2. Run `sbt` here. Make sure the computer is connected to the internet.
-3. Type `compile` into the console to build everything.
-   It will take 2--5 minutes the first time around.
-4. Type `run` into the console to execute [main class][tyranny].
-5. Type `test` into the console to screen for errors.
+
+2. Create a project directory with the following `build.sbt`:
+
+       scalaVersion := "2.11.3"
+
+       resolvers ++= Seq(
+         Resolver.sonatypeRepo("releases"),
+         Resolver.sonatypeRepo("snapshots")
+       )
+
+       libraryDependencies ++= Seq(
+         "com.github.yfcai" %% "creg" % "0.1.1",
+         compilerPlugin("org.scalamacros" % "paradise_2.11.3" % "2.1.0-M5")
+       )
+
+
+#### Usage example
+
+Suppose there is a correct `build.sbt` in the current directory.
+
+```scala
+[demo]$ sbt
+[info] Loading global plugins from $HOME/.sbt/0.13/plugins
+[info] Set current project to demo (in build file:$HOME/demo/)
+> console
+[info] Updating {file:$HOME/demo/}demo...
+[info] Resolving jline#jline;2.12 ...
+[info] downloading https://oss.sonatype.org/content/repositories/releases/com/github/yfcai/creg_2.11/0.1.2/creg_2.11-0.1.2.jar ...
+[info] 	[SUCCESSFUL ] com.github.yfcai#creg_2.11;0.1.2!creg_2.11.jar (1548ms)
+[info] Done updating.
+[info] Starting scala interpreter...
+[info]
+Welcome to Scala version 2.11.3 (Java HotSpot(TM) 64-Bit Server VM, Java 1.7.0_71).
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala> import creg._
+import creg._
+
+scala> @data def List[A] = Fix(L => ListT { Nil ; Cons(head = A, tail = L) })
+import _root_.scala.language.higherKinds
+import _root_.scala.language.implicitConversions
+defined trait ListT
+defined trait Nil
+defined object Nil
+defined class Cons
+defined object Cons
+defined object ListT
+defined type alias List
+defined type alias ListF
+
+scala> val xs: List[Int] = coerce { Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) }
+xs: List[Int] = Roll(Cons(1,Roll(Cons(2,Roll(Cons(3,Roll(Cons(4,Roll(Nil)))))))))
+
+scala> @functor def elemF[A] = Fix(L => ListT { Nil ; Cons(head = A, tail = L) })
+elemF: creg.lib.traversable.Traversable{...}
+
+
+scala> elemF(xs) map (_ * 2)
+res0: elemF.Map[Int] = Roll(Cons(2,Roll(Cons(4,Roll(Cons(6,Roll(Cons(8,Roll(Nil)))))))))
+
+scala> elemF(xs) reduce (0, _ + _)
+res1: Int = 10
+```
 
 
 #### Documentation
@@ -32,9 +91,6 @@ The interfaces [Functor][functor], [Applicative][appl],
 found in the folder for [managed source files][managed].
 
 #### Plan
-
-2. Upload a jar to some binary distribution service so that
-   installation would not traumatize innocent people.
 
 3. Document [examples][main] better.
 
