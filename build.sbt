@@ -1,6 +1,6 @@
 import SonatypeKeys._
 
-val cregVersion = "0.1.1"
+val cregVersion = "0.1.2"
 
 val sversion = "2.11.3"
 
